@@ -39,6 +39,8 @@ interface GraphState {
   /** Drop-to-add: places the node at `position`, optionally inside `parentId`. */
   addNodeAt: (type: ResourceType, position: XYPosition, parentId?: string) => void
   removeNode: (id: string) => void
+  /** Updates a single key in a node's `data.config` (Inspector edits). */
+  updateNodeConfig: (id: string, key: string, value: unknown) => void
   setNodes: (nodes: ResourceNodeType[]) => void
   setEdges: (edges: Edge[]) => void
   setSelected: (id: string | null) => void
@@ -76,7 +78,11 @@ const initialNodes: ResourceNodeType[] = [
     position: { x: 40, y: 70 },
     parentId: 'subnet-1',
     extent: 'parent',
-    data: { type: 'ec2', label: 'EC2 Instance', config: { instance_type: 't3.micro' } },
+    data: {
+      type: 'ec2',
+      label: 'EC2 Instance',
+      config: { instance_type: 't3.micro', ami: 'ami-0abcd1234ef567890' },
+    },
   },
 ]
 
@@ -172,6 +178,15 @@ export const useGraphStore = create<GraphState>((set) => ({
             : state.selectedNodeId,
       }
     }),
+
+  updateNodeConfig: (id, key, value) =>
+    set((state) => ({
+      nodes: state.nodes.map((n) =>
+        n.id === id
+          ? { ...n, data: { ...n.data, config: { ...n.data.config, [key]: value } } }
+          : n,
+      ),
+    })),
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),

@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react'
 import { getResource } from '@/resources'
 import { useGraphStore } from '@/store/useGraphStore'
 import { MissionPanel } from './MissionPanel'
+import { PropertyForm } from './PropertyForm'
 
 /** The selected-node detail view — shared by the desktop aside and the mobile drawer. */
 export function InspectorBody() {
@@ -20,12 +21,23 @@ export function InspectorBody() {
             </div>
             <div className="mt-1 flex items-center gap-2">
               {(() => {
-                const Icon = getResource(node.data.type).icon
-                return <Icon size={18} className={getResource(node.data.type).color} />
+                const meta = getResource(node.data.type)
+                const Icon = meta.icon
+                const invalid = (meta.validate?.(node.data.config) ?? []).length > 0
+                return (
+                  <>
+                    <Icon size={18} className={meta.color} />
+                    <span className="text-sm font-medium text-slate-100">
+                      {node.data.label}
+                    </span>
+                    {invalid && (
+                      <span className="rounded-full bg-rose-900/70 px-2 py-0.5 text-[10px] font-semibold text-rose-200">
+                        오류
+                      </span>
+                    )}
+                  </>
+                )
               })()}
-              <span className="text-sm font-medium text-slate-100">
-                {node.data.label}
-              </span>
             </div>
           </div>
 
@@ -40,10 +52,7 @@ export function InspectorBody() {
             </div>
           </dl>
 
-          {/* Phase 2: property editing form goes here. */}
-          <p className="text-[11px] italic text-slate-600">
-            속성 편집은 이후 단계에서 제공됩니다.
-          </p>
+          <PropertyForm node={node} />
 
           <button
             type="button"

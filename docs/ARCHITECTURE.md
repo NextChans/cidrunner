@@ -113,13 +113,25 @@ interface ResourceMeta {
   container?: boolean                          // holds child nodes (VPC, Subnet)
   defaultSize?: { width; height }              // container size on create
   connectsTo?: ResourceType[]                  // directional edge targets
+  fields?: PropertyField[]                     // Inspector form descriptor (Phase 2)
   terraform: (id, config) => string            // Phase 4 — stubbed
-  validate?: (config) => string[]              // Phase 2/3 — optional
+  validate?: (config) => string[]              // real-time validation (Phase 2)
 }
 ```
 
 The MVP set is fixed at **10** resources — see
 [ADR 0001](decisions/0001-mvp-scope-and-resource-list.md).
+
+## Property editing & validation
+
+The Inspector's form is data-driven (Phase 2): `PropertyForm` reads a resource's
+`fields` (`text` / `number` / `boolean` / `select`) and writes edits back through
+the store's `updateNodeConfig`. `ResourceMeta.validate` runs on every render for
+real-time feedback — errors show as a red badge + message list in the Inspector
+and a red outline on the node. Reusable checks live in
+[`src/resources/validators.ts`](../src/resources/validators.ts). Security Group
+rules are simplified to inbound toggles — see
+[ADR 0011](decisions/0011-inspector-property-form-and-validation.md).
 
 ## Graph rules
 

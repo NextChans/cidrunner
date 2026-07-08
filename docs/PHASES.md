@@ -62,19 +62,23 @@ correctly (VPC ▸ Subnet ▸ EC2/RDS …), and constrain edges by direction/typ
 
 ---
 
-## Phase 2 — Inspector property editor & validation ⏳
+## Phase 2 — Inspector property editor & validation ✅
 
 **Goal.** Edit resource configuration and validate it in real time.
 
 **Definition of Done.**
-- Selecting a node shows a per-resource property form in the Inspector.
-- Each resource seeds sensible default values (`ResourceMeta.defaults`).
-- Real-time validation surfaces errors as red badges / tooltips
-  (via `ResourceMeta.validate`).
+- ✅ Selecting a node shows a per-resource property form in the Inspector,
+  generated from a data-driven `ResourceMeta.fields` descriptor.
+- ✅ Each resource seeds sensible default values (`ResourceMeta.defaults`).
+- ✅ Real-time validation (`ResourceMeta.validate`) surfaces errors as a red
+  badge + message list in the Inspector and a red outline on the node.
 
-**Status.** ⏳ Planned.
+**Status.** ✅ Complete — form and validation are declared on `ResourceMeta`
+(`fields` / `validate`), edited through `updateNodeConfig`, with reusable
+checkers in `src/resources/validators.ts`. SG rules are simplified to inbound
+toggles (see ADR 0011).
 
-**Related.** ADR TBD — validation rule model.
+**Related.** [ADR 0011 — Inspector property form & validation model](decisions/0011-inspector-property-form-and-validation.md)
 
 ---
 
@@ -131,3 +135,4 @@ correctly (VPC ▸ Subnet ▸ EC2/RDS …), and constrain edges by direction/typ
 | 2026-07-08 | Phase 0 completed (`7bfbd38`). Docs skeleton + ADRs 0001–0005 added. |
 | 2026-07-08 | Deploy migrated to GitHub Pages; ADR 0007 added. |
 | 2026-07-08 | Phase 1 completed: palette drag-and-drop, nesting & edge rules; ADR 0010 added. |
+| 2026-07-08 | Phase 2 completed: Inspector property form + real-time validation; ADR 0011 added. |
