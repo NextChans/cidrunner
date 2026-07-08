@@ -172,8 +172,12 @@ See [ADR 0010](decisions/0010-graph-nesting-and-edge-rule-model.md).
 
 Pressing **Start** runs [`src/graph/simulate.ts`](../src/graph/simulate.ts): one
 greedy trace per **entry point** (every ALB, every Lambda with no inbound
-traffic) along the traffic edges to a sink (RDS or S3). Security-Group edges are
-*attachments*, not traffic, and are skipped (they render as dashed rose lines).
+traffic) along the traffic edges to a sink (RDS or S3). Two edge kinds carry no
+traffic and are skipped: Security-Group *attachments* (dashed rose,
+[ADR 0017](decisions/0017-security-model-and-severity-validation.md)) and
+RDS → RDS *replication links* (dashed indigo, target shows a `REPLICA` badge and
+emits `replicate_source_db` —
+[ADR 0019](decisions/0019-rds-read-replica-as-edge.md)).
 The `SimResult` carries `flows[]` plus derived aggregates (`edgeHops`,
 `arrivals`, `blockedNodeIds`). Playback: SVG particles staggered per hop
 (0.45s), a green **arrival pulse** when the request reaches each node (data

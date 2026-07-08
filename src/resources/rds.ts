@@ -17,8 +17,10 @@ export const rds: ResourceMeta = {
     multi_az: false,
     storage_encrypted: true,
   },
-  // Databases live inside a (private) subnet.
+  // Databases live inside a (private) subnet. An RDS → RDS edge marks the
+  // target as a READ REPLICA of the source (ADR 0019).
   allowedParents: ['subnet'],
+  connectsTo: ['rds'],
   fields: [
     {
       key: 'engine',
@@ -47,10 +49,23 @@ export const rds: ResourceMeta = {
     },
   ],
   validate: (c) => collect(validateRange(c.allocated_storage, 20, 65536, '스토리지')),
-  // The generator emits an aws_db_subnet_group per VPC that hosts an RDS.
+  // The generator emits an aws_db_subnet_group per VPC that hosts a primary RDS.
   terraform: ({ name, awsName, config, refs, displayName }) => {
     const sgs = (refs.securityGroups ?? []).map((s) => `aws_security_group.${s}.id`)
     const sgLine = sgs.length ? `\n  vpc_security_group_ids = [${sgs.join(', ')}]` : ''
+    // Read replica: inherits engine/storage/credentials/subnet group from the
+    // source — AWS rejects those attributes on a same-region replica.
+    if (refs.replicaSource) {
+      return `resource "aws_db_instance" "${name}" {
+  identifier          = "${awsName}"
+  replicate_source_db = aws_db_instance.${refs.replicaSource}.identifier
+  instance_class      = "${config.instance_class ?? 'db.t3.micro'}"
+  multi_az            = ${config.multi_az ? 'true' : 'false'}
+  publicly_accessible = false
+  skip_final_snapshot = true${sgLine}
+  tags = { Name = "${displayName}" }
+}`
+    }
     const subnetGroup = refs.vpc ? `\n  db_subnet_group_name = aws_db_subnet_group.${refs.vpc}_dbsg.name` : ''
     return `resource "aws_db_instance" "${name}" {
   identifier          = "${awsName}"

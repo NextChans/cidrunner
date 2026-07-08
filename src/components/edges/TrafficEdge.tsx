@@ -11,6 +11,7 @@ import { HOP_SECONDS } from '@/graph/simulate'
 export function TrafficEdge({
   id,
   source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -22,6 +23,11 @@ export function TrafficEdge({
   const sim = useGraphStore((s) => s.simulation)
   const isAttachment = useGraphStore(
     (s) => s.nodes.find((n) => n.id === source)?.data.type === 'sg',
+  )
+  const isReplication = useGraphStore(
+    (s) =>
+      s.nodes.find((n) => n.id === source)?.data.type === 'rds' &&
+      s.nodes.find((n) => n.id === target)?.data.type === 'rds',
   )
   const [edgePath] = getBezierPath({
     sourceX,
@@ -38,6 +44,17 @@ export function TrafficEdge({
         id={`attach-${id}`}
         path={edgePath}
         style={{ stroke: '#fb7185', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.7 }}
+      />
+    )
+  }
+
+  // Replication link (primary → read replica): indigo dashed, no traffic.
+  if (isReplication) {
+    return (
+      <BaseEdge
+        id={`repl-${id}`}
+        path={edgePath}
+        style={{ stroke: '#818cf8', strokeWidth: 1.5, strokeDasharray: '6 3', opacity: 0.8 }}
       />
     )
   }

@@ -103,12 +103,24 @@ export function Canvas() {
     (connection: Connection) => {
       const source = nodes.find((n) => n.id === connection.source)
       const target = nodes.find((n) => n.id === connection.target)
-      if (!source || !target) return
+      if (!source || !target || source.id === target.id) return
       if (!canConnect(source.data.type, target.data.type)) {
         setNotice(
           `${getResource(source.data.type).label} → ${getResource(target.data.type).label} 연결은 허용되지 않습니다.`,
         )
         return
+      }
+      // Replication link (RDS → RDS): a replica has exactly one source.
+      if (source.data.type === 'rds' && target.data.type === 'rds') {
+        const hasSource = edges.some(
+          (e) =>
+            e.target === target.id &&
+            nodes.find((n) => n.id === e.source)?.data.type === 'rds',
+        )
+        if (hasSource) {
+          setNotice('이 RDS는 이미 복제 소스가 있습니다. 복제본의 소스는 1개입니다.')
+          return
+        }
       }
       stopSimulation()
       setEdges(addEdge({ ...connection, type: 'traffic' }, edges))

@@ -130,8 +130,12 @@ function traceFlow(
 /** Runs the simulation over the whole graph: one flow per entry point. */
 export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
   const byId = new Map(nodes.map((n) => [n.id, n]))
-  // Security Group edges are attachments, not traffic.
-  const trafficEdges = edges.filter((e) => byId.get(e.source)?.data.type !== 'sg')
+  // SG edges are attachments and RDS → RDS edges are replication links (ADR
+  // 0019) — neither carries request traffic.
+  const trafficEdges = edges.filter((e) => {
+    const src = byId.get(e.source)?.data.type
+    return src !== 'sg' && !(src === 'rds' && byId.get(e.target)?.data.type === 'rds')
+  })
 
   const entries = [
     ...nodes.filter((n) => n.data.type === 'alb'),

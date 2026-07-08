@@ -59,6 +59,13 @@ export function generateTerraform(
     edges
       .filter((e) => e.source === albId && typeOf(e.target) === 'ec2')
       .map((e) => tfName(e.target))
+  // rds → rds edge marks the target as a read replica of the source.
+  const replicaSourceOf = (rdsId: string) => {
+    const e = edges.find((e) => e.target === rdsId && typeOf(e.source) === 'rds')
+    return e ? tfName(e.source) : undefined
+  }
+  const isReplica = (n: ResourceNodeType) =>
+    n.data.type === 'rds' && replicaSourceOf(n.id) !== undefined
 
   const subnetsIn = (vpcId: string) =>
     nodes.filter((n) => n.data.type === 'subnet' && vpcOf(n)?.id === vpcId)
@@ -86,6 +93,7 @@ export function generateTerraform(
             .map((s) => tfName(s.id)),
           securityGroups: attachedSGs(node.id),
           targets: node.data.type === 'alb' ? albTargets(node.id) : undefined,
+          replicaSource: node.data.type === 'rds' ? replicaSourceOf(node.id) : undefined,
         },
       })
     })
@@ -103,7 +111,10 @@ export function generateTerraform(
     const privateSubnets = vSubnets.filter((s) => s.data.config.public !== true)
     const igw = nodes.find((n) => n.data.type === 'igw' && vpcOf(n)?.id === vpc.id)
     const nat = nodes.find((n) => n.data.type === 'nat' && vpcOf(n)?.id === vpc.id)
-    const hasRds = nodes.some((n) => n.data.type === 'rds' && vpcOf(n)?.id === vpc.id)
+    // Replicas inherit the source's subnet group — only primaries need one.
+    const hasRds = nodes.some(
+      (n) => n.data.type === 'rds' && !isReplica(n) && vpcOf(n)?.id === vpc.id,
+    )
 
     // Public route table: 0.0.0.0/0 → IGW, associated to public subnets.
     if (igw && publicSubnets.length > 0) {
@@ -151,6 +162,8 @@ export function generateTerraform(
   }
 
   const hasType = (t: ResourceType) => nodes.some((n) => n.data.type === t)
+  // A replica inherits credentials — db_password is only for primaries.
+  const hasPrimaryRds = nodes.some((n) => n.data.type === 'rds' && !isReplica(n))
   const needsAmiLookup = nodes.some(
     (n) =>
       n.data.type === 'ec2' &&
@@ -210,7 +223,7 @@ ${dataBlocks}${blocks.join('\n\n')}${derived.length ? '\n\n# --- Derived network
   default     = "ap-northeast-2"
 }`,
   ]
-  if (hasType('rds')) {
+  if (hasPrimaryRds) {
     vars.push(`variable "db_password" {
   type        = string
   description = "Master password for RDS (pass with -var or TF_VAR_db_password)"
