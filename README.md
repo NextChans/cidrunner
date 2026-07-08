@@ -25,8 +25,13 @@ blocking resource lights up. Clear guided missions, or build freely — then
 
 > [!NOTE]
 > **UI language: Korean.** The in-app UI is Korean (hardcoded, no i18n
-> framework); AWS resource names and technical terms stay in English. See
-> [ADR 0008](docs/decisions/0008-korean-first-ui-no-i18n.md).
+> framework); AWS resource names and technical terms stay in English. This was
+> re-examined in Sprint D and kept — see
+> [ADR 0008](docs/decisions/0008-korean-first-ui-no-i18n.md) and its revisit
+> [ADR 0034](docs/decisions/0034-i18n-defer.md). **i18n roadmap:** we'll
+> reconsider adding English UI once the project sees non-Korean demand (e.g. 100+
+> stars or English issues/PRs). This README is already bilingual so international
+> visitors can get the overview and run it.
 
 ## Documentation
 
@@ -43,7 +48,9 @@ Design and decisions live in [`docs/`](docs/):
 - **Security as gameplay** — attach Security Groups by drawing edges; encryption and public-access toggles; amber warnings for anything insecure.
 - **Traffic playback** — press Start and every flow (ALB → EC2 → RDS, Lambda → S3, …) animates with particles and arrival pulses; blocked paths highlight the blocking node.
 - **Missions & Free mode** — 10 best-practice challenges (tutorial / HA 3-tier / serverless / static CDN / async pipeline / container workload / global dynamic web / event-driven fan-out / security hardening / disaster recovery) with 0–3 star ratings, or an open sandbox.
-- **Save & Share** — designs autosave to the browser (survive refresh) and share as a single URL or a JSON file (mission context included, load asks before replacing your work); no account, no backend.
+- **Save & Share** — designs autosave to the browser (survive refresh) and share as a single URL or a JSON file (mission context included, load asks before replacing your work); no account, no backend. Shared links carry an Open Graph / Twitter Card preview image. See [ADR 0031](docs/decisions/0031-og-image-and-share-metadata.md).
+- **Gallery** — save multiple named designs into local slots and reopen them from a card grid with live SVG thumbnails; rename and delete inline. See [ADR 0033](docs/decisions/0033-gallery-multi-slot.md).
+- **Achievements** — five badges (first clear, first 3-star, first saved design, five missions, all missions 3-star) unlock as you play, derived purely from your progress. See [ADR 0032](docs/decisions/0032-achievements-and-badges.md).
 - **Editor fundamentals** — undo/redo (Ctrl+Z, one step per gesture), a first-visit tutorial hand-off, and per-mission best-star records.
 - **Keyboard & context menu** — global shortcuts for undo/redo (⌘Z / ⌘⇧Z), duplicate (⌘D), delete, fit view (R), simulate (S), export (E), and a `?` cheat-sheet; right-click a node to edit / duplicate / clear edges / detach / delete. See [ADR 0028](docs/decisions/0028-keyboard-shortcuts-and-context-menu.md).
 - **Interactive tutorial** — the first mission shows a live, self-checking step list that ticks off and highlights the next action as you build. See [ADR 0030](docs/decisions/0030-interactive-tutorial-steps.md).

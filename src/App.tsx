@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { Layout } from './components/Layout'
 import { designFromHash } from '@/graph/share'
+import { useAchievements } from '@/hooks/useAchievements'
 import { useGraphStore } from '@/store/useGraphStore'
 
 // First-visit-only overlay — split out of the main bundle (ADR 0029).
@@ -25,6 +26,9 @@ function hasExistingWork(): boolean {
 
 function App() {
   const [sharedLoaded, setSharedLoaded] = useState(false)
+
+  // Watches badge progress and toasts new unlocks (ADR 0032).
+  useAchievements()
 
   // A shared link (#g=…) asks before replacing existing work (a grader opening
   // 30 submissions must not lose their own design — ADR 0023), then the hash

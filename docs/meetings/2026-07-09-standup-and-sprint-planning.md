@@ -109,3 +109,47 @@ Sprint C 완료. `tsc -b` clean · Vitest 80/80 통과 · `oxlint` clean · `vit
   (node24 런타임 기반), CI Node 20→22.
 - **문서 정합화** — 이 미팅 doc의 "trunk-based·PR 없이 push" 규칙을 Sprint B 전환 사실에
   맞춰 정정.
+
+---
+
+## Sprint D 결과 (완료: 2026-07-09 저녁 — 오늘의 마지막 스프린트)
+
+Sprint D 완료. `tsc -b` clean · Vitest 92/92 통과 · `oxlint` clean · `vite build` 성공(최대
+청크 197 kB, 500 kB 경고 없음) · 로컬 dev 배지·갤러리·OG 메타 확인. feature branch → PR →
+merge 워크플로로 진행.
+
+- **정적 OG 이미지** — `public/og-image.png`(1200×630, PIL로 결정적 생성: favicon과 동일한
+  네트워크 모티프 + 타이틀 + 한글 태그라인). `index.html`에 Open Graph(type·title·description·
+  url·image·width/height·alt·locale) + Twitter `summary_large_image` 메타 추가. 이미지·URL은
+  GitHub Pages 절대 경로. 동적 OG는 서버가 필요해 보류(재검토 조건 명시). ADR 0031.
+- **배지 5종** — `first-mission`·`first-three-star`·`first-slot`·`five-missions`·
+  `all-three-star`. `bestStars` + 갤러리 슬롯 수에서 파생되는 **순수 predicate**라 미션 채점
+  로직 무변경. 스토어는 "이미 알린 배지"(`earnedBadges`)만 persist하고, `useAchievements` 훅이
+  마운트 시 기존 진행도를 조용히 백필한 뒤 세션 중 신규 획득만 토스트. 툴바 트로피 아이콘(획득 수
+  chip) → lazy 모달. ADR 0032.
+- **다중 슬롯 갤러리** — persist에 `slots` 추가(공유와 동일 스냅샷 형태 → 로드 시 동일 sanitizer
+  재통과). 썸네일은 저장하지 않고 노드 위치에서 **순수 SVG 즉석 렌더**(`thumbnail.ts`, 부모
+  체인 절대좌표 접기 + viewBox 정규화). 카드 클릭=불러오기, 이름변경·삭제. backward-compat로
+  persist 버전 미변경(기존 저장 설계 보존). ADR 0033.
+- **i18n 재검토** — Korean-first **유지**, 코드 변경 없음. 도입 트리거(별 100개·영어권 이슈
+  유입·비한국어권 배포 목표) 명시. README/README.ko에 국제화 로드맵 단락 추가. ADR 0034.
+- **번들** — Gallery(4.98 kB)·Achievements(1.93 kB) 모두 lazy 청크. 최대 청크 197 kB 유지.
+- **테스트 80→92** — 배지 predicate 8케이스(신규/파생/전 미션 3-star 경계), 썸네일 투영·정렬·
+  절대좌표 4케이스.
+
+---
+
+## Retrospective — 오늘 4개 스프린트 완료 (2026-07-09)
+
+하루에 A(부채·QA) → B(콘텐츠 2차) → C(UX 심화) → D(소셜·공유) 4개 스프린트를 완주했다.
+
+- **회귀 0**: 각 스프린트가 `tsc`/Vitest/`oxlint`/`build` 게이트를 통과하고 이전 스프린트 결과를
+  깨지 않았다. 테스트는 42(어제)→59(A)→74(B)→80(C)→**92(D)** 로 꾸준히 증가.
+- **워크플로**: Sprint A만 trunk-based, B부터 feature branch → PR → CI green → merge 정착.
+  D까지 동일하게 유지 — 리뷰 게이트·CI 확인이 하루 4스프린트 속도에서도 안전망이 됐다.
+- **ADR 규율**: 결정마다 ADR을 남겨 0024~0034(11건) 축적. "왜"가 문서로 남아 재논쟁 비용 0.
+- **의도적 보류**: Kinesis·데이터 레이크(B), 이벤트형 배지 🚀(D), 동적 OG(D), i18n(D)을 조건과
+  함께 명시 보류 — 스코프 팽창 없이 후속(Sprint E: 리소스 3차·검색)으로 넘겼다.
+- **남은 관심사(Sprint E 시작 전)**: (1) OG 실 SNS 미리보기는 배포 후 각 플랫폼 크롤러로만
+  검증 가능(로컬은 head 태그 확인까지). (2) 갤러리 슬롯은 localStorage 스코프라 기기 간 동기화
+  없음 — 대량 슬롯 시 용량/정리 UX 필요. (3) 리소스 확장 3차·검색은 Sprint E로 이월.

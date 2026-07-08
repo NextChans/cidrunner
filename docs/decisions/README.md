@@ -55,3 +55,7 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0028](0028-keyboard-shortcuts-and-context-menu.md) | 키보드 단축키 & 노드 우클릭 컨텍스트 메뉴 | Accepted | 2026-07-09 |
 | [0029](0029-perf-code-splitting.md) | 성능 — 번들 code-splitting & 대형 그래프 렌더링 | Accepted | 2026-07-09 |
 | [0030](0030-interactive-tutorial-steps.md) | 인터랙티브 튜토리얼 — 단계별 자가 점검 힌트 | Accepted | 2026-07-09 |
+| [0031](0031-og-image-and-share-metadata.md) | OG 이미지 & 소셜 공유 메타데이터 | Accepted | 2026-07-09 |
+| [0032](0032-achievements-and-badges.md) | Achievements — 배지 시스템 (5종, 파생 상태) | Accepted | 2026-07-09 |
+| [0033](0033-gallery-multi-slot.md) | 갤러리 — 다중 슬롯 저장 (extends 0020) | Accepted | 2026-07-09 |
+| [0034](0034-i18n-defer.md) | i18n 유보 재검토 — Korean-first 유지 (revisits 0008) | Accepted | 2026-07-09 |

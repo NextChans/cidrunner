@@ -12,6 +12,8 @@ import {
   Undo2,
   Redo2,
   Keyboard,
+  Trophy,
+  Images,
 } from 'lucide-react'
 import { redoDesign, undoDesign, useGraphStore, type Mode } from '@/store/useGraphStore'
 import { downloadTerraformZip } from '@/graph/terraform'
@@ -46,6 +48,9 @@ export function Toolbar() {
   const setNotice = useGraphStore((s) => s.setNotice)
   const loadDesign = useGraphStore((s) => s.loadDesign)
   const setShortcutHelp = useGraphStore((s) => s.setShortcutHelp)
+  const setShowGallery = useGraphStore((s) => s.setShowGallery)
+  const setShowAchievements = useGraphStore((s) => s.setShowAchievements)
+  const badgeCount = useGraphStore((s) => s.earnedBadges.length)
   const canUndo = useStore(useGraphStore.temporal, (s) => s.pastStates.length > 0)
   const canRedo = useStore(useGraphStore.temporal, (s) => s.futureStates.length > 0)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -187,6 +192,31 @@ export function Toolbar() {
       >
         <Download size={14} />
         Terraform 내보내기
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setShowGallery(true)}
+        className={iconBtn}
+        title="갤러리 (저장된 설계)"
+        aria-label="갤러리"
+      >
+        <Images size={14} />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setShowAchievements(true)}
+        className={clsx(iconBtn, 'relative')}
+        title="배지"
+        aria-label="배지"
+      >
+        <Trophy size={14} />
+        {badgeCount > 0 && (
+          <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[9px] font-bold text-slate-900">
+            {badgeCount}
+          </span>
+        )}
       </button>
 
       <button
