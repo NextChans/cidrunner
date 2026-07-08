@@ -94,6 +94,8 @@ export interface TfContext {
     securityGroups?: string[]
     /** Local names of EC2 instances this ALB forwards to (alb → ec2 edges). */
     targets?: string[]
+    /** Local name of the source RDS when this node is a read replica (rds → rds edge). */
+    replicaSource?: string
   }
 }
 

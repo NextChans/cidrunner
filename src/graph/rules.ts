@@ -21,9 +21,12 @@ export function canBeTopLevel(type: ResourceType): boolean {
   return getResource(type).allowedParents.includes('canvas')
 }
 
-/** True if a directional edge `source → target` is allowed. */
+/**
+ * True if a directional edge `source → target` is allowed. Same-type edges are
+ * legal when declared (e.g. RDS → RDS is a replication link — ADR 0019);
+ * connecting a node to itself is blocked at the canvas level by node id.
+ */
 export function canConnect(source: ResourceType, target: ResourceType): boolean {
-  if (source === target) return false
   return getResource(source).connectsTo?.includes(target) ?? false
 }
 

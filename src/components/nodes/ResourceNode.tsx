@@ -33,6 +33,16 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
   const blocked = sim?.blockedNodeIds.includes(id) ?? false
   const onPath = !blocked && (sim?.pathNodeIds.includes(id) ?? false)
   const arrival = sim?.arrivals[id]
+  // An RDS that is the target of an rds → rds edge is a read replica (ADR 0019).
+  const isReplica = useGraphStore(
+    (s) =>
+      data.type === 'rds' &&
+      s.edges.some(
+        (e) =>
+          e.target === id &&
+          s.nodes.find((n) => n.id === e.source)?.data.type === 'rds',
+      ),
+  )
 
   if (meta.container) {
     return (
@@ -104,6 +114,11 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
         <span className="text-sm font-medium text-slate-100">{data.label}</span>
         <span className="text-[10px] uppercase tracking-wide text-slate-500">
           {data.type}
+          {isReplica && (
+            <span className="ml-1 rounded bg-indigo-900/70 px-1 py-px font-semibold text-indigo-300">
+              REPLICA
+            </span>
+          )}
         </span>
       </div>
       {hasWarning && !invalid && !blocked && !onPath && (

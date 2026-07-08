@@ -154,3 +154,4 @@ validation sweep (ADR 0011). See ADR 0014.
 | 2026-07-08 | Phase 5 completed: mission clear detection + star rating; ADR 0014 added. MVP feature-complete. |
 | 2026-07-08 | Post-MVP: resizable containers (NodeResizer); graph-level CIDR validation (ADR 0015). |
 | 2026-07-08 | v2 "엔지니어 시뮬레이션": apply-ready Terraform (ADR 0016), SG attachment edges + severity validation (ADR 0017), multi-flow playback + categorized palette + minimap toggle (ADR 0018), node naming, security-hardening mission. |
+| 2026-07-08 | RDS read replica: RDS → RDS replication edge + REPLICA badge + `replicate_source_db` emit (ADR 0019). |

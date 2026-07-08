@@ -127,6 +127,26 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
     }
   }
 
+  // Replication links (rds → rds, ADR 0019): the replica must match the
+  // source engine, and cross-AZ placement is the point of a replica.
+  for (const e of edges) {
+    const src = byId.get(e.source)
+    const dst = byId.get(e.target)
+    if (src?.data.type !== 'rds' || dst?.data.type !== 'rds') continue
+    if ((src.data.config.engine ?? 'mysql') !== (dst.data.config.engine ?? 'mysql')) {
+      push(errors, dst.id, '읽기 복제본은 소스와 같은 엔진이어야 합니다.')
+    }
+    const azOf = (n: ResourceNodeType) => {
+      const parent = n.parentId ? byId.get(n.parentId) : undefined
+      return parent?.data.type === 'subnet' ? String(parent.data.config.az ?? 'a') : null
+    }
+    const srcAz = azOf(src)
+    const dstAz = azOf(dst)
+    if (srcAz !== null && srcAz === dstAz) {
+      push(warnings, dst.id, '복제본이 소스와 같은 AZ에 있습니다 — 다른 AZ 권장.')
+    }
+  }
+
   return { errors, warnings }
 }
 
