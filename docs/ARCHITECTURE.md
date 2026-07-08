@@ -133,6 +133,13 @@ and a red outline on the node. Reusable checks live in
 rules are simplified to inbound toggles — see
 [ADR 0011](decisions/0011-inspector-property-form-and-validation.md).
 
+On top of per-node checks, [`src/graph/cidr.ts`](../src/graph/cidr.ts) runs
+**graph-level CIDR validation** (memoized per nodes-array): a subnet's CIDR must
+sit inside its parent VPC's CIDR, and sibling subnets in one VPC must not
+overlap (VPC-to-VPC overlap is allowed, as in AWS). Results feed the same
+UI surfaces and the mission `allValid` check — see
+[ADR 0015](decisions/0015-graph-level-cidr-validation.md).
+
 ## Graph rules
 
 Nesting and edge constraints (Phase 1) are **data-driven**, derived entirely

@@ -1,17 +1,22 @@
 import { getResource } from '@/resources'
 import type { PropertyField } from '@/resources/types'
+import { getCidrIssues } from '@/graph/cidr'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
 /**
  * Renders a resource's editable properties as a form, driven entirely by
- * `ResourceMeta.fields` (Phase 2). Edits flow straight into the store, and
- * `ResourceMeta.validate` runs on every render for real-time feedback.
+ * `ResourceMeta.fields` (Phase 2). Edits flow straight into the store;
+ * per-node `validate` plus graph-level CIDR checks run on every render for
+ * real-time feedback.
  */
 export function PropertyForm({ node }: { node: ResourceNodeType }) {
   const updateNodeConfig = useGraphStore((s) => s.updateNodeConfig)
+  // Select the cached array (or undefined) directly — defaulting to a fresh []
+  // inside the selector would return a new reference every snapshot and loop.
+  const graphErrors = useGraphStore((s) => getCidrIssues(s.nodes).get(node.id))
   const meta = getResource(node.data.type)
   const fields = meta.fields ?? []
-  const errors = meta.validate?.(node.data.config) ?? []
+  const errors = [...(meta.validate?.(node.data.config) ?? []), ...(graphErrors ?? [])]
 
   if (fields.length === 0) {
     return (
