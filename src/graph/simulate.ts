@@ -47,7 +47,13 @@ export interface SimResult {
 }
 
 /** Types that terminate a successful request (the "DB / storage" tier). */
-const SINKS: ReadonlySet<ResourceType> = new Set<ResourceType>(['rds', 's3', 'dynamodb'])
+const SINKS: ReadonlySet<ResourceType> = new Set<ResourceType>([
+  'rds',
+  's3',
+  'dynamodb',
+  'elasticache',
+  'efs',
+])
 
 /** Types that can originate a request when nothing feeds them. */
 const ENTRY_CAPABLE: ReadonlySet<ResourceType> = new Set<ResourceType>([
@@ -55,6 +61,8 @@ const ENTRY_CAPABLE: ReadonlySet<ResourceType> = new Set<ResourceType>([
   'cloudfront',
   'alb',
   'lambda',
+  'ecs',
+  'eks',
 ])
 
 function blockedMessage(type: ResourceType): string {
@@ -69,8 +77,13 @@ function blockedMessage(type: ResourceType): string {
       return 'EC2에서 데이터베이스나 스토리지로 가는 경로가 없습니다.'
     case 'lambda':
       return 'Lambda에서 데이터베이스나 스토리지로 가는 경로가 없습니다.'
+    case 'ecs':
+    case 'eks':
+      return '컨테이너에서 데이터베이스나 스토리지로 가는 경로가 없습니다.'
     case 'sqs':
       return '큐를 소비할 Lambda가 연결되어 있지 않습니다.'
+    case 'sns':
+      return 'SNS 토픽을 구독하는 대상(SQS/Lambda)이 없습니다.'
     default:
       return `${getResource(type).label}에서 경로가 끊겼습니다.`
   }
@@ -144,11 +157,16 @@ function traceFlow(
 /** Runs the simulation over the whole graph: one flow per entry point. */
 export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
   const byId = new Map(nodes.map((n) => [n.id, n]))
-  // SG edges are attachments and RDS → RDS edges are replication links (ADR
-  // 0019) — neither carries request traffic.
+  // SG edges are attachments, CloudWatch edges are monitoring links, and
+  // RDS → RDS edges are replication links (ADR 0019) — none carries request
+  // traffic.
   const trafficEdges = edges.filter((e) => {
     const src = byId.get(e.source)?.data.type
-    return src !== 'sg' && !(src === 'rds' && byId.get(e.target)?.data.type === 'rds')
+    return (
+      src !== 'sg' &&
+      src !== 'cloudwatch' &&
+      !(src === 'rds' && byId.get(e.target)?.data.type === 'rds')
+    )
   })
 
   // Entry = an entry-capable node nothing feeds (a CloudFront-fed ALB is a

@@ -50,3 +50,5 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0023](0023-editor-fundamentals.md) | Editor Fundamentals — undo/redo, 온보딩, 공유 안전화 | Accepted | 2026-07-08 |
 | [0024](0024-typescript-strict-hardening.md) | TypeScript strict 전면 적용 (noImplicitReturns · noUncheckedIndexedAccess) | Accepted | 2026-07-09 |
 | [0025](0025-terraform-apply-audit.md) | Terraform apply-readiness 감사 (Sprint A) | Accepted | 2026-07-09 |
+| [0026](0026-resource-expansion-2.md) | Resource expansion batch 2 — ECS · EKS · SNS · EFS · ElastiCache · CloudWatch (extends 0022) | Accepted | 2026-07-09 |
+| [0027](0027-mission-expansion-2.md) | Mission expansion batch 2 — 컨테이너 · 글로벌 동적 웹 · 이벤트 드리븐 · 재난 복구 | Accepted | 2026-07-09 |

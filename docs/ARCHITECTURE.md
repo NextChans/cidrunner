@@ -24,7 +24,7 @@ console and docs. See [ADR 0008](decisions/0008-korean-first-ui-no-i18n.md).
 ```
 App
 └─ Layout                     responsive shell (3-pane ≥md / drawers <md)
-   ├─ Palette         (left)    draggable list of the 14 resource types
+   ├─ Palette         (left)    draggable list of the 20 resource types
    ├─ Canvas          (center)  React Flow editor — nodes, edges, nesting
    │  └─ ResourceNode           one node renderer, driven by ResourceMeta
    ├─ Inspector       (right)   per-resource property form (Phase 2)
@@ -128,8 +128,10 @@ interface ResourceMeta {
 }
 ```
 
-The resource set is **14** blocks — the 10-block MVP set plus expansion batch 1 — see
-[ADR 0001](decisions/0001-mvp-scope-and-resource-list.md).
+The resource set is **20** blocks — the 10-block MVP set (ADR 0001) plus expansion
+batch 1 ([ADR 0022](decisions/0022-resource-expansion-batch-1.md): DynamoDB,
+CloudFront, Route 53, SQS) and batch 2 ([ADR 0026](decisions/0026-resource-expansion-2.md):
+ECS, EKS, ElastiCache, EFS, SNS, CloudWatch).
 
 ## Property editing & validation
 
@@ -210,8 +212,11 @@ provider 5.x + archive provider).
 
 ## Mission registry
 
-[`src/missions/`](../src/missions/) holds one module per mission (`tutorial`,
-`threeTier`, `serverless`, `securityHardening`) plus an `index.ts`. A `Mission`
+[`src/missions/`](../src/missions/) holds one module per mission (10 total:
+`tutorial`, `threeTier`, `serverless`, `staticCdn`, `asyncPipeline`,
+`containerWorkload`, `globalWeb`, `eventDriven`, `securityHardening`,
+`disasterRecovery` — see [ADR 0027](decisions/0027-mission-expansion-2.md)) plus
+an `index.ts`. A `Mission`
 describes its `goal`, optional `hint`, `requiredResources`, and a `check(ctx)`
 that returns a 0–3 star rating (0 = not cleared) for the current graph. The
 MissionPanel builds the check context live — the multi-flow simulation result,

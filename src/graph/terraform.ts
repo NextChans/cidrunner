@@ -25,8 +25,9 @@ function awsName(id: string): string {
 
 /** Emit order so the file reads network-outward. */
 const ORDER: ResourceType[] = [
-  'vpc', 'subnet', 'igw', 'nat', 'sg', 'alb', 'ec2', 'rds', 's3', 'dynamodb',
-  'sqs', 'lambda', 'cloudfront', 'route53',
+  'vpc', 'subnet', 'igw', 'nat', 'sg', 'efs', 'alb', 'ec2', 'ecs', 'eks',
+  'rds', 'elasticache', 's3', 'dynamodb', 'sqs', 'sns', 'lambda', 'cloudwatch',
+  'cloudfront', 'route53',
 ]
 
 function ancestorOfType(
@@ -82,9 +83,28 @@ export function generateTerraform(
     edges
       .filter((e) => e.target === lambdaId && typeOf(e.source) === 'sqs')
       .map((e) => tfName(e.source))
+  // All outgoing edges of `nodeId` whose target type is in `kinds` → typed refs
+  // (SNS subscribers, CloudWatch monitor targets).
+  const targetsOf = (nodeId: string, kinds: ResourceType[]) =>
+    edges
+      .filter((e) => e.source === nodeId && kinds.includes(typeOf(e.target) as ResourceType))
+      .map((e) => ({ kind: typeOf(e.target) as ResourceType, name: tfName(e.target) }))
 
   const subnetsIn = (vpcId: string) =>
     nodes.filter((n) => n.data.type === 'subnet' && vpcOf(n)?.id === vpcId)
+  /** One subnet per distinct AZ (EFS mount targets are unique per AZ). */
+  const oneSubnetPerAz = (subnets: ResourceNodeType[]) => {
+    const seen = new Set<string>()
+    const out: ResourceNodeType[] = []
+    for (const s of subnets) {
+      const az = String(s.data.config.az ?? 'a')
+      if (!seen.has(az)) {
+        seen.add(az)
+        out.push(s)
+      }
+    }
+    return out
+  }
 
   const ordered = [...nodes].sort(
     (a, b) => ORDER.indexOf(a.data.type) - ORDER.indexOf(b.data.type),
@@ -107,6 +127,10 @@ export function generateTerraform(
           publicSubnets: vpcSubnets
             .filter((s) => s.data.config.public === true)
             .map((s) => tfName(s.id)),
+          privateSubnets: vpcSubnets
+            .filter((s) => s.data.config.public !== true)
+            .map((s) => tfName(s.id)),
+          azUniqueSubnets: oneSubnetPerAz(vpcSubnets).map((s) => tfName(s.id)),
           securityGroups: attachedSGs(node.id),
           targets: node.data.type === 'alb' ? albTargets(node.id) : undefined,
           replicaSource: node.data.type === 'rds' ? replicaSourceOf(node.id) : undefined,
@@ -120,6 +144,12 @@ export function generateTerraform(
               : undefined,
           consumers: node.data.type === 'sqs' ? sqsConsumers(node.id) : undefined,
           sqsSources: node.data.type === 'lambda' ? lambdaSqsSources(node.id) : undefined,
+          subscribers:
+            node.data.type === 'sns' ? targetsOf(node.id, ['sqs', 'lambda']) : undefined,
+          monitorTargets:
+            node.data.type === 'cloudwatch'
+              ? targetsOf(node.id, ['ec2', 'rds', 'alb', 'lambda'])
+              : undefined,
         },
       })
     })
@@ -140,6 +170,9 @@ export function generateTerraform(
     // Replicas inherit the source's subnet group — only primaries need one.
     const hasRds = nodes.some(
       (n) => n.data.type === 'rds' && !isReplica(n) && vpcOf(n)?.id === vpc.id,
+    )
+    const hasCache = nodes.some(
+      (n) => n.data.type === 'elasticache' && vpcOf(n)?.id === vpc.id,
     )
 
     // Public route table: 0.0.0.0/0 → IGW, associated to public subnets.
@@ -183,6 +216,14 @@ export function generateTerraform(
       derived.push(`resource "aws_db_subnet_group" "${v}_dbsg" {
   name_prefix = "${awsName(vpc.id).toLowerCase()}-"
   subnet_ids  = [${vSubnets.map((s) => `aws_subnet.${tfName(s.id)}.id`).join(', ')}]
+}`)
+    }
+
+    // Cache subnet group (ElastiCache also needs subnets across ≥2 AZs).
+    if (hasCache && vSubnets.length > 0) {
+      derived.push(`resource "aws_elasticache_subnet_group" "${v}_cachesg" {
+  name       = "${awsName(vpc.id).toLowerCase()}-cache"
+  subnet_ids = [${vSubnets.map((s) => `aws_subnet.${tfName(s.id)}.id`).join(', ')}]
 }`)
     }
   }
@@ -307,6 +348,42 @@ ${dataBlocks}${blocks.join('\n\n')}${derived.length ? '\n\n# --- Derived network
       outputs.push(`output "${name}_queue_url" {
   description = "${n.data.label} queue URL"
   value       = aws_sqs_queue.${name}.url
+}`)
+    }
+    if (n.data.type === 'sns') {
+      outputs.push(`output "${name}_topic_arn" {
+  description = "${n.data.label} topic ARN"
+  value       = aws_sns_topic.${name}.arn
+}`)
+    }
+    if (n.data.type === 'elasticache') {
+      outputs.push(`output "${name}_cache_address" {
+  description = "${n.data.label} configuration endpoint"
+  value       = aws_elasticache_cluster.${name}.cache_nodes[0].address
+}`)
+    }
+    if (n.data.type === 'efs') {
+      outputs.push(`output "${name}_file_system_id" {
+  description = "${n.data.label} file system id"
+  value       = aws_efs_file_system.${name}.id
+}`)
+    }
+    if (n.data.type === 'ecs') {
+      outputs.push(`output "${name}_cluster_name" {
+  description = "${n.data.label} ECS cluster name"
+  value       = aws_ecs_cluster.${name}.name
+}`)
+    }
+    if (n.data.type === 'eks') {
+      outputs.push(`output "${name}_cluster_endpoint" {
+  description = "${n.data.label} EKS API endpoint"
+  value       = aws_eks_cluster.${name}.endpoint
+}`)
+    }
+    if (n.data.type === 'cloudwatch') {
+      outputs.push(`output "${name}_log_group" {
+  description = "${n.data.label} log group name"
+  value       = aws_cloudwatch_log_group.${name}.name
 }`)
     }
   }

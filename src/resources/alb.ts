@@ -16,7 +16,7 @@ export const alb: ResourceMeta = {
   },
   // Spans a VPC's subnets; forwards traffic to compute targets.
   allowedParents: ['vpc'],
-  connectsTo: ['ec2', 'lambda'],
+  connectsTo: ['ec2', 'lambda', 'ecs', 'eks'],
   fields: [
     {
       key: 'internal',

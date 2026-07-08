@@ -5,6 +5,10 @@ import { serverless } from './serverless'
 import { securityHardening } from './securityHardening'
 import { staticCdn } from './staticCdn'
 import { asyncPipeline } from './asyncPipeline'
+import { containerWorkload } from './containerWorkload'
+import { globalWeb } from './globalWeb'
+import { eventDriven } from './eventDriven'
+import { disasterRecovery } from './disasterRecovery'
 
 /** Ordered list of missions shown in the MissionPanel. */
 export const missions: Mission[] = [
@@ -13,7 +17,11 @@ export const missions: Mission[] = [
   serverless,
   staticCdn,
   asyncPipeline,
+  containerWorkload,
+  globalWeb,
+  eventDriven,
   securityHardening,
+  disasterRecovery,
 ]
 
 export function getMission(id: string): Mission | undefined {

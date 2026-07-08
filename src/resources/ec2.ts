@@ -16,7 +16,7 @@ export const ec2: ResourceMeta = {
   },
   // Compute lives inside a subnet; talks to databases, storage, and queues.
   allowedParents: ['subnet'],
-  connectsTo: ['rds', 's3', 'dynamodb', 'sqs'],
+  connectsTo: ['rds', 's3', 'dynamodb', 'sqs', 'sns', 'elasticache', 'efs'],
   fields: [
     {
       key: 'instance_type',

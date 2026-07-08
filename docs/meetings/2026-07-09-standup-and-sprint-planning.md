@@ -55,3 +55,27 @@ Sprint A 완료. `tsc -b` clean · Vitest 59/59 통과 · `vite build` 성공.
 - **라이브 사이트** https://nextchans.github.io/cidrunner/ HTTP 200 확인.
 
 남은 관심사: (1) node_modules가 stale하면 `npm ci` 필요(감사 초기 발견). (2) B/C/D는 후속 태스크.
+
+---
+
+## Sprint B 결과 (완료: 2026-07-09 오후)
+
+Sprint B 완료. `tsc -b` clean · Vitest 74/74 통과 · `oxlint` clean · `vite build` 성공 ·
+로컬 dev 팔레트·미션 렌더 확인. **feature branch → PR → merge** 워크플로로 진행(main 직접
+push 금지 규칙 적용).
+
+- **리소스 14→20종** — ECS Fargate·EKS(컴퓨팅), ElastiCache(데이터베이스), EFS(스토리지),
+  SNS(앱 통합), CloudWatch(**새 `관리·모니터링` 카테고리**). 모두 apply-ready HCL:
+  ECS는 자기완결형 Fargate 서비스, EKS는 롤+정책+노드그룹, ElastiCache는 VPC별 캐시
+  Subnet Group, EFS는 AZ당 마운트 타깃, SNS는 구독+전달 권한, CloudWatch는 로그 그룹+
+  대상별 지표 알람. ALB→컨테이너는 시뮬/토폴로지 관계로만(타깃 그룹 `target_type` 충돌
+  회피). 싱크에 ElastiCache·EFS 추가, 컨테이너는 진입 가능 컴퓨트. ADR 0026.
+- **미션 6→10종** — 컨테이너 워크로드(ALB→ECS/EKS→RDS), 글로벌 동적 웹(R53→CF→ALB→EC2→RDS),
+  이벤트 드리븐 팬아웃(Lambda→SNS→SQS→Lambda→DynamoDB), 재난 복구(Multi-AZ + 크로스 AZ
+  읽기 복제본). ElastiCache/EFS/CloudWatch는 자유 모드 콘텐츠로. ADR 0027.
+- **테스트 +15** — 신규 리소스 엣지 규칙·시뮬(싱크·컨테이너·팬아웃)·검증(멀티 AZ 오류·
+  dangling 경고)·terraform 스냅샷(ECS/EKS/ElastiCache/EFS/SNS/CloudWatch apply-ready 불변식)·
+  미션 4종 3-star 클리어 + 미달 케이스.
+- **Kinesis 보류** — 스트림 단독은 도달할 싱크가 없어 시뮬이 막힘. 데이터 레이크 미션·
+  스트림 소비 모델과 함께 3차 배치로.
+- **라이브 사이트** https://nextchans.github.io/cidrunner/ (merge 후 배포 반영 확인).
