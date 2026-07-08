@@ -206,9 +206,14 @@ export function Canvas() {
       {notice && (
         <div
           role="alert"
-          className="pointer-events-none absolute left-1/2 top-4 z-10 max-w-[90%] -translate-x-1/2 rounded-md border border-rose-800/70 bg-rose-950/90 px-4 py-2 text-center text-xs text-rose-200 shadow-lg"
+          className={
+            'pointer-events-none absolute left-1/2 top-4 z-10 max-w-[90%] -translate-x-1/2 rounded-md border px-4 py-2 text-center text-xs shadow-lg ' +
+            (notice.kind === 'info'
+              ? 'border-accent/60 bg-emerald-950/90 text-emerald-200'
+              : 'border-rose-800/70 bg-rose-950/90 text-rose-200')
+          }
         >
-          {notice}
+          {notice.text}
         </div>
       )}
 
