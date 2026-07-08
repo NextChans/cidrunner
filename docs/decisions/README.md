@@ -31,3 +31,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0004](0004-tech-stack.md) | Tech stack | Accepted | 2026-07-08 |
 | [0005](0005-terraform-generation-approach.md) | Terraform generation approach | Accepted | 2026-07-08 |
 | [0006](0006-ci-cd-workflow-split.md) | CI/Deploy workflow split & deploy secret gating | Accepted | 2026-07-08 |
+| [0007](0007-github-pages-over-cloudflare.md) | GitHub Pages over Cloudflare Pages | Accepted | 2026-07-08 |

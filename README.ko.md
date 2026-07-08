@@ -84,32 +84,31 @@ npm run lint     # oxlint
 ## CI & 배포
 
 GitHub Actions 워크플로가 두 개로 나뉘어 있습니다
-(자세한 근거는 [ADR 0006](docs/decisions/0006-ci-cd-workflow-split.md)):
+(자세한 근거는 [ADR 0006](docs/decisions/0006-ci-cd-workflow-split.md),
+[ADR 0007](docs/decisions/0007-github-pages-over-cloudflare.md)):
 
 - **[`ci.yml`](.github/workflows/ci.yml)** — `main` push와 모든 pull request에서
   실행. 의존성 설치 → lint → 타입체크 → 빌드를 수행합니다. **시크릿이 전혀
-  필요 없어서**, Cloudflare 설정 전에도 CI는 초록불을 유지합니다.
+  필요 없습니다.**
 - **[`deploy.yml`](.github/workflows/deploy.yml)** — `main` push(및 수동 실행)에서
-  Cloudflare Pages로 배포합니다. 배포 단계는 **Cloudflare 시크릿 존재 여부로
-  게이팅**되어, 시크릿이 없으면 경고만 남기고 job은 성공으로 끝납니다. 즉
-  시크릿 부재가 실패한 run으로 나타나지 않습니다.
+  `actions/deploy-pages@v4`로 **GitHub Pages**에 배포합니다. 인증은 OIDC로
+  처리하므로 이쪽도 **시크릿이 필요 없습니다.**
 
-배포를 활성화하려면 저장소 시크릿을 등록하세요
-(**Settings → Secrets and variables → Actions**):
+배포 URL은 **https://nextchans.github.io/cidrunner/** 입니다. Vite는 프로덕션
+빌드에서 `base: '/cidrunner/'`로 설정되어 있고([`vite.config.ts`](vite.config.ts)),
+로컬 `npm run dev`는 `/` 그대로 유지됩니다.
 
-| 시크릿 | 위치 |
-| ------ | ---- |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare 대시보드 → My Profile → API Tokens (*Cloudflare Pages: Edit* 템플릿 사용) |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 대시보드 → Workers & Pages → Account ID |
+**최초 1회 설정.** GitHub Pages의 소스를 Actions로 한 번 바꿔줘야 합니다:
 
-그다음 **`cidrunner`**라는 이름의 Pages 프로젝트를 한 번 생성하거나, 첫
-배포가 자동으로 생성하도록 두면 됩니다. 빌드 산출물 디렉토리는 `dist`입니다.
-시크릿 두 개가 등록되면 다음 `main` push부터 자동으로 배포됩니다(워크플로
-수정 불필요).
+1. 저장소 → **Settings → Pages**.
+2. **Build and deployment → Source**에서 **GitHub Actions**를 선택합니다
+   ("Deploy from a branch" 방식 아님).
+3. `main`에 push(또는 Deploy 워크플로 수동 실행)합니다. 첫 run이 성공하면
+   `https://nextchans.github.io/cidrunner/` 에서 사이트가 열립니다.
 
-> 대시보드 연동을 선호한다면, Cloudflare Pages 대시보드에서 이 저장소를 직접
-> 연결하고 빌드 명령 `npm run build`, 출력 디렉토리 `dist`로 설정한 뒤
-> `deploy.yml`을 삭제해도 됩니다.
+> Pages 소스를 GitHub Actions로 바꾸기 전에는 첫 `deploy` job이 실패할 수
+> 있습니다 — 정상입니다. build job은 소스와 무관하게 프로덕션 번들을 계속
+> 검증합니다.
 
 ## 프로젝트 구조
 

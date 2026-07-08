@@ -84,31 +84,31 @@ npm run lint     # oxlint
 ## CI & Deployment
 
 Two GitHub Actions workflows (see
-[ADR 0006](docs/decisions/0006-ci-cd-workflow-split.md)):
+[ADR 0006](docs/decisions/0006-ci-cd-workflow-split.md) and
+[ADR 0007](docs/decisions/0007-github-pages-over-cloudflare.md)):
 
 - **[`ci.yml`](.github/workflows/ci.yml)** — runs on every push to `main` and on
   every pull request. Installs deps, lints, type-checks, and builds. **Requires
-  no secrets**, so CI stays green even before Cloudflare is configured.
+  no secrets.**
 - **[`deploy.yml`](.github/workflows/deploy.yml)** — runs on push to `main` (and
-  manual dispatch) and deploys to Cloudflare Pages. The deploy step is **gated
-  on the Cloudflare secrets**: if they are absent the job logs a warning and
-  still succeeds, so a missing secret never surfaces as a failed run.
+  manual dispatch) and deploys to **GitHub Pages** via `actions/deploy-pages@v4`.
+  Authentication is handled by OIDC, so it **requires no secrets** either.
 
-To enable deploys, add these repository secrets
-(**Settings → Secrets and variables → Actions**):
+The site is served at **https://nextchans.github.io/cidrunner/** — Vite is
+configured with `base: '/cidrunner/'` for production builds
+([`vite.config.ts`](vite.config.ts)), while local `npm run dev` stays at `/`.
 
-| Secret | Where to find it |
-| ------ | ---------------- |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard → My Profile → API Tokens (use the *Cloudflare Pages: Edit* template) |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID |
+**One-time setup.** GitHub Pages must be switched to the Actions source once:
 
-Then create a Pages project named **`cidrunner`** once (or let the first
-deploy create it). Build output directory is `dist`. Once both secrets exist,
-the next push to `main` deploys automatically — no workflow change needed.
+1. Repo → **Settings → Pages**.
+2. Under **Build and deployment → Source**, choose **GitHub Actions** (not the
+   "Deploy from a branch" option).
+3. Push to `main` (or run the Deploy workflow manually). Once the first run
+   succeeds, the site is live at `https://nextchans.github.io/cidrunner/`.
 
-> Prefer the dashboard integration? You can instead connect this repo directly
-> in the Cloudflare Pages dashboard with build command `npm run build` and
-> output directory `dist`, and delete `deploy.yml`.
+> Until Pages is switched to the GitHub Actions source, the `deploy` job may
+> fail on its first run — that is expected. The build job still validates the
+> production bundle regardless.
 
 ## Project structure
 

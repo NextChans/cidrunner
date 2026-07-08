@@ -7,7 +7,8 @@
 
 cidrunner is a client-only single-page app. There is no backend: the entire
 editor, simulator, and Terraform generator run in the browser, and the build is
-served as static files (Cloudflare Pages). State lives in memory in a single
+served as static files (GitHub Pages, under `/cidrunner/` — see
+[ADR 0007](decisions/0007-github-pages-over-cloudflare.md)). State lives in memory in a single
 Zustand store; nothing is persisted server-side.
 
 The user builds an AWS topology as a graph of nodes (resources) and edges

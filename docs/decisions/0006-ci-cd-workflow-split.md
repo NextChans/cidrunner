@@ -4,6 +4,12 @@
 - Date: 2026-07-08
 - Deciders: 차니, Claude
 
+> **각주 (2026-07-08 갱신).** CI/Deploy 분리 정책은 그대로 유효하다. 다만 아래
+> 본문의 배포 **대상**은 [ADR 0007](0007-github-pages-over-cloudflare.md)에서
+> Cloudflare Pages → GitHub Pages로 변경되었다. 이에 따라 시크릿 게이팅 로직은
+> 더 이상 사용하지 않는다(GitHub Pages는 시크릿 0개, OIDC 인증). 0007은 0006을
+> supersede하지 않는다.
+
 ## Context
 
 Phase 0 스캐폴딩 이후 첫 push부터 GitHub Actions가 연속 실패했다. 원인은 두

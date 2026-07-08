@@ -26,14 +26,15 @@ tooling, state layer, and a non-functional three-pane UI.
 - Toolbar stub (mode toggle, Start/Export buttons — non-functional).
 - Zustand `useGraphStore` holds nodes / edges / mode / selection.
 - CI configured: a `ci.yml` build/lint/type-check gate (always runs) and a
-  `deploy.yml` Cloudflare Pages deploy that is gated on the CF secrets.
+  `deploy.yml` GitHub Pages deploy (`actions/deploy-pages@v4`, no secrets).
 
 **Status.** ✅ Complete — scaffold shipped in `7bfbd38`; CI split and lockfile
-fix followed (see ADR 0006).
+fix followed (see ADR 0006); deploy target moved to GitHub Pages (see ADR 0007).
 
 **Related.** [ADR 0004 — Tech stack](decisions/0004-tech-stack.md) ·
 [ADR 0002 — React Flow over Blockly](decisions/0002-react-flow-over-blockly.md) ·
-[ADR 0006 — CI/Deploy workflow split](decisions/0006-ci-cd-workflow-split.md)
+[ADR 0006 — CI/Deploy workflow split](decisions/0006-ci-cd-workflow-split.md) ·
+[ADR 0007 — GitHub Pages over Cloudflare](decisions/0007-github-pages-over-cloudflare.md)
 
 ---
 
@@ -124,3 +125,4 @@ correctly (VPC ▸ Subnet ▸ EC2/RDS …), and constrain edges by direction/typ
 | Date | Change |
 | ---- | ------ |
 | 2026-07-08 | Phase 0 completed (`7bfbd38`). Docs skeleton + ADRs 0001–0005 added. |
+| 2026-07-08 | Deploy migrated to GitHub Pages; ADR 0007 added. |
