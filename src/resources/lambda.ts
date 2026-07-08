@@ -37,6 +37,17 @@ export const lambda: ResourceMeta = {
       validatePattern(c.handler, /^\S+$/, '핸들러를 입력하세요 (예: index.handler).'),
       validateRange(c.memory_mb, 128, 10240, '메모리'),
     ),
-  // Phase 4: emit aws_lambda_function + aws_apigatewayv2_* HCL.
-  terraform: () => '',
+  terraform: ({ name, awsName, config }) => `resource "aws_lambda_function" "${name}" {
+  function_name = "${awsName}"
+  role          = var.lambda_role_arn
+  handler       = "${config.handler ?? 'index.handler'}"
+  runtime       = "${config.runtime ?? 'nodejs20.x'}"
+  memory_size   = ${Number(config.memory_mb ?? 128)}
+  filename      = "lambda.zip"
+}
+
+resource "aws_apigatewayv2_api" "${name}_api" {
+  name          = "${awsName}-api"
+  protocol_type = "HTTP"
+}`,
 }

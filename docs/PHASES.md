@@ -103,19 +103,23 @@ modeled (see ADR 0012).
 
 ---
 
-## Phase 4 — Terraform HCL export ⏳
+## Phase 4 — Terraform HCL export ✅
 
 **Goal.** Turn a valid design into runnable Terraform.
 
 **Definition of Done.**
-- **Export** button downloads a zip in the browser.
-- Output passes `terraform validate` for the minimum set
-  (VPC / Subnet / SG / ALB / EC2 / RDS).
-- `terraform apply` is explicitly **not** a goal.
+- ✅ **Export** button downloads a `main.tf` / `variables.tf` / `README.md` zip
+  in the browser (JSZip).
+- ✅ Output passes `terraform validate` — verified with Terraform v1.9.8 on the
+  full 10-resource topology (superset of VPC / Subnet / SG / ALB / EC2 / RDS).
+- ✅ `terraform apply` is explicitly **not** a goal (placeholder secrets/AMI/IAM).
 
-**Status.** ⏳ Planned.
+**Status.** ✅ Complete — per-resource emitters (`ResourceMeta.terraform(ctx)`)
+own their HCL; `src/graph/terraform.ts` resolves topology references and zips the
+output. See ADR 0013.
 
-**Related.** [ADR 0005 — Terraform generation approach](decisions/0005-terraform-generation-approach.md)
+**Related.** [ADR 0005 — Terraform generation approach](decisions/0005-terraform-generation-approach.md) ·
+[ADR 0013 — Terraform export implementation](decisions/0013-terraform-export-implementation.md)
 
 ---
 
@@ -142,3 +146,4 @@ modeled (see ADR 0012).
 | 2026-07-08 | Phase 1 completed: palette drag-and-drop, nesting & edge rules; ADR 0010 added. |
 | 2026-07-08 | Phase 2 completed: Inspector property form + real-time validation; ADR 0011 added. |
 | 2026-07-08 | Phase 3 completed: traffic simulation (path trace + particle animation); ADR 0012 added. |
+| 2026-07-08 | Phase 4 completed: Terraform export (validate-passing HCL + zip); ADR 0013 added. |

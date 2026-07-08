@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { Play, Square, RotateCcw, Download } from 'lucide-react'
 import { useGraphStore, type Mode } from '@/store/useGraphStore'
+import { downloadTerraformZip } from '@/graph/terraform'
 
 const MODES: Mode[] = ['free', 'challenge']
 
@@ -60,8 +61,9 @@ export function Toolbar() {
 
       <button
         type="button"
-        // Phase 4: generate main.tf + variables.tf and zip-download.
-        onClick={() => console.log('TODO: export terraform')}
+        onClick={() => {
+          void downloadTerraformZip(useGraphStore.getState().nodes)
+        }}
         className="flex items-center gap-1.5 rounded-md border border-surface-border px-3 py-1.5 text-xs text-slate-200 transition-colors hover:bg-slate-700/60"
       >
         <Download size={14} />

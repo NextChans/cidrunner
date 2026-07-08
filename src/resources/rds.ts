@@ -33,6 +33,14 @@ export const rds: ResourceMeta = {
     { key: 'multi_az', label: 'Multi-AZ', type: 'boolean', help: '고가용성을 위한 다중 가용영역 배포' },
   ],
   validate: (c) => collect(validateRange(c.allocated_storage, 20, 65536, '스토리지')),
-  // Phase 4: emit aws_db_instance HCL.
-  terraform: () => '',
+  terraform: ({ name, awsName, config }) => `resource "aws_db_instance" "${name}" {
+  identifier          = "${awsName}"
+  allocated_storage   = ${Number(config.allocated_storage ?? 20)}
+  engine              = "${config.engine ?? 'mysql'}"
+  instance_class      = "${config.instance_class ?? 'db.t3.micro'}"
+  username            = "admin"
+  password            = var.db_password
+  multi_az            = ${config.multi_az ? 'true' : 'false'}
+  skip_final_snapshot = true
+}`,
 }

@@ -26,6 +26,33 @@ export const alb: ResourceMeta = {
     { key: 'listener_port', label: '리스너 포트', type: 'number', min: 1, max: 65535 },
   ],
   validate: (c) => collect(validateRange(c.listener_port, 1, 65535, '리스너 포트')),
-  // Phase 4: emit aws_lb + target group + listener HCL.
-  terraform: () => '',
+  terraform: ({ name, awsName, config, refs }) => {
+    const port = Number(config.listener_port ?? 80)
+    const subnets = (refs.subnets ?? []).map((s) => `aws_subnet.${s}.id`).join(', ')
+    const sgs = (refs.securityGroups ?? []).map((s) => `aws_security_group.${s}.id`).join(', ')
+    return `resource "aws_lb" "${name}" {
+  name               = "${awsName}"
+  internal           = ${config.internal ? 'true' : 'false'}
+  load_balancer_type = "application"
+  security_groups    = [${sgs}]
+  subnets            = [${subnets}]
+}
+
+resource "aws_lb_target_group" "${name}_tg" {
+  name     = "${awsName}-tg"
+  port     = ${port}
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.${refs.vpc ?? 'REPLACE_ME'}.id
+}
+
+resource "aws_lb_listener" "${name}_listener" {
+  load_balancer_arn = aws_lb.${name}.arn
+  port              = ${port}
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.${name}_tg.arn
+  }
+}`
+  },
 }

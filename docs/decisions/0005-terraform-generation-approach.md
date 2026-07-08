@@ -1,6 +1,6 @@
 # 0005. Terraform generation approach
 
-- Status: Accepted
+- Status: Accepted (emitter signature refined by [0013](0013-terraform-export-implementation.md))
 - Date: 2026-07-08
 - Deciders: 차니, Claude
 

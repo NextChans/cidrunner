@@ -164,6 +164,17 @@ blocking node pulses red, with a banner over the canvas. Scope is connectivity
 only — security-group and routing rules are not modeled. See
 [ADR 0012](decisions/0012-traffic-simulation-model.md).
 
+## Terraform export
+
+**Export** runs [`src/graph/terraform.ts`](../src/graph/terraform.ts). Each
+resource owns its HCL via `ResourceMeta.terraform(ctx)`; the generator walks the
+topology once to build each node's `TfContext` (a Terraform-safe name plus
+resolved `refs` — enclosing VPC/subnet and same-VPC subnets/SGs), calls the
+emitters, and assembles `main.tf` / `variables.tf` / `README.md`, zipped for
+download with JSZip. The output targets `terraform validate` (verified with
+Terraform v1.9.8), not `terraform apply` — secrets, AMI, and the Lambda role are
+placeholders. See [ADR 0013](decisions/0013-terraform-export-implementation.md).
+
 ## Mission registry
 
 [`src/missions/`](../src/missions/) holds one module per mission

@@ -22,6 +22,10 @@ export const subnet: ResourceMeta = {
     { key: 'public', label: '퍼블릭 서브넷', type: 'boolean', help: '인터넷에서 직접 접근 가능' },
   ],
   validate: (c) => collect(validateCidr(c.cidr_block)),
-  // Phase 4: emit aws_subnet HCL.
-  terraform: () => '',
+  terraform: ({ name, awsName, config, refs }) => `resource "aws_subnet" "${name}" {
+  vpc_id                  = aws_vpc.${refs.vpc ?? 'REPLACE_ME'}.id
+  cidr_block              = "${config.cidr_block ?? '10.0.1.0/24'}"
+  map_public_ip_on_launch = ${config.public ? 'true' : 'false'}
+  tags = { Name = "${awsName}" }
+}`,
 }

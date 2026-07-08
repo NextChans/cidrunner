@@ -34,6 +34,10 @@ export const ec2: ResourceMeta = {
     collect(
       validatePattern(c.ami, /^ami-[0-9a-f]{8,}$/, 'AMI ID 형식이 올바르지 않습니다 (예: ami-0abcd1234ef567890).'),
     ),
-  // Phase 4: emit aws_instance HCL.
-  terraform: () => '',
+  terraform: ({ name, awsName, config, refs }) => `resource "aws_instance" "${name}" {
+  ami           = "${config.ami ?? 'ami-0abcd1234ef567890'}"
+  instance_type = "${config.instance_type ?? 't3.micro'}"
+  subnet_id     = aws_subnet.${refs.subnet ?? 'REPLACE_ME'}.id
+  tags = { Name = "${awsName}" }
+}`,
 }
