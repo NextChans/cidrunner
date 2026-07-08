@@ -16,8 +16,9 @@ blocking resource lights up. Clear guided missions, or build freely — then
 
 > [!WARNING]
 > **Status: early development — not usable yet.**
-> This is **Phase 0**: scaffolding and a skeleton UI only. There is no working
-> simulation, property editing, or Terraform generation yet. See the roadmap.
+> Through **Phase 1**: you can build a topology (drag-and-drop from the palette,
+> nest resources, wire rule-checked edges), but there is no property editing,
+> simulation, or Terraform generation yet. See the roadmap.
 
 > [!NOTE]
 > **UI language: Korean.** The in-app UI is Korean (hardcoded, no i18n
@@ -46,8 +47,8 @@ Design and decisions live in [`docs/`](docs/):
 
 | Phase | Scope | Status |
 | ----- | ----- | ------ |
-| **Phase 0** | Scaffolding + skeleton UI (layout, palette, canvas, store) | ✅ current |
-| **Phase 1** | Drag-and-drop from palette, node nesting, edge rules | ⬜ planned |
+| **Phase 0** | Scaffolding + skeleton UI (layout, palette, canvas, store) | ✅ done |
+| **Phase 1** | Drag-and-drop from palette, node nesting, edge rules | ✅ current |
 | **Phase 2** | Inspector property editing per resource | ⬜ planned |
 | **Phase 3** | Traffic simulation + mission validation | ⬜ planned |
 | **Phase 4** | Terraform generation + zip export | ⬜ planned |

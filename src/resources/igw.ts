@@ -9,6 +9,8 @@ export const igw: ResourceMeta = {
   icon: Globe,
   color: 'text-blue-400',
   defaults: {},
+  // Attaches to the VPC boundary.
+  allowedParents: ['vpc'],
   // Phase 4: emit aws_internet_gateway HCL.
   terraform: () => '',
 }

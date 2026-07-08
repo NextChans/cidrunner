@@ -38,23 +38,27 @@ fix followed (see ADR 0006); deploy target moved to GitHub Pages (see ADR 0007).
 
 ---
 
-## Phase 1 — Palette drag-and-drop, nesting & edge rules ⏳
+## Phase 1 — Palette drag-and-drop, nesting & edge rules ✅
 
 **Goal.** Make the canvas editable: drag resources from the palette, nest them
 correctly (VPC ▸ Subnet ▸ EC2/RDS …), and constrain edges by direction/type.
 
 **Definition of Done.**
-- Drag a resource from the palette and drop it onto the canvas to create a node.
-- Nesting works: drop a Subnet inside a VPC, and an EC2 inside a Subnet.
-- Invalid parent relationships are rejected in the UI (a Subnet cannot contain
-  a VPC; an EC2 cannot be a top-level orphan where a Subnet is required).
-- Edges enforce direction and type constraints (e.g. ALB → EC2, EC2 → RDS);
-  disallowed connections are refused with visible feedback.
+- ✅ Drag a resource from the palette and drop it onto the canvas to create a
+  node. (Click-to-add is also supported and auto-places into a valid container.)
+- ✅ Nesting works: drop a Subnet inside a VPC, and an EC2 inside a Subnet.
+- ✅ Invalid parent relationships are rejected in the UI (a Subnet cannot contain
+  a VPC; an EC2 cannot be a top-level orphan where a Subnet is required), with a
+  transient Korean notice.
+- ✅ Edges enforce direction and type constraints (ALB → EC2/Lambda,
+  EC2/Lambda → RDS/S3); disallowed connections are refused with visible feedback.
 
-**Status.** ⏳ Planned.
+**Status.** ✅ Complete — the rule model lives on `ResourceMeta`
+(`allowedParents` / `container` / `connectsTo`) and is centralized in
+`src/graph/rules.ts`; the canvas stays free of per-resource branching.
 
-**Related.** [ADR 0001 — MVP scope & resource list](decisions/0001-mvp-scope-and-resource-list.md)
-(nesting rules will get their own ADR when the rule model is decided).
+**Related.** [ADR 0001 — MVP scope & resource list](decisions/0001-mvp-scope-and-resource-list.md) ·
+[ADR 0010 — Graph nesting & edge rule model](decisions/0010-graph-nesting-and-edge-rule-model.md)
 
 ---
 
@@ -126,3 +130,4 @@ correctly (VPC ▸ Subnet ▸ EC2/RDS …), and constrain edges by direction/typ
 | ---- | ------ |
 | 2026-07-08 | Phase 0 completed (`7bfbd38`). Docs skeleton + ADRs 0001–0005 added. |
 | 2026-07-08 | Deploy migrated to GitHub Pages; ADR 0007 added. |
+| 2026-07-08 | Phase 1 completed: palette drag-and-drop, nesting & edge rules; ADR 0010 added. |

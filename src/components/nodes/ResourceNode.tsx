@@ -2,19 +2,22 @@ import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import clsx from 'clsx'
 import { getResource } from '@/resources'
+import { canBeSource, canBeTarget } from '@/graph/rules'
 import type { ResourceNodeType } from '@/store/useGraphStore'
 
 /**
- * Custom React Flow node rendering an AWS resource block.
- * `vpc` renders as a translucent container that visually holds child nodes;
- * everything else renders as a compact card.
+ * Custom React Flow node rendering an AWS resource block. Containers (VPC,
+ * Subnet) render as a translucent box that visually holds child nodes;
+ * everything else renders as a compact card. Connection handles appear only
+ * where the edge rules allow the node to be a source and/or target.
  */
 function ResourceNodeComponent({ data, selected }: NodeProps<ResourceNodeType>) {
   const meta = getResource(data.type)
   const Icon = meta.icon
-  const isContainer = data.type === 'vpc'
+  const showSource = canBeSource(data.type)
+  const showTarget = canBeTarget(data.type)
 
-  if (isContainer) {
+  if (meta.container) {
     return (
       <div
         className={clsx(
@@ -22,12 +25,10 @@ function ResourceNodeComponent({ data, selected }: NodeProps<ResourceNodeType>) 
           selected ? 'border-accent' : 'border-slate-600',
         )}
       >
-        <Handle type="target" position={Position.Left} className="!bg-accent" />
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
           <Icon size={16} className={meta.color} />
           <span className="text-slate-300">{data.label}</span>
         </div>
-        <Handle type="source" position={Position.Right} className="!bg-accent" />
       </div>
     )
   }
@@ -39,7 +40,7 @@ function ResourceNodeComponent({ data, selected }: NodeProps<ResourceNodeType>) 
         selected ? 'border-accent ring-1 ring-accent' : 'border-surface-border',
       )}
     >
-      <Handle type="target" position={Position.Left} className="!bg-accent" />
+      {showTarget && <Handle type="target" position={Position.Left} className="!bg-accent" />}
       <Icon size={18} className={meta.color} />
       <div className="flex flex-col leading-tight">
         <span className="text-sm font-medium text-slate-100">{data.label}</span>
@@ -47,7 +48,7 @@ function ResourceNodeComponent({ data, selected }: NodeProps<ResourceNodeType>) 
           {data.type}
         </span>
       </div>
-      <Handle type="source" position={Position.Right} className="!bg-accent" />
+      {showSource && <Handle type="source" position={Position.Right} className="!bg-accent" />}
     </div>
   )
 }

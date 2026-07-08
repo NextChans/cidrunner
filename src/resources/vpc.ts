@@ -11,6 +11,10 @@ export const vpc: ResourceMeta = {
   defaults: {
     cidr_block: '10.0.0.0/16',
   },
+  // Top-level network boundary; holds subnets and VPC-scoped resources.
+  allowedParents: ['canvas'],
+  container: true,
+  defaultSize: { width: 480, height: 340 },
   // Phase 4: emit aws_vpc HCL.
   terraform: () => '',
 }

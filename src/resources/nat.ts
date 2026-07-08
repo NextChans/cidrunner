@@ -9,6 +9,8 @@ export const nat: ResourceMeta = {
   icon: Waypoints,
   color: 'text-amber-400',
   defaults: {},
+  // Lives in a (public) subnet.
+  allowedParents: ['subnet'],
   // Phase 4: emit aws_nat_gateway (+ EIP) HCL.
   terraform: () => '',
 }

@@ -79,6 +79,7 @@ is the source of truth:
 - `selectedNodeId` — drives the Inspector
 - `activeMissionId` — drives the MissionPanel
 - `mobileDrawers` — `{ palette, inspector, missions }` open flags for the `<md` drawers (`setDrawer`)
+- `notice` — transient player-facing message for a rejected drop/edge (`setNotice`)
 
 Nodes carry a typed `data` payload:
 
@@ -108,13 +109,37 @@ interface ResourceMeta {
   icon: LucideIcon
   color: string
   defaults: Record<string, unknown>
-  terraform: (id, config) => string        // Phase 4 — stubbed
-  validate?: (config) => string[]          // Phase 2/3 — optional
+  allowedParents: (ResourceType | 'canvas')[] // where it may be placed (nesting)
+  container?: boolean                          // holds child nodes (VPC, Subnet)
+  defaultSize?: { width; height }              // container size on create
+  connectsTo?: ResourceType[]                  // directional edge targets
+  terraform: (id, config) => string            // Phase 4 — stubbed
+  validate?: (config) => string[]              // Phase 2/3 — optional
 }
 ```
 
 The MVP set is fixed at **10** resources — see
 [ADR 0001](decisions/0001-mvp-scope-and-resource-list.md).
+
+## Graph rules
+
+Nesting and edge constraints (Phase 1) are **data-driven**, derived entirely
+from the `ResourceMeta` fields above so the canvas carries no per-resource
+branching. [`src/graph/rules.ts`](../src/graph/rules.ts) exposes the derived
+predicates — `canContain`, `canBeTopLevel`, `canConnect`, `canBeSource`,
+`canBeTarget` — used by the canvas and node renderer:
+
+- **Nesting** — a drop resolves the innermost container under the pointer whose
+  type is in the dropped resource's `allowedParents`; if none matches it falls
+  back to top level (when `'canvas'` is allowed) or is rejected. React Flow's
+  native `parentId` + `extent: 'parent'` then keep children within their parent.
+- **Edges** — a connection `source → target` is allowed only when the source's
+  `connectsTo` lists the target's type; connection handles are rendered only
+  where a node may be an edge source and/or target.
+- **Feedback** — a rejected drop or edge sets a transient `notice` string in the
+  store, surfaced as a toast over the canvas.
+
+See [ADR 0010](decisions/0010-graph-nesting-and-edge-rule-model.md).
 
 ## Mission registry
 
