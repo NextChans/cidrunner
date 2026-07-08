@@ -112,11 +112,19 @@ modeled (see ADR 0012).
   in the browser (JSZip).
 - ✅ Output passes `terraform validate` — verified with Terraform v1.9.8 on the
   full 10-resource topology (superset of VPC / Subnet / SG / ALB / EC2 / RDS).
-- ✅ `terraform apply` is explicitly **not** a goal (placeholder secrets/AMI/IAM).
+- ✅ `terraform apply` was **not** a Phase 4 goal (placeholder secrets/AMI/IAM).
 
 **Status.** ✅ Complete — per-resource emitters (`ResourceMeta.terraform(ctx)`)
 own their HCL; `src/graph/terraform.ts` resolves topology references and zips the
 output. See ADR 0013.
+
+> **Superseded post-MVP by [ADR 0016](decisions/0016-apply-ready-terraform.md).**
+> The export is now **apply-ready**: the region and DB password are variables
+> (the latter `sensitive`, no default), AMIs resolve via a `data.aws_ami` lookup,
+> and Lambda ships a real IAM execution role + API Gateway. The only remaining
+> `REPLACE_ME` markers are loud, non-appliable placeholders for resources the
+> editor's nesting rules forbid (an orphaned EC2/subnet) — see
+> [ADR 0025](decisions/0025-terraform-apply-audit.md).
 
 **Related.** [ADR 0005 — Terraform generation approach](decisions/0005-terraform-generation-approach.md) ·
 [ADR 0013 — Terraform export implementation](decisions/0013-terraform-export-implementation.md)
@@ -159,3 +167,4 @@ validation sweep (ADR 0011). See ADR 0014.
 | 2026-07-08 | 리소스 확장 1차 (10→14종): DynamoDB·CloudFront·Route 53·SQS + 미션 2종(글로벌 정적 웹, 비동기 파이프라인) (ADR 0022). |
 | 2026-07-08 | CIDR 검증 apply 기준 강화: 호스트 비트 검사(정정 제안 포함) + AWS /16–/28 프리픽스 (ADR 0011 갱신). |
 | 2026-07-08 | Editor Fundamentals 스프린트 (제품 미팅 #2): undo/redo, 첫 방문 온보딩, 공유 안전화(+미션 컨텍스트), 별점 최고기록, sanitize 리하이드레이트 (ADR 0023). |
+| 2026-07-09 | Sprint A (부채 정리 & QA): TS strict 강화 — `noImplicitReturns` + `noUncheckedIndexedAccess` (ADR 0024); TF apply-readiness 감사 — blocker 0건, `REPLACE_ME` loud 마커 유지 (ADR 0025); 테스트 8→11 파일·42→59 케이스; 문서-코드 mismatch 5건 수정 (Phase 4 노트·ARCHITECTURE 시그니처·README/README.ko 구조·미션 목록). |

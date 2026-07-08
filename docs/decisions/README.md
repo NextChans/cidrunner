@@ -48,3 +48,5 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0021](0021-test-safety-net.md) | Test safety net for graph modules (Vitest) | Accepted | 2026-07-08 |
 | [0022](0022-resource-expansion-batch-1.md) | Resource expansion batch 1 — DynamoDB · CloudFront · Route 53 · SQS (extends 0001) | Accepted | 2026-07-08 |
 | [0023](0023-editor-fundamentals.md) | Editor Fundamentals — undo/redo, 온보딩, 공유 안전화 | Accepted | 2026-07-08 |
+| [0024](0024-typescript-strict-hardening.md) | TypeScript strict 전면 적용 (noImplicitReturns · noUncheckedIndexedAccess) | Accepted | 2026-07-09 |
+| [0025](0025-terraform-apply-audit.md) | Terraform apply-readiness 감사 (Sprint A) | Accepted | 2026-07-09 |

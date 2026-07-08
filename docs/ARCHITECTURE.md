@@ -123,7 +123,7 @@ interface ResourceMeta {
   defaultSize?: { width; height }              // container size on create
   connectsTo?: ResourceType[]                  // directional edge targets
   fields?: PropertyField[]                     // Inspector form descriptor (Phase 2)
-  terraform: (id, config) => string            // Phase 4 — stubbed
+  terraform: (ctx: TfContext) => string        // apply-ready HCL (ADR 0016)
   validate?: (config) => string[]              // real-time validation (Phase 2)
 }
 ```

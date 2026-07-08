@@ -130,8 +130,8 @@ src/
 ├─ store/useGraphStore.ts   # Zustand — nodes / edges / mode
 ├─ components/              # Layout, Canvas, Palette, Inspector, MissionPanel, Toolbar
 │  └─ nodes/ResourceNode.tsx
-├─ resources/              # 10 resource metas + registry (terraform emitters stubbed)
-└─ missions/               # tutorial / 3-tier / serverless
+├─ resources/              # 14 resource metas + registry (apply-ready terraform emitters)
+└─ missions/               # tutorial / 3-tier / serverless / security / static-CDN / async-pipeline
 ```
 
 ## License

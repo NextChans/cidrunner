@@ -130,8 +130,8 @@ src/
 ├─ store/useGraphStore.ts   # Zustand — nodes / edges / mode
 ├─ components/              # Layout, Canvas, Palette, Inspector, MissionPanel, Toolbar
 │  └─ nodes/ResourceNode.tsx
-├─ resources/              # 리소스 10종 meta + 레지스트리 (terraform 생성기는 스텁)
-└─ missions/               # 튜토리얼 / 3-tier / 서버리스
+├─ resources/              # 리소스 14종 meta + 레지스트리 (apply-ready terraform 생성기)
+└─ missions/               # 튜토리얼 / 3-tier / 서버리스 / 보안 / 정적CDN / 비동기파이프라인
 ```
 
 ## 라이선스
