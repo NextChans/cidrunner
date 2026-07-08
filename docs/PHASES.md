@@ -158,3 +158,4 @@ validation sweep (ADR 0011). See ADR 0014.
 | 2026-07-08 | Save & Share 스프린트 (제품 미팅 결정): Vitest 안전망 + CI 편입 (ADR 0021), localStorage 자동저장 + URL 공유 + JSON 내보내기/가져오기 (ADR 0020). |
 | 2026-07-08 | 리소스 확장 1차 (10→14종): DynamoDB·CloudFront·Route 53·SQS + 미션 2종(글로벌 정적 웹, 비동기 파이프라인) (ADR 0022). |
 | 2026-07-08 | CIDR 검증 apply 기준 강화: 호스트 비트 검사(정정 제안 포함) + AWS /16–/28 프리픽스 (ADR 0011 갱신). |
+| 2026-07-08 | Editor Fundamentals 스프린트 (제품 미팅 #2): undo/redo, 첫 방문 온보딩, 공유 안전화(+미션 컨텍스트), 별점 최고기록, sanitize 리하이드레이트 (ADR 0023). |

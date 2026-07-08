@@ -24,6 +24,19 @@ describe('share', () => {
     expect(design!.nodes.find((n) => n.id === 'rds-10')?.data.config.engine).toBe('mysql')
   })
 
+  it('carries mission context and drops unknown mission ids', () => {
+    const { nodes, edges } = bestPracticeTopology()
+    const withMission = designFromHash(packHash(toSnapshot(nodes, edges, 'three-tier')))
+    expect(withMission?.missionId).toBe('three-tier')
+
+    const unknown = designFromHash(packHash({ ...toSnapshot(nodes, edges), m: 'not-a-mission' }))
+    expect(unknown).not.toBeNull()
+    expect(unknown?.missionId).toBeUndefined()
+
+    const none = designFromHash(packHash(toSnapshot(nodes, edges)))
+    expect(none?.missionId).toBeUndefined()
+  })
+
   it('rejects garbage and foreign shapes', () => {
     expect(designFromHash('#g=%%%%')).toBeNull()
     expect(designFromHash('#other')).toBeNull()
