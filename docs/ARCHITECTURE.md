@@ -96,12 +96,28 @@ Nesting uses React Flow's native `parentId` + `extent: 'parent'` (a Subnet's
 
 **Persistence & sharing** ([ADR 0020](decisions/0020-save-and-share.md)): the
 store is wrapped in zustand's `persist` — durable design state
-(`nodes`/`edges`/`mode`/`activeMissionId`) autosaves to localStorage (versioned,
-with a migrate hook); transient UI never persists. Designs also serialize to a
+(`nodes`/`edges`/`mode`/`activeMissionId`/`bestStars`, plus gallery `slots` and
+`earnedBadges`) autosaves to localStorage (versioned, with a migrate hook);
+transient UI never persists. Designs also serialize to a
 versioned JSON snapshot carried in a shareable `#g=` URL fragment or a
 downloadable `.json` file; incoming snapshots are rebuilt field-by-field from a
 whitelist ([`src/graph/share.ts`](../src/graph/share.ts)). Graph modules are
 unit-tested with Vitest in CI ([ADR 0021](decisions/0021-test-safety-net.md)).
+
+**Gallery** ([ADR 0033](decisions/0033-gallery-multi-slot.md)): `slots` holds
+named designs, each carrying the *same* versioned snapshot used for sharing, so
+`loadSlot` re-runs the share sanitizer on the way in. Card thumbnails are
+rendered as pure SVG on demand from a slot's node positions
+([`src/graph/thumbnail.ts`](../src/graph/thumbnail.ts)) — no canvas capture, no
+stored images. **Achievements** ([ADR 0032](decisions/0032-achievements-and-badges.md)):
+five badges are pure predicates over `bestStars` + slot count
+([`src/graph/achievements.ts`](../src/graph/achievements.ts)); the store persists
+only `earnedBadges` (which badges have been announced) so `useAchievements` can
+toast newly-unlocked badges once, without touching mission grading.
+
+**Social preview** ([ADR 0031](decisions/0031-og-image-and-share-metadata.md)):
+`index.html` carries static Open Graph / Twitter Card tags pointing at a
+committed `public/og-image.png` (1200×630) with absolute GitHub Pages URLs.
 
 ## Resource registry
 
@@ -253,8 +269,9 @@ The production build ships as split chunks rather than one bundle
 rolldown's `codeSplitting.groups` to isolate `react-flow` and a catch-all
 `vendor` chunk, keeping every chunk under the 500 kB warning threshold. Code only
 needed on demand is lazy-loaded: **JSZip** (`await import('jszip')` inside the
-Terraform export path) and the **Onboarding**, **ShortcutHelp**, and
-**NodeContextMenu** components (`React.lazy`). On the canvas, React Flow runs with
+Terraform export path) and the **Onboarding**, **ShortcutHelp**,
+**NodeContextMenu**, **Gallery**, and **Achievements** components (`React.lazy`).
+On the canvas, React Flow runs with
 `onlyRenderVisibleElements` so off-viewport nodes are culled and large graphs
 (100+ nodes) stay responsive on pan/zoom.
 

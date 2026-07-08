@@ -13,11 +13,15 @@ import { useGraphStore } from '@/store/useGraphStore'
 // Split out of the main bundle (ADR 0029): each is only fetched when first shown.
 const ShortcutHelp = lazy(() => import('./ShortcutHelp'))
 const NodeContextMenu = lazy(() => import('./NodeContextMenu'))
+const Gallery = lazy(() => import('./Gallery'))
+const Achievements = lazy(() => import('./Achievements'))
 
 export function Layout() {
   const drawers = useGraphStore((s) => s.mobileDrawers)
   const setDrawer = useGraphStore((s) => s.setDrawer)
   const showShortcutHelp = useGraphStore((s) => s.showShortcutHelp)
+  const showGallery = useGraphStore((s) => s.showGallery)
+  const showAchievements = useGraphStore((s) => s.showAchievements)
   const contextMenu = useGraphStore((s) => s.contextMenu)
 
   // Mounted here (inside ReactFlowProvider) so `R` can reach the flow instance.
@@ -82,6 +86,8 @@ export function Layout() {
       <Suspense fallback={null}>
         {contextMenu && <NodeContextMenu />}
         {showShortcutHelp && <ShortcutHelp />}
+        {showGallery && <Gallery />}
+        {showAchievements && <Achievements />}
       </Suspense>
     </div>
   )

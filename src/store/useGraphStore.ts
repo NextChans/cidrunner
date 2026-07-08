@@ -5,9 +5,22 @@ import type { Edge, Node, XYPosition } from '@xyflow/react'
 import { getResource, type ResourceType } from '@/resources'
 import { canBeTopLevel, canContain, requiredParentLabel } from '@/graph/rules'
 import { simulate, type SimResult } from '@/graph/simulate'
-import { sanitizeSnapshot } from '@/graph/share'
+import { sanitizeSnapshot, toSnapshot, type DesignSnapshot } from '@/graph/share'
 
 export type Mode = 'free' | 'challenge'
+
+/**
+ * A saved design in the gallery (ADR 0033). The snapshot is the same versioned
+ * shape used for URL/JSON sharing, so a slot round-trips through the identical
+ * sanitizer on load — foreign/corrupt data can't reach the store.
+ */
+export interface GallerySlot {
+  id: string
+  name: string
+  snapshot: DesignSnapshot
+  createdAt: number
+  updatedAt: number
+}
 
 /** Transient toast: errors are rose, info (e.g. "link copied") is emerald. */
 export interface Notice {
@@ -57,6 +70,14 @@ interface GraphState {
   contextMenu: ContextMenuState | null
   /** Whether the keyboard-shortcut help modal is open (ADR 0028). */
   showShortcutHelp: boolean
+  /** Whether the gallery modal is open (ADR 0033). */
+  showGallery: boolean
+  /** Whether the achievements modal is open (ADR 0032). */
+  showAchievements: boolean
+  /** Saved design slots — persisted (ADR 0033). */
+  slots: GallerySlot[]
+  /** Ids of badges already announced to the player — persisted (ADR 0032). */
+  earnedBadges: string[]
 
   setMode: (mode: Mode) => void
   /** Click-to-add: places the node into a valid container automatically. */
@@ -98,8 +119,21 @@ interface GraphState {
   toggleMiniMap: () => void
   setContextMenu: (menu: ContextMenuState | null) => void
   setShortcutHelp: (open: boolean) => void
+  setShowGallery: (open: boolean) => void
+  setShowAchievements: (open: boolean) => void
+  /** Saves the current design into a new gallery slot. */
+  saveSlot: (name: string) => void
+  /** Replaces the canvas with a slot's design (re-sanitized on the way in). */
+  loadSlot: (id: string) => void
+  deleteSlot: (id: string) => void
+  renameSlot: (id: string, name: string) => void
+  /** Marks badge ids as announced; returns nothing (idempotent, deduped). */
+  markBadges: (ids: string[]) => void
   reset: () => void
 }
+
+// Monotonic disambiguator so two slots saved in the same millisecond differ.
+let slotSeq = 0
 
 /** Seed graph: a VPC ▸ public Subnet ▸ EC2, demonstrating valid nesting. */
 const initialNodes: ResourceNodeType[] = [
@@ -223,6 +257,10 @@ export const useGraphStore = create<GraphState>()(
   showMiniMap: !isMobileViewport(),
   contextMenu: null,
   showShortcutHelp: false,
+  showGallery: false,
+  showAchievements: false,
+  slots: [],
+  earnedBadges: [],
 
   setMode: (mode) => set({ mode }),
 
@@ -465,6 +503,63 @@ export const useGraphStore = create<GraphState>()(
 
   setContextMenu: (contextMenu) => set({ contextMenu }),
   setShortcutHelp: (showShortcutHelp) => set({ showShortcutHelp }),
+  setShowGallery: (showGallery) => set({ showGallery }),
+  setShowAchievements: (showAchievements) => set({ showAchievements }),
+
+  saveSlot: (name) =>
+    set((state) => {
+      slotSeq += 1
+      const now = Date.now()
+      const slot: GallerySlot = {
+        id: `s-${now.toString(36)}-${slotSeq}`,
+        name: name.trim() || `설계 ${state.slots.length + 1}`,
+        snapshot: toSnapshot(state.nodes, state.edges, state.activeMissionId),
+        createdAt: now,
+        updatedAt: now,
+      }
+      return { slots: [slot, ...state.slots] }
+    }),
+
+  loadSlot: (id) => {
+    const slot = useGraphStore.getState().slots.find((s) => s.id === id)
+    if (!slot) return
+    // Re-sanitize on load: a slot persisted under an older schema (or hand-
+    // edited localStorage) can't inject anything the share path wouldn't.
+    const clean = sanitizeSnapshot(slot.snapshot)
+    if (!clean) {
+      set({ notice: { text: '슬롯을 불러올 수 없습니다 (손상된 데이터).', kind: 'error' } })
+      return
+    }
+    bumpNodeSeq(clean.nodes)
+    set({
+      nodes: clean.nodes,
+      edges: clean.edges,
+      selectedNodeId: null,
+      activeMissionId: clean.missionId ?? null,
+      ...(clean.missionId ? { mode: 'challenge' as const } : {}),
+      simulation: null,
+      showGallery: false,
+      notice: { text: `"${slot.name}" 설계를 불러왔습니다.`, kind: 'info' },
+    })
+  },
+
+  deleteSlot: (id) =>
+    set((state) => ({ slots: state.slots.filter((s) => s.id !== id) })),
+
+  renameSlot: (id, name) =>
+    set((state) => ({
+      slots: state.slots.map((s) =>
+        s.id === id ? { ...s, name: name.trim() || s.name, updatedAt: Date.now() } : s,
+      ),
+    })),
+
+  markBadges: (ids) =>
+    set((state) => {
+      const next = new Set(state.earnedBadges)
+      let changed = false
+      for (const id of ids) if (!next.has(id)) { next.add(id); changed = true }
+      return changed ? { earnedBadges: [...next] } : state
+    }),
 
   reset: () =>
     set({
@@ -490,6 +585,12 @@ export const useGraphStore = create<GraphState>()(
           mode: s.mode,
           activeMissionId: s.activeMissionId,
           bestStars: s.bestStars,
+          // Gallery slots (ADR 0033) + announced badges (ADR 0032). New fields
+          // stay backward-compatible: an older payload without them simply
+          // keeps the `[]` defaults via the merge below (no version bump, so
+          // existing saved designs are never discarded).
+          slots: s.slots,
+          earnedBadges: s.earnedBadges,
         }),
         // Rehydrate through the same whitelist as shared URLs (ADR 0023). If
         // the stored graph fails sanitation we keep it as-is — local data is
