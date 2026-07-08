@@ -16,8 +16,9 @@ blocking resource lights up. Clear guided missions, or build freely — then
 
 > [!WARNING]
 > **Status: early development — not usable yet.**
-> This is **Phase 0**: scaffolding and a skeleton UI only. There is no working
-> simulation, property editing, or Terraform generation yet. See the roadmap.
+> Through **Phase 1**: you can build a topology (drag-and-drop from the palette,
+> nest resources, wire rule-checked edges), but there is no property editing,
+> simulation, or Terraform generation yet. See the roadmap.
 
 > [!NOTE]
 > **UI language: Korean.** The in-app UI is Korean (hardcoded, no i18n
@@ -40,13 +41,14 @@ Design and decisions live in [`docs/`](docs/):
 - **Missions & Free mode** — guided challenges (tutorial / 3-tier / serverless) or an open sandbox.
 - **Terraform export** — download a `main.tf` + `variables.tf` zip that aims to pass `terraform validate`.
 - **MVP resource set (10)** — VPC · Subnet · IGW · NAT · Security Group · ALB · EC2 · RDS · S3 · Lambda+API GW.
+- **Mobile** — building infra is a desktop-first experience, but narrow screens (<768px) get a full-viewport canvas with the palette / inspector / missions moved into overlay drawers, so a project stays viewable and demo-able on a phone. See [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md).
 
 ## Roadmap
 
 | Phase | Scope | Status |
 | ----- | ----- | ------ |
-| **Phase 0** | Scaffolding + skeleton UI (layout, palette, canvas, store) | ✅ current |
-| **Phase 1** | Drag-and-drop from palette, node nesting, edge rules | ⬜ planned |
+| **Phase 0** | Scaffolding + skeleton UI (layout, palette, canvas, store) | ✅ done |
+| **Phase 1** | Drag-and-drop from palette, node nesting, edge rules | ✅ current |
 | **Phase 2** | Inspector property editing per resource | ⬜ planned |
 | **Phase 3** | Traffic simulation + mission validation | ⬜ planned |
 | **Phase 4** | Terraform generation + zip export | ⬜ planned |

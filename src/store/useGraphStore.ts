@@ -14,6 +14,15 @@ export interface NodeData {
 
 export type ResourceNodeType = Node<NodeData>
 
+/** Which of the three side panels are open as overlay drawers on mobile. */
+export type DrawerKey = 'palette' | 'inspector' | 'missions'
+export type MobileDrawers = Record<DrawerKey, boolean>
+
+/** Matches Tailwind's default `md` breakpoint: anything below 768px is mobile. */
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+}
+
 interface GraphState {
   mode: Mode
   nodes: ResourceNodeType[]
@@ -22,6 +31,7 @@ interface GraphState {
   activeMissionId: string | null
   /** Transient, player-facing message (e.g. a rejected drop/edge). */
   notice: string | null
+  mobileDrawers: MobileDrawers
 
   setMode: (mode: Mode) => void
   /** Click-to-add: places the node into a valid container automatically. */
@@ -34,6 +44,7 @@ interface GraphState {
   setSelected: (id: string | null) => void
   setActiveMission: (id: string | null) => void
   setNotice: (notice: string | null) => void
+  setDrawer: (which: DrawerKey, open: boolean) => void
   reset: () => void
 }
 
@@ -117,6 +128,7 @@ export const useGraphStore = create<GraphState>((set) => ({
   selectedNodeId: null,
   activeMissionId: null,
   notice: null,
+  mobileDrawers: { palette: false, inspector: false, missions: false },
 
   setMode: (mode) => set({ mode }),
 
@@ -163,9 +175,24 @@ export const useGraphStore = create<GraphState>((set) => ({
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
-  setSelected: (selectedNodeId) => set({ selectedNodeId }),
+
+  setSelected: (selectedNodeId) =>
+    set((state) => {
+      // On mobile the Inspector is a drawer; selecting a node should surface it.
+      if (selectedNodeId && isMobileViewport()) {
+        return {
+          selectedNodeId,
+          mobileDrawers: { ...state.mobileDrawers, inspector: true },
+        }
+      }
+      return { selectedNodeId }
+    }),
+
   setActiveMission: (activeMissionId) => set({ activeMissionId }),
   setNotice: (notice) => set({ notice }),
+
+  setDrawer: (which, open) =>
+    set((state) => ({ mobileDrawers: { ...state.mobileDrawers, [which]: open } })),
 
   reset: () =>
     set({
@@ -174,5 +201,6 @@ export const useGraphStore = create<GraphState>((set) => ({
       selectedNodeId: null,
       activeMissionId: null,
       notice: null,
+      mobileDrawers: { palette: false, inspector: false, missions: false },
     }),
 }))
