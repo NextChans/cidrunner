@@ -3,7 +3,11 @@
  * Each returns a Korean error message, or `null` when the value is valid.
  */
 
-/** Validates an IPv4 CIDR block such as `10.0.0.0/16`. */
+/**
+ * Validates an IPv4 CIDR block such as `10.0.0.0/16` against what AWS actually
+ * accepts for VPC/Subnet CIDRs: /16–/28 prefix, and no host bits set (the
+ * address must be the network base — AWS rejects `10.0.1.5/24`).
+ */
 export function validateCidr(value: unknown): string | null {
   if (typeof value !== 'string' || value.trim() === '') {
     return 'CIDR 블록을 입력하세요.'
@@ -13,7 +17,17 @@ export function validateCidr(value: unknown): string | null {
   const octets = [match[1], match[2], match[3], match[4]].map(Number)
   if (octets.some((o) => o > 255)) return 'IP 옥텟은 0–255 범위여야 합니다.'
   const prefix = Number(match[5])
-  if (prefix > 32) return '프리픽스는 0–32 범위여야 합니다.'
+  if (prefix < 16 || prefix > 28) {
+    return 'AWS VPC/Subnet 프리픽스는 /16–/28 범위여야 합니다.'
+  }
+  const ip =
+    ((octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]) >>> 0
+  const size = 2 ** (32 - prefix)
+  const base = (ip & ~((size - 1) >>> 0)) >>> 0
+  if (ip !== base) {
+    const dotted = [base >>> 24, (base >>> 16) & 255, (base >>> 8) & 255, base & 255].join('.')
+    return `호스트 비트가 설정되어 있습니다 — ${dotted}/${prefix}을(를) 사용하세요.`
+  }
   return null
 }
 
