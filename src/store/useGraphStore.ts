@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { Edge, Node, XYPosition } from '@xyflow/react'
 import { getResource, type ResourceType } from '@/resources'
 import { canBeTopLevel, canContain, requiredParentLabel } from '@/graph/rules'
+import { simulate, type SimResult } from '@/graph/simulate'
 
 export type Mode = 'free' | 'challenge'
 
@@ -32,6 +33,8 @@ interface GraphState {
   /** Transient, player-facing message (e.g. a rejected drop/edge). */
   notice: string | null
   mobileDrawers: MobileDrawers
+  /** Result of the last/current traffic simulation run (Phase 3), or null. */
+  simulation: SimResult | null
 
   setMode: (mode: Mode) => void
   /** Click-to-add: places the node into a valid container automatically. */
@@ -47,6 +50,10 @@ interface GraphState {
   setActiveMission: (id: string | null) => void
   setNotice: (notice: string | null) => void
   setDrawer: (which: DrawerKey, open: boolean) => void
+  /** Runs the traffic simulation over the current graph and stores the result. */
+  runSimulation: () => void
+  /** Clears the current simulation highlight. */
+  stopSimulation: () => void
   reset: () => void
 }
 
@@ -135,6 +142,7 @@ export const useGraphStore = create<GraphState>((set) => ({
   activeMissionId: null,
   notice: null,
   mobileDrawers: { palette: false, inspector: false, missions: false },
+  simulation: null,
 
   setMode: (mode) => set({ mode }),
 
@@ -144,7 +152,12 @@ export const useGraphStore = create<GraphState>((set) => ({
       if (canBeTopLevel(type)) {
         const offset = (state.nodes.length % 6) * 28
         const node = makeNode(type, { x: 560 + offset, y: 120 + offset })
-        return { nodes: [...state.nodes, node], selectedNodeId: node.id, notice: null }
+        return {
+          nodes: [...state.nodes, node],
+          selectedNodeId: node.id,
+          notice: null,
+          simulation: null,
+        }
       }
       // Nested resources need an existing valid container.
       const parent = state.nodes.find((n) => canContain(n.data.type, type))
@@ -157,13 +170,23 @@ export const useGraphStore = create<GraphState>((set) => ({
       const siblings = state.nodes.filter((n) => n.parentId === parent.id).length
       const fan = (siblings % 4) * 22
       const node = makeNode(type, { x: 24 + fan, y: 48 + fan }, parent.id)
-      return { nodes: [...state.nodes, node], selectedNodeId: node.id, notice: null }
+      return {
+        nodes: [...state.nodes, node],
+        selectedNodeId: node.id,
+        notice: null,
+        simulation: null,
+      }
     }),
 
   addNodeAt: (type, position, parentId) =>
     set((state) => {
       const node = makeNode(type, position, parentId)
-      return { nodes: [...state.nodes, node], selectedNodeId: node.id, notice: null }
+      return {
+        nodes: [...state.nodes, node],
+        selectedNodeId: node.id,
+        notice: null,
+        simulation: null,
+      }
     }),
 
   removeNode: (id) =>
@@ -176,6 +199,7 @@ export const useGraphStore = create<GraphState>((set) => ({
           state.selectedNodeId && doomed.has(state.selectedNodeId)
             ? null
             : state.selectedNodeId,
+        simulation: null,
       }
     }),
 
@@ -209,6 +233,11 @@ export const useGraphStore = create<GraphState>((set) => ({
   setDrawer: (which, open) =>
     set((state) => ({ mobileDrawers: { ...state.mobileDrawers, [which]: open } })),
 
+  runSimulation: () =>
+    set((state) => ({ simulation: simulate(state.nodes, state.edges) })),
+
+  stopSimulation: () => set({ simulation: null }),
+
   reset: () =>
     set({
       nodes: initialNodes,
@@ -217,5 +246,6 @@ export const useGraphStore = create<GraphState>((set) => ({
       activeMissionId: null,
       notice: null,
       mobileDrawers: { palette: false, inspector: false, missions: false },
+      simulation: null,
     }),
 }))

@@ -82,18 +82,23 @@ toggles (see ADR 0011).
 
 ---
 
-## Phase 3 — Traffic simulation ⏳
+## Phase 3 — Traffic simulation ✅
 
 **Goal.** Animate a request flowing through the topology and highlight failures.
 
 **Definition of Done.**
-- **Start** button animates particles `client → LB → target → DB`.
-- When a rule is violated (broken path, missing route/SG), the blocking point is
-  highlighted with a failure message.
+- ✅ **Start** button traces `client → LB → app → DB` and animates particles
+  along the path edges (SVG `animateMotion`, staggered per hop).
+- ✅ When the path is broken, the blocking node is highlighted (red pulse) with a
+  Korean failure message; path nodes glow green on success.
 
-**Status.** ⏳ Planned.
+**Status.** ✅ Complete — `src/graph/simulate.ts` does a greedy single-path trace
+(entry = ALB/Lambda, sink = RDS/S3); `TrafficEdge` animates particles; the store
+holds the `simulation` result. Scope: connectivity only — SG/route rules are not
+modeled (see ADR 0012).
 
-**Related.** [ADR 0003 — Mission system in MVP](decisions/0003-mission-system-in-mvp.md)
+**Related.** [ADR 0012 — Traffic simulation model](decisions/0012-traffic-simulation-model.md) ·
+[ADR 0003 — Mission system in MVP](decisions/0003-mission-system-in-mvp.md)
 (mission clear checks build on the simulator).
 
 ---
@@ -136,3 +141,4 @@ toggles (see ADR 0011).
 | 2026-07-08 | Deploy migrated to GitHub Pages; ADR 0007 added. |
 | 2026-07-08 | Phase 1 completed: palette drag-and-drop, nesting & edge rules; ADR 0010 added. |
 | 2026-07-08 | Phase 2 completed: Inspector property form + real-time validation; ADR 0011 added. |
+| 2026-07-08 | Phase 3 completed: traffic simulation (path trace + particle animation); ADR 0012 added. |

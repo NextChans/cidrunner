@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Play, RotateCcw, Download } from 'lucide-react'
+import { Play, Square, RotateCcw, Download } from 'lucide-react'
 import { useGraphStore, type Mode } from '@/store/useGraphStore'
 
 const MODES: Mode[] = ['free', 'challenge']
@@ -13,6 +13,9 @@ export function Toolbar() {
   const mode = useGraphStore((s) => s.mode)
   const setMode = useGraphStore((s) => s.setMode)
   const reset = useGraphStore((s) => s.reset)
+  const running = useGraphStore((s) => s.simulation !== null)
+  const runSimulation = useGraphStore((s) => s.runSimulation)
+  const stopSimulation = useGraphStore((s) => s.stopSimulation)
 
   return (
     <div className="flex items-center gap-3">
@@ -39,12 +42,11 @@ export function Toolbar() {
 
       <button
         type="button"
-        // Phase 3: run the traffic simulation.
-        onClick={() => console.log('TODO: start simulation')}
+        onClick={() => (running ? stopSimulation() : runSimulation())}
         className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-slate-900 transition-colors hover:bg-accent-soft"
       >
-        <Play size={14} />
-        시작
+        {running ? <Square size={14} /> : <Play size={14} />}
+        {running ? '중지' : '시작'}
       </button>
 
       <button

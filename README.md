@@ -16,10 +16,11 @@ blocking resource lights up. Clear guided missions, or build freely — then
 
 > [!WARNING]
 > **Status: early development.**
-> Through **Phase 2**: you can build a topology (drag-and-drop from the palette,
-> nest resources, wire rule-checked edges) and edit each resource's properties
-> with real-time validation. Traffic simulation and Terraform generation are not
-> in yet. See the roadmap.
+> Through **Phase 3**: you can build a topology (drag-and-drop from the palette,
+> nest resources, wire rule-checked edges), edit each resource's properties with
+> real-time validation, and press **Start** to simulate traffic
+> (`client → LB → app → DB`) with the blocking point highlighted. Terraform
+> generation is not in yet. See the roadmap.
 
 > [!NOTE]
 > **UI language: Korean.** The in-app UI is Korean (hardcoded, no i18n
@@ -50,8 +51,8 @@ Design and decisions live in [`docs/`](docs/):
 | ----- | ----- | ------ |
 | **Phase 0** | Scaffolding + skeleton UI (layout, palette, canvas, store) | ✅ done |
 | **Phase 1** | Drag-and-drop from palette, node nesting, edge rules | ✅ done |
-| **Phase 2** | Inspector property editing per resource | ✅ current |
-| **Phase 3** | Traffic simulation | ⬜ planned |
+| **Phase 2** | Inspector property editing per resource | ✅ done |
+| **Phase 3** | Traffic simulation | ✅ current |
 | **Phase 4** | Terraform generation + zip export | ⬜ planned |
 | **Phase 5** | Mission system (clear detection + star rating) | ⬜ planned |
 

@@ -153,6 +153,17 @@ predicates — `canContain`, `canBeTopLevel`, `canConnect`, `canBeSource`,
 
 See [ADR 0010](decisions/0010-graph-nesting-and-edge-rule-model.md).
 
+## Traffic simulation
+
+Pressing **Start** runs [`src/graph/simulate.ts`](../src/graph/simulate.ts): a
+greedy single-path trace from an entry node (ALB, else an unfed Lambda) along the
+edges to a sink (RDS or S3). The `SimResult` (path node/edge ids, blocking node,
+message) lives in the store as `simulation`. `TrafficEdge` renders a moving SVG
+particle along each path edge (staggered per hop); path nodes glow green and the
+blocking node pulses red, with a banner over the canvas. Scope is connectivity
+only — security-group and routing rules are not modeled. See
+[ADR 0012](decisions/0012-traffic-simulation-model.md).
+
 ## Mission registry
 
 [`src/missions/`](../src/missions/) holds one module per mission
