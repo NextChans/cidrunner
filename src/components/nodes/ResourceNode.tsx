@@ -1,16 +1,20 @@
 import { memo } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react'
 import clsx from 'clsx'
 import { getResource } from '@/resources'
 import { canBeSource, canBeTarget } from '@/graph/rules'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
+/** Containers can't shrink below this, so their header and children stay visible. */
+const MIN_CONTAINER = { width: 160, height: 100 }
+
 /**
  * Custom React Flow node rendering an AWS resource block. Containers (VPC,
- * Subnet) render as a translucent box that visually holds child nodes;
- * everything else renders as a compact card. Connection handles appear only
- * where the edge rules allow the node to be a source and/or target. During a
- * simulation, nodes on the traced path glow green and the blocking node red.
+ * Subnet) render as a translucent box that visually holds child nodes and are
+ * resizable while selected; everything else renders as a compact card.
+ * Connection handles appear only where the edge rules allow the node to be a
+ * source and/or target. During a simulation, nodes on the traced path glow
+ * green and the blocking node red.
  */
 function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeType>) {
   const meta = getResource(data.type)
@@ -38,6 +42,19 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
                   : 'border-slate-600',
         )}
       >
+        <NodeResizer
+          isVisible={selected ?? false}
+          minWidth={MIN_CONTAINER.width}
+          minHeight={MIN_CONTAINER.height}
+          lineStyle={{ borderColor: '#10b981' }}
+          handleStyle={{
+            width: 8,
+            height: 8,
+            borderRadius: 2,
+            backgroundColor: '#10b981',
+            border: '1px solid #0f172a',
+          }}
+        />
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
           <Icon size={16} className={meta.color} />
           <span className="text-slate-300">{data.label}</span>
