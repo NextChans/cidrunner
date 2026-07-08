@@ -25,7 +25,8 @@ function awsName(id: string): string {
 
 /** Emit order so the file reads network-outward. */
 const ORDER: ResourceType[] = [
-  'vpc', 'subnet', 'igw', 'nat', 'sg', 'alb', 'ec2', 'rds', 's3', 'lambda',
+  'vpc', 'subnet', 'igw', 'nat', 'sg', 'alb', 'ec2', 'rds', 's3', 'dynamodb',
+  'sqs', 'lambda', 'cloudfront', 'route53',
 ]
 
 function ancestorOfType(
@@ -66,6 +67,21 @@ export function generateTerraform(
   }
   const isReplica = (n: ResourceNodeType) =>
     n.data.type === 'rds' && replicaSourceOf(n.id) !== undefined
+  // First outgoing edge into one of `kinds` → typed reference (CF origin, R53 alias).
+  const firstTargetOf = (nodeId: string, kinds: ResourceType[]) => {
+    const e = edges.find(
+      (e) => e.source === nodeId && kinds.includes(typeOf(e.target) as ResourceType),
+    )
+    return e ? { kind: typeOf(e.target) as ResourceType, name: tfName(e.target) } : undefined
+  }
+  const sqsConsumers = (sqsId: string) =>
+    edges
+      .filter((e) => e.source === sqsId && typeOf(e.target) === 'lambda')
+      .map((e) => tfName(e.target))
+  const lambdaSqsSources = (lambdaId: string) =>
+    edges
+      .filter((e) => e.target === lambdaId && typeOf(e.source) === 'sqs')
+      .map((e) => tfName(e.source))
 
   const subnetsIn = (vpcId: string) =>
     nodes.filter((n) => n.data.type === 'subnet' && vpcOf(n)?.id === vpcId)
@@ -94,6 +110,16 @@ export function generateTerraform(
           securityGroups: attachedSGs(node.id),
           targets: node.data.type === 'alb' ? albTargets(node.id) : undefined,
           replicaSource: node.data.type === 'rds' ? replicaSourceOf(node.id) : undefined,
+          originTarget:
+            node.data.type === 'cloudfront'
+              ? firstTargetOf(node.id, ['alb', 's3', 'lambda'])
+              : undefined,
+          aliasTarget:
+            node.data.type === 'route53'
+              ? firstTargetOf(node.id, ['cloudfront', 'alb'])
+              : undefined,
+          consumers: node.data.type === 'sqs' ? sqsConsumers(node.id) : undefined,
+          sqsSources: node.data.type === 'lambda' ? lambdaSqsSources(node.id) : undefined,
         },
       })
     })
@@ -257,6 +283,30 @@ ${dataBlocks}${blocks.join('\n\n')}${derived.length ? '\n\n# --- Derived network
       outputs.push(`output "${name}_endpoint" {
   description = "${n.data.label} connection endpoint"
   value       = aws_db_instance.${name}.endpoint
+}`)
+    }
+    if (n.data.type === 'cloudfront') {
+      outputs.push(`output "${name}_domain" {
+  description = "${n.data.label} distribution domain"
+  value       = aws_cloudfront_distribution.${name}.domain_name
+}`)
+    }
+    if (n.data.type === 'route53') {
+      outputs.push(`output "${name}_name_servers" {
+  description = "${n.data.label} zone name servers"
+  value       = aws_route53_zone.${name}.name_servers
+}`)
+    }
+    if (n.data.type === 'dynamodb') {
+      outputs.push(`output "${name}_table" {
+  description = "${n.data.label} table name"
+  value       = aws_dynamodb_table.${name}.name
+}`)
+    }
+    if (n.data.type === 'sqs') {
+      outputs.push(`output "${name}_queue_url" {
+  description = "${n.data.label} queue URL"
+  value       = aws_sqs_queue.${name}.url
 }`)
     }
   }

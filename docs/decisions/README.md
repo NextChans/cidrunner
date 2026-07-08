@@ -46,3 +46,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0019](0019-rds-read-replica-as-edge.md) | RDS read replica as a replication edge | Accepted | 2026-07-08 |
 | [0020](0020-save-and-share.md) | Save & Share — localStorage autosave & URL sharing | Accepted | 2026-07-08 |
 | [0021](0021-test-safety-net.md) | Test safety net for graph modules (Vitest) | Accepted | 2026-07-08 |
+| [0022](0022-resource-expansion-batch-1.md) | Resource expansion batch 1 — DynamoDB · CloudFront · Route 53 · SQS (extends 0001) | Accepted | 2026-07-08 |

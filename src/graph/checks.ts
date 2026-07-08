@@ -1,6 +1,6 @@
 import type { Edge } from '@xyflow/react'
 import type { ResourceNodeType } from '@/store/useGraphStore'
-import { cidrIssues } from '@/graph/cidr'
+import { cidrIssues, parseCidr } from '@/graph/cidr'
 
 /**
  * Graph-level validation with severity (ADR 0017):
@@ -123,6 +123,58 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
       if (cfg.encryption === false) push(warnings, node.id, '기본 암호화가 꺼져 있습니다.')
       if (cfg.block_public_access === false) {
         push(warnings, node.id, '퍼블릭 액세스 차단이 꺼져 있습니다.')
+      }
+    }
+
+    if (t === 'cloudfront') {
+      const origin = edges.find(
+        (e) =>
+          e.source === node.id &&
+          ['alb', 's3', 'lambda'].includes(byId.get(e.target)?.data.type ?? ''),
+      )
+      if (!origin) {
+        push(errors, node.id, 'CloudFront에 오리진(ALB/S3/Lambda)이 연결되어 있지 않습니다.')
+      } else if (byId.get(origin.target)?.data.config.internal === true) {
+        push(warnings, node.id, '내부(Internal) ALB는 CloudFront 오리진으로 동작하지 않습니다.')
+      }
+    }
+
+    if (t === 'route53') {
+      const hasTarget = edges.some(
+        (e) =>
+          e.source === node.id &&
+          ['cloudfront', 'alb'].includes(byId.get(e.target)?.data.type ?? ''),
+      )
+      if (!hasTarget) {
+        push(warnings, node.id, '레코드가 가리킬 대상(CloudFront/ALB)이 없습니다.')
+      }
+    }
+
+    if (t === 'sqs') {
+      const hasConsumer = edges.some(
+        (e) => e.source === node.id && byId.get(e.target)?.data.type === 'lambda',
+      )
+      if (!hasConsumer) {
+        push(warnings, node.id, '큐를 소비할 Lambda가 연결되어 있지 않습니다.')
+      }
+    }
+  }
+
+  // VPC-to-VPC CIDR overlap: AWS allows it, so it is not an error (ADR 0015),
+  // but it breaks the moment the VPCs are peered/VPN-connected — warn.
+  const vpcRanges = nodes
+    .filter((n) => n.data.type === 'vpc')
+    .map((n) => ({ node: n, range: parseCidr(n.data.config.cidr_block) }))
+  for (let i = 0; i < vpcRanges.length; i++) {
+    for (let j = i + 1; j < vpcRanges.length; j++) {
+      const a = vpcRanges[i]
+      const b = vpcRanges[j]
+      if (!a.range || !b.range) continue
+      if (a.range.start <= b.range.end && b.range.start <= a.range.end) {
+        const msg = (other: ResourceNodeType) =>
+          `다른 VPC(${other.data.label}, ${other.data.config.cidr_block})와 CIDR이 겹칩니다 — 피어링/VPN 연결 시 라우팅이 불가합니다.`
+        push(warnings, a.node.id, msg(b.node))
+        push(warnings, b.node.id, msg(a.node))
       }
     }
   }

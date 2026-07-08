@@ -24,7 +24,7 @@ console and docs. See [ADR 0008](decisions/0008-korean-first-ui-no-i18n.md).
 ```
 App
 └─ Layout                     responsive shell (3-pane ≥md / drawers <md)
-   ├─ Palette         (left)    draggable list of the 10 resource types
+   ├─ Palette         (left)    draggable list of the 14 resource types
    ├─ Canvas          (center)  React Flow editor — nodes, edges, nesting
    │  └─ ResourceNode           one node renderer, driven by ResourceMeta
    ├─ Inspector       (right)   per-resource property form (Phase 2)
@@ -128,7 +128,7 @@ interface ResourceMeta {
 }
 ```
 
-The MVP set is fixed at **10** resources — see
+The resource set is **14** blocks — the 10-block MVP set plus expansion batch 1 — see
 [ADR 0001](decisions/0001-mvp-scope-and-resource-list.md).
 
 ## Property editing & validation

@@ -45,7 +45,7 @@ Design and decisions live in [`docs/`](docs/):
 - **Missions & Free mode** — best-practice challenges (tutorial / HA 3-tier / serverless / security hardening) with 0–3 star ratings, or an open sandbox.
 - **Save & Share** — designs autosave to the browser (survive refresh) and share as a single URL or a JSON file; no account, no backend.
 - **Apply-ready Terraform export** — `main.tf`, `variables.tf`, `outputs.tf` with derived route tables, DB subnet groups, IAM, and a working API Gateway; `terraform apply` creates real resources.
-- **MVP resource set (10)** — VPC · Subnet · IGW · NAT · Security Group · ALB · EC2 · RDS · S3 · Lambda+API GW.
+- **Resource set (14)** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · Lambda+API GW · RDS (+read replica) · DynamoDB · S3 · SQS · Security Group.
 - **Mobile** — building infra is a desktop-first experience, but narrow screens (<768px) get a full-viewport canvas with the palette / inspector / missions moved into overlay drawers, so a project stays viewable and demo-able on a phone. See [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md).
 
 ## Roadmap

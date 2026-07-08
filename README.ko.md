@@ -45,7 +45,7 @@
 - **미션 & 자유 모드** — 베스트 프랙티스 챌린지(튜토리얼 / 고가용성 3-tier / 서버리스 / 시큐리티 하드닝)와 별점(0–3), 또는 자유 샌드박스.
 - **저장 & 공유** — 설계가 브라우저에 자동 저장되어 새로고침에도 유지되고, URL 하나 또는 JSON 파일로 공유됩니다. 계정·백엔드 불필요.
 - **apply 가능한 Terraform 내보내기** — 라우트 테이블·DB Subnet Group·IAM·API Gateway까지 유도 생성된 `main.tf`/`variables.tf`/`outputs.tf`. `terraform apply` 하면 실제 리소스가 생성됩니다.
-- **MVP 리소스 10종** — VPC · Subnet · IGW · NAT · Security Group · ALB · EC2 · RDS · S3 · Lambda+API GW.
+- **리소스 14종** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · Lambda+API GW · RDS(+읽기 복제본) · DynamoDB · S3 · SQS · Security Group.
 - **모바일** — 인프라 편집은 데스크톱 우선 경험이지만, 좁은 화면(<768px)에서는 캔버스가 전체 화면을 차지하고 팔레트 / 인스펙터 / 미션이 오버레이 drawer로 이동해 폰에서도 프로젝트를 보고 데모할 수 있습니다. [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md) 참고.
 
 ## 로드맵

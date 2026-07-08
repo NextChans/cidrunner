@@ -156,3 +156,4 @@ validation sweep (ADR 0011). See ADR 0014.
 | 2026-07-08 | v2 "엔지니어 시뮬레이션": apply-ready Terraform (ADR 0016), SG attachment edges + severity validation (ADR 0017), multi-flow playback + categorized palette + minimap toggle (ADR 0018), node naming, security-hardening mission. |
 | 2026-07-08 | RDS read replica: RDS → RDS replication edge + REPLICA badge + `replicate_source_db` emit (ADR 0019). |
 | 2026-07-08 | Save & Share 스프린트 (제품 미팅 결정): Vitest 안전망 + CI 편입 (ADR 0021), localStorage 자동저장 + URL 공유 + JSON 내보내기/가져오기 (ADR 0020). |
+| 2026-07-08 | 리소스 확장 1차 (10→14종): DynamoDB·CloudFront·Route 53·SQS + 미션 2종(글로벌 정적 웹, 비동기 파이프라인) (ADR 0022). |

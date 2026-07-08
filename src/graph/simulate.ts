@@ -47,16 +47,30 @@ export interface SimResult {
 }
 
 /** Types that terminate a successful request (the "DB / storage" tier). */
-const SINKS: ReadonlySet<ResourceType> = new Set<ResourceType>(['rds', 's3'])
+const SINKS: ReadonlySet<ResourceType> = new Set<ResourceType>(['rds', 's3', 'dynamodb'])
+
+/** Types that can originate a request when nothing feeds them. */
+const ENTRY_CAPABLE: ReadonlySet<ResourceType> = new Set<ResourceType>([
+  'route53',
+  'cloudfront',
+  'alb',
+  'lambda',
+])
 
 function blockedMessage(type: ResourceType): string {
   switch (type) {
+    case 'route53':
+      return 'Route 53 레코드가 가리킬 대상(CloudFront/ALB)이 없습니다.'
+    case 'cloudfront':
+      return 'CloudFront에 오리진(ALB/S3)이 연결되어 있지 않습니다.'
     case 'alb':
       return '로드 밸런서에서 대상(EC2/Lambda)으로 가는 연결이 없습니다.'
     case 'ec2':
       return 'EC2에서 데이터베이스나 스토리지로 가는 경로가 없습니다.'
     case 'lambda':
       return 'Lambda에서 데이터베이스나 스토리지로 가는 경로가 없습니다.'
+    case 'sqs':
+      return '큐를 소비할 Lambda가 연결되어 있지 않습니다.'
     default:
       return `${getResource(type).label}에서 경로가 끊겼습니다.`
   }
@@ -137,19 +151,18 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
     return src !== 'sg' && !(src === 'rds' && byId.get(e.target)?.data.type === 'rds')
   })
 
-  const entries = [
-    ...nodes.filter((n) => n.data.type === 'alb'),
-    ...nodes.filter(
-      (n) =>
-        n.data.type === 'lambda' && !trafficEdges.some((e) => e.target === n.id),
-    ),
-  ]
+  // Entry = an entry-capable node nothing feeds (a CloudFront-fed ALB is a
+  // hop, not its own entry; a Route 53 record starts the journey).
+  const entries = nodes.filter(
+    (n) =>
+      ENTRY_CAPABLE.has(n.data.type) && !trafficEdges.some((e) => e.target === n.id),
+  )
 
   if (entries.length === 0) {
     return {
       ok: false,
       flows: [],
-      message: '트래픽 진입점이 없습니다. ALB 또는 Lambda를 추가하세요.',
+      message: '트래픽 진입점이 없습니다. Route 53 / CloudFront / ALB / Lambda를 추가하세요.',
       pathNodeIds: [],
       pathEdgeIds: [],
       blockedNodeIds: [],
