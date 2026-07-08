@@ -19,6 +19,15 @@ blocking resource lights up. Clear guided missions, or build freely — then
 > This is **Phase 0**: scaffolding and a skeleton UI only. There is no working
 > simulation, property editing, or Terraform generation yet. See the roadmap.
 
+## Documentation
+
+Design and decisions live in [`docs/`](docs/):
+
+- [Architecture](docs/ARCHITECTURE.md) — system overview, components, data flow
+- [Phases](docs/PHASES.md) — roadmap with definitions of done and status
+- [Decisions (ADRs)](docs/decisions/) — the design trade-offs and why
+- [Contributing](docs/CONTRIBUTING.md) — docs & commit conventions
+
 ## Concept
 
 - **Block-style editor** — a React Flow canvas where AWS resources are draggable nodes.
@@ -37,6 +46,10 @@ blocking resource lights up. Clear guided missions, or build freely — then
 | **Phase 3** | Traffic simulation + mission validation | ⬜ planned |
 | **Phase 4** | Terraform generation + zip export | ⬜ planned |
 | **Phase 5** | Polish, sharing, more resources & missions | ⬜ planned |
+
+Detailed definitions of done and current status are in
+[docs/PHASES.md](docs/PHASES.md); the design trade-offs behind these choices are
+recorded as ADRs in [docs/decisions/](docs/decisions/).
 
 ## Tech stack
 

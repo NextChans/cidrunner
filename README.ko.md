@@ -19,6 +19,15 @@
 > 지금은 **Phase 0**로, 스캐폴딩과 스켈레톤 UI만 있습니다. 시뮬레이션,
 > 속성 편집, Terraform 생성은 아직 동작하지 않습니다. 로드맵을 참고하세요.
 
+## 문서
+
+설계와 결정은 [`docs/`](docs/)에 정리되어 있습니다:
+
+- [아키텍처](docs/ARCHITECTURE.md) — 시스템 개요, 컴포넌트, 데이터 흐름
+- [Phases](docs/PHASES.md) — 완료 기준과 현재 상태가 담긴 로드맵
+- [결정 기록 (ADR)](docs/decisions/) — 설계 트레이드오프와 그 근거
+- [기여 가이드](docs/CONTRIBUTING.md) — 문서 · 커밋 규칙
+
 ## 컨셉
 
 - **블록형 에디터** — AWS 리소스를 드래그 가능한 노드로 다루는 React Flow 캔버스.
@@ -37,6 +46,10 @@
 | **Phase 3** | 트래픽 시뮬레이션 + 미션 검증 | ⬜ 예정 |
 | **Phase 4** | Terraform 생성 + zip 내보내기 | ⬜ 예정 |
 | **Phase 5** | 마감 다듬기, 공유, 리소스·미션 추가 | ⬜ 예정 |
+
+각 Phase의 자세한 완료 기준과 현재 상태는
+[docs/PHASES.md](docs/PHASES.md)에, 이 선택들의 설계 트레이드오프는
+[docs/decisions/](docs/decisions/)의 ADR에 기록되어 있습니다.
 
 ## 기술 스택
 
