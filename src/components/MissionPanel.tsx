@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import clsx from 'clsx'
 import { Target, Star } from 'lucide-react'
 import { missions } from '@/missions'
@@ -31,6 +31,8 @@ export function MissionList() {
   const activeMissionId = useGraphStore((s) => s.activeMissionId)
   const setActiveMission = useGraphStore((s) => s.setActiveMission)
   const setMode = useGraphStore((s) => s.setMode)
+  const bestStars = useGraphStore((s) => s.bestStars)
+  const recordStars = useGraphStore((s) => s.recordStars)
 
   const disabled = mode !== 'challenge'
 
@@ -46,6 +48,16 @@ export function MissionList() {
     const securityOk = nodes.every((n) => (issues.warnings.get(n.id)?.length ?? 0) === 0)
     return { nodes, edges, sim: simulate(nodes, edges), allValid, securityOk, issues }
   }, [nodes, edges])
+
+  // Persist best star records (ADR 0023) as the live results change.
+  useEffect(() => {
+    for (const mission of missions) {
+      const stars = mission.check?.(ctx) ?? 0
+      if (stars > (useGraphStore.getState().bestStars[mission.id] ?? 0)) {
+        recordStars(mission.id, stars)
+      }
+    }
+  }, [ctx, recordStars])
 
   return (
     <div className="space-y-2 overflow-y-auto px-3 pb-3">
@@ -87,6 +99,14 @@ export function MissionList() {
               ) : active ? (
                 <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-slate-900">
                   진행 중
+                </span>
+              ) : (bestStars[mission.id] ?? 0) > 0 ? (
+                <span
+                  className="flex items-center gap-1 text-[10px] text-slate-400"
+                  title="최고 기록"
+                >
+                  최고
+                  <Stars earned={bestStars[mission.id]} />
                 </span>
               ) : (
                 <Stars earned={0} />

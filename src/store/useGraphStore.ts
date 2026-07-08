@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { temporal } from 'zundo'
 import type { Edge, Node, XYPosition } from '@xyflow/react'
 import { getResource, type ResourceType } from '@/resources'
 import { canBeTopLevel, canContain, requiredParentLabel } from '@/graph/rules'
 import { simulate, type SimResult } from '@/graph/simulate'
+import { sanitizeSnapshot } from '@/graph/share'
 
 export type Mode = 'free' | 'challenge'
 
@@ -62,7 +64,11 @@ interface GraphState {
   setNotice: (text: string | null, kind?: Notice['kind']) => void
   setDrawer: (which: DrawerKey, open: boolean) => void
   /** Replaces the whole design (shared URL / JSON import). */
-  loadDesign: (nodes: ResourceNodeType[], edges: Edge[]) => void
+  loadDesign: (nodes: ResourceNodeType[], edges: Edge[], missionId?: string) => void
+  /** Best star record per mission id — persisted (Editor Fundamentals sprint). */
+  bestStars: Record<string, number>
+  /** Records a mission result, keeping the historical maximum. */
+  recordStars: (missionId: string, stars: number) => void
   /** Runs the traffic simulation over the current graph and stores the result. */
   runSimulation: () => void
   /** Clears the current simulation highlight. */
@@ -157,9 +163,31 @@ function withDescendants(nodes: ResourceNodeType[], rootId: string): Set<string>
   return ids
 }
 
+/**
+ * Debounced-leading history capture (ADR 0023): continuous gestures (node
+ * drags, container resizes, typing bursts) emit dozens of set() calls; we keep
+ * only the FIRST pre-gesture state per 300ms-quiet window, so one gesture =
+ * one undo step.
+ */
+function debouncedLeadingHandleSet<T>(
+  handleSet: (pastState: T) => void,
+): (pastState: T) => void {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let pending: T | undefined
+  return (pastState) => {
+    if (pending === undefined) pending = pastState
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      if (pending !== undefined) handleSet(pending)
+      pending = undefined
+    }, 300)
+  }
+}
+
 export const useGraphStore = create<GraphState>()(
-  persist(
-    (set) => ({
+  temporal(
+    persist(
+      (set) => ({
   mode: 'free',
   nodes: initialNodes,
   edges: [],
@@ -269,17 +297,26 @@ export const useGraphStore = create<GraphState>()(
   setDrawer: (which, open) =>
     set((state) => ({ mobileDrawers: { ...state.mobileDrawers, [which]: open } })),
 
-  loadDesign: (nodes, edges) => {
+  loadDesign: (nodes, edges, missionId) => {
     bumpNodeSeq(nodes)
     set({
       nodes,
       edges,
       selectedNodeId: null,
-      activeMissionId: null,
+      activeMissionId: missionId ?? null,
+      ...(missionId ? { mode: 'challenge' as const } : {}),
       simulation: null,
       notice: null,
     })
   },
+
+  bestStars: {},
+  recordStars: (missionId, stars) =>
+    set((state) =>
+      stars > (state.bestStars[missionId] ?? 0)
+        ? { bestStars: { ...state.bestStars, [missionId]: stars } }
+        : state,
+    ),
 
   runSimulation: () =>
     set((state) => ({ simulation: simulate(state.nodes, state.edges) })),
@@ -298,22 +335,58 @@ export const useGraphStore = create<GraphState>()(
       mobileDrawers: { palette: false, inspector: false, missions: false },
       simulation: null,
     }),
-    }),
-    {
-      // Autosave (ADR 0020): the design survives refresh/close. Only durable
-      // design state is persisted — transient UI (selection, notices, drawers,
-      // simulation) always starts fresh.
-      name: 'cidrunner-design',
-      version: 1,
-      partialize: (s) => ({
-        nodes: s.nodes,
-        edges: s.edges,
-        mode: s.mode,
-        activeMissionId: s.activeMissionId,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state) bumpNodeSeq(state.nodes)
+      {
+        // Autosave (ADR 0020): the design survives refresh/close. Only durable
+        // design state is persisted — transient UI (selection, notices,
+        // drawers, simulation) always starts fresh.
+        name: 'cidrunner-design',
+        version: 1,
+        partialize: (s) => ({
+          nodes: s.nodes,
+          edges: s.edges,
+          mode: s.mode,
+          activeMissionId: s.activeMissionId,
+          bestStars: s.bestStars,
+        }),
+        // Rehydrate through the same whitelist as shared URLs (ADR 0023). If
+        // the stored graph fails sanitation we keep it as-is — local data is
+        // trusted more than a foreign URL, and dropping a design is worse.
+        merge: (persisted, current) => {
+          const p = (persisted ?? {}) as Record<string, unknown>
+          const merged = { ...current, ...p } as GraphState
+          if (Array.isArray(p.nodes)) {
+            const clean = sanitizeSnapshot({ v: 1, nodes: p.nodes, edges: p.edges ?? [] })
+            if (clean) {
+              merged.nodes = clean.nodes
+              merged.edges = clean.edges
+            }
+          }
+          return merged
+        },
+        onRehydrateStorage: () => (state) => {
+          if (state) bumpNodeSeq(state.nodes)
+        },
       },
+    ),
+    {
+      // Undo/redo tracks only the design graph (ADR 0023).
+      partialize: (s) => ({ nodes: s.nodes, edges: s.edges }),
+      equality: (a, b) => a.nodes === b.nodes && a.edges === b.edges,
+      handleSet: (handleSet) => debouncedLeadingHandleSet(handleSet),
+      limit: 100,
     },
   ),
 )
+
+/** Undo the last design change; transient state is reset alongside. */
+export function undoDesign() {
+  useGraphStore.temporal.getState().undo()
+  useGraphStore.setState({ simulation: null, selectedNodeId: null })
+}
+
+/** Redo the last undone design change. */
+export function redoDesign() {
+  useGraphStore.temporal.getState().redo()
+  useGraphStore.setState({ simulation: null, selectedNodeId: null })
+}

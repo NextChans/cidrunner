@@ -1,7 +1,18 @@
 import { useRef } from 'react'
 import clsx from 'clsx'
-import { Play, Square, RotateCcw, Download, Share2, FileDown, FileUp } from 'lucide-react'
-import { useGraphStore, type Mode } from '@/store/useGraphStore'
+import { useStore } from 'zustand'
+import {
+  Play,
+  Square,
+  RotateCcw,
+  Download,
+  Share2,
+  FileDown,
+  FileUp,
+  Undo2,
+  Redo2,
+} from 'lucide-react'
+import { redoDesign, undoDesign, useGraphStore, type Mode } from '@/store/useGraphStore'
 import { downloadTerraformZip } from '@/graph/terraform'
 import { encodeShareUrl, sanitizeSnapshot, toSnapshot } from '@/graph/share'
 
@@ -33,14 +44,17 @@ export function Toolbar() {
   const stopSimulation = useGraphStore((s) => s.stopSimulation)
   const setNotice = useGraphStore((s) => s.setNotice)
   const loadDesign = useGraphStore((s) => s.loadDesign)
+  const canUndo = useStore(useGraphStore.temporal, (s) => s.pastStates.length > 0)
+  const canRedo = useStore(useGraphStore.temporal, (s) => s.futureStates.length > 0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const iconBtn =
     'flex items-center gap-1.5 rounded-md border border-surface-border px-2 py-1.5 text-xs text-slate-200 transition-colors hover:bg-slate-700/60'
 
   const share = async () => {
-    const { nodes, edges } = useGraphStore.getState()
-    const url = encodeShareUrl(nodes, edges)
+    // Mission context rides along so a shared submission opens gradable.
+    const { nodes, edges, activeMissionId } = useGraphStore.getState()
+    const url = encodeShareUrl(nodes, edges, activeMissionId)
     try {
       await navigator.clipboard.writeText(url)
       setNotice('공유 링크가 클립보드에 복사되었습니다.', 'info')
@@ -51,8 +65,11 @@ export function Toolbar() {
   }
 
   const exportJson = () => {
-    const { nodes, edges } = useGraphStore.getState()
-    downloadText('cidrunner-design.json', JSON.stringify(toSnapshot(nodes, edges), null, 2))
+    const { nodes, edges, activeMissionId } = useGraphStore.getState()
+    downloadText(
+      'cidrunner-design.json',
+      JSON.stringify(toSnapshot(nodes, edges, activeMissionId), null, 2),
+    )
     setNotice('설계를 cidrunner-design.json으로 저장했습니다.', 'info')
   }
 
@@ -63,7 +80,7 @@ export function Toolbar() {
         setNotice('불러오기 실패: cidrunner 설계 파일이 아닙니다.')
         return
       }
-      loadDesign(design.nodes, design.edges)
+      loadDesign(design.nodes, design.edges, design.missionId)
       setNotice('설계를 불러왔습니다.', 'info')
     } catch {
       setNotice('불러오기 실패: JSON을 읽을 수 없습니다.')
@@ -108,6 +125,26 @@ export function Toolbar() {
       </button>
 
       <div className="h-5 w-px bg-surface-border" />
+
+      <button
+        type="button"
+        onClick={() => undoDesign()}
+        disabled={!canUndo}
+        className={clsx(iconBtn, !canUndo && 'cursor-not-allowed opacity-40')}
+        title="실행 취소 (Ctrl+Z)"
+      >
+        <Undo2 size={14} />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => redoDesign()}
+        disabled={!canRedo}
+        className={clsx(iconBtn, !canRedo && 'cursor-not-allowed opacity-40')}
+        title="다시 실행 (Ctrl+Shift+Z)"
+      >
+        <Redo2 size={14} />
+      </button>
 
       <button type="button" onClick={() => void share()} className={iconBtn} title="공유 링크 복사">
         <Share2 size={14} />

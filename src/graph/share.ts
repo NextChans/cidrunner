@@ -1,5 +1,6 @@
 import type { Edge } from '@xyflow/react'
 import { resources, type ResourceType } from '@/resources'
+import { getMission } from '@/missions'
 import type { ResourceNodeType } from '@/store/useGraphStore'
 
 /**
@@ -14,10 +15,24 @@ export interface DesignSnapshot {
   v: 1
   nodes: ResourceNodeType[]
   edges: Edge[]
+  /** Active mission id, so a shared submission opens in grading context. */
+  m?: string
 }
 
-export function toSnapshot(nodes: ResourceNodeType[], edges: Edge[]): DesignSnapshot {
-  return { v: 1, nodes, edges }
+export interface LoadedDesign {
+  nodes: ResourceNodeType[]
+  edges: Edge[]
+  missionId?: string
+}
+
+export function toSnapshot(
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  missionId?: string | null,
+): DesignSnapshot {
+  const snap: DesignSnapshot = { v: 1, nodes, edges }
+  if (missionId) snap.m = missionId
+  return snap
 }
 
 /** UTF-8 safe base64url encode. */
@@ -40,8 +55,12 @@ function b64urlDecode(packed: string): string | null {
 }
 
 /** Builds a shareable URL for the current page carrying the design. */
-export function encodeShareUrl(nodes: ResourceNodeType[], edges: Edge[]): string {
-  const packed = b64urlEncode(JSON.stringify(toSnapshot(nodes, edges)))
+export function encodeShareUrl(
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  missionId?: string | null,
+): string {
+  const packed = b64urlEncode(JSON.stringify(toSnapshot(nodes, edges, missionId)))
   return `${location.origin}${location.pathname}#g=${packed}`
 }
 
@@ -51,7 +70,7 @@ const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFin
  * Validates and rebuilds a snapshot from untrusted JSON. Returns null when the
  * shape is unusable; unknown fields are dropped.
  */
-export function sanitizeSnapshot(raw: unknown): { nodes: ResourceNodeType[]; edges: Edge[] } | null {
+export function sanitizeSnapshot(raw: unknown): LoadedDesign | null {
   if (typeof raw !== 'object' || raw === null) return null
   const snap = raw as Record<string, unknown>
   if (!Array.isArray(snap.nodes) || !Array.isArray(snap.edges)) return null
@@ -106,11 +125,15 @@ export function sanitizeSnapshot(raw: unknown): { nodes: ResourceNodeType[]; edg
     edges.push({ id: e.id, source: e.source, target: e.target, type: 'traffic' })
   }
 
-  return { nodes, edges }
+  // Mission context is optional; an unknown id is dropped, not fatal.
+  const missionId =
+    typeof snap.m === 'string' && getMission(snap.m) ? snap.m : undefined
+
+  return { nodes, edges, missionId }
 }
 
 /** Parses a design out of `location.hash` (`#g=…`), if present and valid. */
-export function designFromHash(hash: string): { nodes: ResourceNodeType[]; edges: Edge[] } | null {
+export function designFromHash(hash: string): LoadedDesign | null {
   const match = hash.match(/^#g=(.+)$/)
   if (!match) return null
   const json = b64urlDecode(match[1])
