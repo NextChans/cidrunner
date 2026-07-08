@@ -3,7 +3,7 @@ import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react'
 import clsx from 'clsx'
 import { getResource } from '@/resources'
 import { canBeSource, canBeTarget } from '@/graph/rules'
-import { getCidrIssues } from '@/graph/cidr'
+import { getGraphIssues } from '@/graph/checks'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
 /** Containers can't shrink below this, so their header and children stay visible. */
@@ -13,20 +13,26 @@ const MIN_CONTAINER = { width: 160, height: 100 }
  * Custom React Flow node rendering an AWS resource block. Containers (VPC,
  * Subnet) render as a translucent box that visually holds child nodes and are
  * resizable while selected; everything else renders as a compact card.
- * Connection handles appear only where the edge rules allow the node to be a
- * source and/or target. During a simulation, nodes on the traced path glow
- * green and the blocking node red.
+ * Validation state is visual: red = error, amber = security/best-practice
+ * warning. During a simulation, path nodes glow green with an arrival pulse
+ * and blocking nodes pulse red.
  */
 function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeType>) {
   const meta = getResource(data.type)
   const Icon = meta.icon
   const showSource = canBeSource(data.type)
   const showTarget = canBeTarget(data.type)
-  const cidrInvalid = useGraphStore((s) => (getCidrIssues(s.nodes).get(id)?.length ?? 0) > 0)
-  const invalid = cidrInvalid || (meta.validate?.(data.config) ?? []).length > 0
+  const hasError = useGraphStore(
+    (s) => (getGraphIssues(s.nodes, s.edges).errors.get(id)?.length ?? 0) > 0,
+  )
+  const hasWarning = useGraphStore(
+    (s) => (getGraphIssues(s.nodes, s.edges).warnings.get(id)?.length ?? 0) > 0,
+  )
+  const invalid = hasError || (meta.validate?.(data.config) ?? []).length > 0
   const sim = useGraphStore((s) => s.simulation)
-  const blocked = sim?.blockedNodeId === id
+  const blocked = sim?.blockedNodeIds.includes(id) ?? false
   const onPath = !blocked && (sim?.pathNodeIds.includes(id) ?? false)
+  const arrival = sim?.arrivals[id]
 
   if (meta.container) {
     return (
@@ -39,9 +45,11 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
               ? 'border-accent-soft'
               : invalid
                 ? 'border-rose-500'
-                : selected
-                  ? 'border-accent'
-                  : 'border-slate-600',
+                : hasWarning
+                  ? 'border-amber-400'
+                  : selected
+                    ? 'border-accent'
+                    : 'border-slate-600',
         )}
       >
         <NodeResizer
@@ -60,6 +68,7 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
           <Icon size={16} className={meta.color} />
           <span className="text-slate-300">{data.label}</span>
+          {hasWarning && !invalid && <span title="보안 경고">⚠️</span>}
         </div>
       </div>
     )
@@ -68,18 +77,27 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
   return (
     <div
       className={clsx(
-        'flex min-w-[140px] items-center gap-2 rounded-lg border bg-surface-raised px-3 py-2 shadow-lg transition-colors',
+        'relative flex min-w-[140px] items-center gap-2 rounded-lg border bg-surface-raised px-3 py-2 shadow-lg transition-colors',
         blocked
           ? 'border-rose-500 ring-2 ring-rose-500 animate-pulse'
           : onPath
             ? 'border-accent-soft ring-2 ring-accent-soft'
             : invalid
               ? 'border-rose-500 ring-1 ring-rose-500'
-              : selected
-                ? 'border-accent ring-1 ring-accent'
-                : 'border-surface-border',
+              : hasWarning
+                ? 'border-amber-400 ring-1 ring-amber-400'
+                : selected
+                  ? 'border-accent ring-1 ring-accent'
+                  : 'border-surface-border',
       )}
     >
+      {/* Arrival pulse: fires when the simulated request reaches this node. */}
+      {onPath && arrival !== undefined && (
+        <span
+          className="sim-arrival pointer-events-none absolute inset-0 rounded-lg"
+          style={{ animationDelay: `${arrival}s` }}
+        />
+      )}
       {showTarget && <Handle type="target" position={Position.Left} className="!bg-accent" />}
       <Icon size={18} className={meta.color} />
       <div className="flex flex-col leading-tight">
@@ -88,6 +106,11 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
           {data.type}
         </span>
       </div>
+      {hasWarning && !invalid && !blocked && !onPath && (
+        <span className="text-xs" title="보안 경고">
+          ⚠️
+        </span>
+      )}
       {showSource && <Handle type="source" position={Position.Right} className="!bg-accent" />}
     </div>
   )

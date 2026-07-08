@@ -6,7 +6,8 @@ import { collect, validateRange } from './validators'
 export const alb: ResourceMeta = {
   type: 'alb',
   label: 'Load Balancer',
-  description: 'L7 트래픽 분산',
+  description: 'L7 트래픽 분산 (2개 AZ 필요)',
+  category: 'network',
   icon: Scale,
   color: 'text-violet-400',
   defaults: {
@@ -23,19 +24,42 @@ export const alb: ResourceMeta = {
       type: 'boolean',
       help: '켜면 VPC 내부에서만 접근 가능',
     },
-    { key: 'listener_port', label: '리스너 포트', type: 'number', min: 1, max: 65535 },
+    {
+      key: 'listener_port',
+      label: '리스너 포트',
+      type: 'number',
+      required: true,
+      min: 1,
+      max: 65535,
+    },
   ],
   validate: (c) => collect(validateRange(c.listener_port, 1, 65535, '리스너 포트')),
-  terraform: ({ name, awsName, config, refs }) => {
+  terraform: ({ name, awsName, config, refs, displayName }) => {
     const port = Number(config.listener_port ?? 80)
-    const subnets = (refs.subnets ?? []).map((s) => `aws_subnet.${s}.id`).join(', ')
+    // External ALBs live in public subnets (best practice); internal in any.
+    const subnetPool = config.internal
+      ? (refs.subnets ?? [])
+      : (refs.publicSubnets?.length ? refs.publicSubnets : (refs.subnets ?? []))
+    const subnets = subnetPool.map((s) => `aws_subnet.${s}.id`).join(', ')
     const sgs = (refs.securityGroups ?? []).map((s) => `aws_security_group.${s}.id`).join(', ')
+    const attachments = (refs.targets ?? [])
+      .map(
+        (t) => `
+
+resource "aws_lb_target_group_attachment" "${name}_${t}" {
+  target_group_arn = aws_lb_target_group.${name}_tg.arn
+  target_id        = aws_instance.${t}.id
+  port             = ${port}
+}`,
+      )
+      .join('')
     return `resource "aws_lb" "${name}" {
   name               = "${awsName}"
   internal           = ${config.internal ? 'true' : 'false'}
   load_balancer_type = "application"
   security_groups    = [${sgs}]
   subnets            = [${subnets}]
+  tags = { Name = "${displayName}" }
 }
 
 resource "aws_lb_target_group" "${name}_tg" {
@@ -43,6 +67,10 @@ resource "aws_lb_target_group" "${name}_tg" {
   port     = ${port}
   protocol = "HTTP"
   vpc_id   = aws_vpc.${refs.vpc ?? 'REPLACE_ME'}.id
+  health_check {
+    path    = "/"
+    matcher = "200-399"
+  }
 }
 
 resource "aws_lb_listener" "${name}_listener" {
@@ -53,6 +81,6 @@ resource "aws_lb_listener" "${name}_listener" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.${name}_tg.arn
   }
-}`
+}${attachments}`
   },
 }

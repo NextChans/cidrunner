@@ -16,6 +16,26 @@ export type ResourceType =
   | 's3'
   | 'lambda'
 
+/** Palette groups, mirroring how the AWS console organizes services. */
+export type ResourceCategory = 'network' | 'compute' | 'database' | 'storage' | 'security'
+
+export const CATEGORY_LABELS: Record<ResourceCategory, string> = {
+  network: '네트워킹',
+  compute: '컴퓨팅',
+  database: '데이터베이스',
+  storage: '스토리지',
+  security: '보안',
+}
+
+/** Palette display order for the categories. */
+export const CATEGORY_ORDER: readonly ResourceCategory[] = [
+  'network',
+  'compute',
+  'database',
+  'storage',
+  'security',
+]
+
 /**
  * A valid placement target for a resource: either another resource type that
  * acts as its container, or `'canvas'` for a top-level (unparented) node.
@@ -33,6 +53,8 @@ export interface PropertyField {
   /** Human-facing label (Korean). */
   label: string
   type: 'text' | 'number' | 'boolean' | 'select'
+  /** Marks the field as mandatory: an empty value is a validation error. */
+  required?: boolean
   /** Options for a `'select'` field. */
   options?: readonly { value: string; label: string }[]
   /** Placeholder shown in empty text/number inputs. */
@@ -45,15 +67,18 @@ export interface PropertyField {
 }
 
 /**
- * Everything a resource needs to emit valid Terraform (Phase 4). The generator
- * builds this per node, resolving `refs` from the graph topology (parent chain
- * and same-VPC siblings) so emitters never have to walk the graph themselves.
+ * Everything a resource needs to emit apply-ready Terraform (Phase 4, refined
+ * post-MVP — see ADR 0016). The generator builds this per node, resolving
+ * `refs` from the graph topology (parent chain, same-VPC siblings, and
+ * attachment/traffic edges) so emitters never walk the graph themselves.
  */
 export interface TfContext {
   /** Terraform-safe local name (resource label), e.g. `subnet_1`. */
   name: string
   /** Value safe for AWS `name` attributes (alphanumeric + hyphen), e.g. `subnet-1`. */
   awsName: string
+  /** Player-set display name, used for `tags.Name`. */
+  displayName: string
   /** The node's `data.config`. */
   config: Record<string, unknown>
   refs: {
@@ -61,10 +86,14 @@ export interface TfContext {
     vpc?: string
     /** Local name of the enclosing subnet (for ec2/rds/nat). */
     subnet?: string
-    /** Local names of all subnets in the same VPC (for alb). */
+    /** Local names of all subnets in the same VPC. */
     subnets?: string[]
-    /** Local names of all security groups in the same VPC (for alb). */
+    /** Local names of the *public* subnets in the same VPC (for external ALB). */
+    publicSubnets?: string[]
+    /** Local names of security groups attached to this node via SG edges. */
     securityGroups?: string[]
+    /** Local names of EC2 instances this ALB forwards to (alb → ec2 edges). */
+    targets?: string[]
   }
 }
 
@@ -74,6 +103,8 @@ export interface ResourceMeta {
   label: string
   /** Short one-liner describing what the block represents. */
   description: string
+  /** Palette category (see {@link CATEGORY_LABELS}). */
+  category: ResourceCategory
   /** lucide-react icon component. */
   icon: LucideIcon
   /** Tailwind text-color class used to tint the node accent. */
@@ -97,7 +128,8 @@ export interface ResourceMeta {
   /**
    * Resource types this one may draw a (directional) edge to. Drives edge
    * rules (Phase 1): a connection `source → target` is allowed only if the
-   * source's `connectsTo` includes the target's type.
+   * source's `connectsTo` includes the target's type. Edges from a Security
+   * Group are *attachments*, not traffic (see ADR 0017).
    */
   connectsTo?: readonly ResourceType[]
   /**
@@ -106,9 +138,9 @@ export interface ResourceMeta {
    */
   fields?: readonly PropertyField[]
   /**
-   * Emits the Terraform HCL block(s) for this resource (Phase 4). The generator
-   * resolves cross-resource references from the graph topology and passes them
-   * in via `TfContext.refs`. See ADR 0013.
+   * Emits the Terraform HCL block(s) for this resource (Phase 4 / ADR 0016).
+   * The generator resolves cross-resource references from the graph topology
+   * and passes them in via `TfContext.refs`.
    */
   terraform: (ctx: TfContext) => string
   /**

@@ -40,3 +40,6 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0013](0013-terraform-export-implementation.md) | Terraform export implementation (refines 0005) | Accepted | 2026-07-08 |
 | [0014](0014-mission-clear-detection-and-stars.md) | Mission clear detection & star rating | Accepted | 2026-07-08 |
 | [0015](0015-graph-level-cidr-validation.md) | Graph-level CIDR validation | Accepted | 2026-07-08 |
+| [0016](0016-apply-ready-terraform.md) | Apply-ready Terraform export (extends 0013) | Accepted | 2026-07-08 |
+| [0017](0017-security-model-and-severity-validation.md) | Security model: SG attachment edges & severity validation | Accepted | 2026-07-08 |
+| [0018](0018-multi-flow-playback-and-palette-categories.md) | Multi-flow playback & categorized palette (extends 0012) | Accepted | 2026-07-08 |

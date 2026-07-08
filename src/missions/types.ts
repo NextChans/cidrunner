@@ -2,18 +2,24 @@ import type { Edge } from '@xyflow/react'
 import type { ResourceType } from '@/resources/types'
 import type { ResourceNodeType } from '@/store/useGraphStore'
 import type { SimResult } from '@/graph/simulate'
+import type { GraphIssues } from '@/graph/checks'
 
 /**
- * Inputs to a mission's clear check (Phase 5). The MissionPanel builds this from
- * the current graph plus a simulation run and a validation sweep.
+ * Inputs to a mission's clear check (Phase 5 / ADR 0014). The MissionPanel
+ * builds this from the current graph plus a simulation run and the graph-level
+ * validation sweep (ADR 0017).
  */
 export interface MissionCheckContext {
   nodes: ResourceNodeType[]
   edges: Edge[]
   /** Result of running the traffic simulation on the current graph. */
   sim: SimResult
-  /** True when no node has any validation error. */
+  /** True when no node has any validation error (config, required, graph). */
   allValid: boolean
+  /** True when no node carries a security/best-practice warning. */
+  securityOk: boolean
+  /** Full issue maps for missions that need specifics. */
+  issues: GraphIssues
 }
 
 /**

@@ -1,28 +1,37 @@
 import { Shield } from 'lucide-react'
 import type { ResourceMeta } from './types'
 
-/** Security Group — stateful virtual firewall attached to resources. */
+/**
+ * Security Group — stateful virtual firewall. Draw an edge SG → resource to
+ * *attach* it (attachment edges are not traffic — see ADR 0017). The MVP
+ * simplifies rules to common inbound toggles (ADR 0011); egress is allow-all.
+ */
 export const sg: ResourceMeta = {
   type: 'sg',
   label: 'Security Group',
-  description: '스테이트풀 방화벽',
+  description: '스테이트풀 방화벽 — 엣지로 리소스에 연결',
+  category: 'security',
   icon: Shield,
   color: 'text-rose-400',
-  // MVP simplifies SG rules to a few common ingress toggles (see ADR 0011);
-  // egress defaults to allow-all in the emitted Terraform.
   defaults: {
     allow_http: true,
     allow_https: true,
     allow_ssh: false,
   },
-  // A VPC-scoped firewall.
+  // A VPC-scoped firewall; attach to ALB/EC2/RDS by drawing an edge.
   allowedParents: ['vpc'],
+  connectsTo: ['alb', 'ec2', 'rds'],
   fields: [
     { key: 'allow_http', label: 'HTTP (80) 허용', type: 'boolean' },
     { key: 'allow_https', label: 'HTTPS (443) 허용', type: 'boolean' },
-    { key: 'allow_ssh', label: 'SSH (22) 허용', type: 'boolean', help: '운영 환경에서는 권장하지 않습니다' },
+    {
+      key: 'allow_ssh',
+      label: 'SSH (22) 허용',
+      type: 'boolean',
+      help: '0.0.0.0/0 SSH 개방은 보안 경고를 발생시킵니다',
+    },
   ],
-  terraform: ({ name, awsName, config, refs }) => {
+  terraform: ({ name, config, refs, displayName }) => {
     const rule = (port: number, desc: string) => `
   ingress {
     description = "${desc}"
@@ -38,7 +47,8 @@ export const sg: ResourceMeta = {
     // No `name` attribute: AWS reserves the `sg-` prefix, and our ids start with
     // it — let AWS generate the name and tag it instead.
     return `resource "aws_security_group" "${name}" {
-  vpc_id = aws_vpc.${refs.vpc ?? 'REPLACE_ME'}.id
+  description = "cidrunner: ${displayName}"
+  vpc_id      = aws_vpc.${refs.vpc ?? 'REPLACE_ME'}.id
 ${ingress}
   egress {
     from_port   = 0
@@ -46,7 +56,7 @@ ${ingress}
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  tags = { Name = "${awsName}" }
+  tags = { Name = "${displayName}" }
 }`
   },
 }

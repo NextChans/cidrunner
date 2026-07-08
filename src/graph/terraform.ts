@@ -1,12 +1,15 @@
 import JSZip from 'jszip'
+import type { Edge } from '@xyflow/react'
 import { getResource, type ResourceType } from '@/resources'
 import type { ResourceNodeType } from '@/store/useGraphStore'
 
 /**
- * Terraform generation (Phase 4). Each resource owns its HCL emitter
- * (`ResourceMeta.terraform`); this module resolves cross-resource references
- * from the graph topology, assembles the files, and zips them for download.
- * The goal is to pass `terraform validate` — not `terraform apply`. See ADR 0013.
+ * Apply-ready Terraform generation (ADR 0016, refining ADR 0013). Each resource
+ * owns its HCL emitter (`ResourceMeta.terraform`); this module resolves
+ * cross-resource references from the graph topology (parents, SG-attachment
+ * edges, ALB-target edges), derives the plumbing AWS needs but the canvas
+ * doesn't show (route tables, DB subnet groups, the AMI lookup), assembles the
+ * files, and zips them for download.
  */
 
 /** Terraform-safe local resource name (label / reference), e.g. `subnet_1`. */
@@ -38,10 +41,27 @@ function ancestorOfType(
   return undefined
 }
 
-/** Builds the `main.tf` / `variables.tf` / `README.md` contents for a graph. */
-export function generateTerraform(nodes: ResourceNodeType[]): Record<string, string> {
+/** Builds the exported file map (`main.tf`, `variables.tf`, …) for a graph. */
+export function generateTerraform(
+  nodes: ResourceNodeType[],
+  edges: Edge[] = [],
+): Record<string, string> {
   const byId = new Map(nodes.map((n) => [n.id, n]))
   const vpcOf = (n: ResourceNodeType) => ancestorOfType(n, 'vpc', byId)
+  const typeOf = (id: string) => byId.get(id)?.data.type
+
+  // SG-attachment edges (sg → resource) and ALB-target edges (alb → ec2).
+  const attachedSGs = (nodeId: string) =>
+    edges
+      .filter((e) => e.target === nodeId && typeOf(e.source) === 'sg')
+      .map((e) => tfName(e.source))
+  const albTargets = (albId: string) =>
+    edges
+      .filter((e) => e.source === albId && typeOf(e.target) === 'ec2')
+      .map((e) => tfName(e.target))
+
+  const subnetsIn = (vpcId: string) =>
+    nodes.filter((n) => n.data.type === 'subnet' && vpcOf(n)?.id === vpcId)
 
   const ordered = [...nodes].sort(
     (a, b) => ORDER.indexOf(a.data.type) - ORDER.indexOf(b.data.type),
@@ -51,39 +71,128 @@ export function generateTerraform(nodes: ResourceNodeType[]): Record<string, str
     .map((node) => {
       const vpc = vpcOf(node)
       const subnet = ancestorOfType(node, 'subnet', byId)
-      const subnets = vpc
-        ? nodes.filter((n) => n.data.type === 'subnet' && vpcOf(n)?.id === vpc.id)
-        : []
-      const securityGroups = vpc
-        ? nodes.filter((n) => n.data.type === 'sg' && vpcOf(n)?.id === vpc.id)
-        : []
+      const vpcSubnets = vpc ? subnetsIn(vpc.id) : []
       return getResource(node.data.type).terraform({
         name: tfName(node.id),
         awsName: awsName(node.id),
+        displayName: node.data.label,
         config: node.data.config,
         refs: {
           vpc: vpc ? tfName(vpc.id) : undefined,
           subnet: subnet ? tfName(subnet.id) : undefined,
-          subnets: subnets.map((s) => tfName(s.id)),
-          securityGroups: securityGroups.map((s) => tfName(s.id)),
+          subnets: vpcSubnets.map((s) => tfName(s.id)),
+          publicSubnets: vpcSubnets
+            .filter((s) => s.data.config.public === true)
+            .map((s) => tfName(s.id)),
+          securityGroups: attachedSGs(node.id),
+          targets: node.data.type === 'alb' ? albTargets(node.id) : undefined,
         },
       })
     })
     .filter((b) => b.trim() !== '')
 
+  // ---- Derived plumbing the canvas doesn't draw ------------------------------
+
+  const derived: string[] = []
+  const vpcs = nodes.filter((n) => n.data.type === 'vpc')
+
+  for (const vpc of vpcs) {
+    const v = tfName(vpc.id)
+    const vSubnets = subnetsIn(vpc.id)
+    const publicSubnets = vSubnets.filter((s) => s.data.config.public === true)
+    const privateSubnets = vSubnets.filter((s) => s.data.config.public !== true)
+    const igw = nodes.find((n) => n.data.type === 'igw' && vpcOf(n)?.id === vpc.id)
+    const nat = nodes.find((n) => n.data.type === 'nat' && vpcOf(n)?.id === vpc.id)
+    const hasRds = nodes.some((n) => n.data.type === 'rds' && vpcOf(n)?.id === vpc.id)
+
+    // Public route table: 0.0.0.0/0 → IGW, associated to public subnets.
+    if (igw && publicSubnets.length > 0) {
+      derived.push(`resource "aws_route_table" "${v}_public" {
+  vpc_id = aws_vpc.${v}.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.${tfName(igw.id)}.id
+  }
+  tags = { Name = "${vpc.data.label}-public" }
+}`)
+      for (const s of publicSubnets) {
+        derived.push(`resource "aws_route_table_association" "${tfName(s.id)}_public" {
+  subnet_id      = aws_subnet.${tfName(s.id)}.id
+  route_table_id = aws_route_table.${v}_public.id
+}`)
+      }
+    }
+
+    // Private route table: 0.0.0.0/0 → NAT, associated to private subnets.
+    if (nat && privateSubnets.length > 0) {
+      derived.push(`resource "aws_route_table" "${v}_private" {
+  vpc_id = aws_vpc.${v}.id
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.${tfName(nat.id)}.id
+  }
+  tags = { Name = "${vpc.data.label}-private" }
+}`)
+      for (const s of privateSubnets) {
+        derived.push(`resource "aws_route_table_association" "${tfName(s.id)}_private" {
+  subnet_id      = aws_subnet.${tfName(s.id)}.id
+  route_table_id = aws_route_table.${v}_private.id
+}`)
+      }
+    }
+
+    // DB subnet group (RDS requires subnets across ≥2 AZs — enforced by checks).
+    if (hasRds && vSubnets.length > 0) {
+      derived.push(`resource "aws_db_subnet_group" "${v}_dbsg" {
+  name_prefix = "${awsName(vpc.id).toLowerCase()}-"
+  subnet_ids  = [${vSubnets.map((s) => `aws_subnet.${tfName(s.id)}.id`).join(', ')}]
+}`)
+    }
+  }
+
   const hasType = (t: ResourceType) => nodes.some((n) => n.data.type === t)
+  const needsAmiLookup = nodes.some(
+    (n) =>
+      n.data.type === 'ec2' &&
+      !(typeof n.data.config.ami === 'string' && n.data.config.ami.startsWith('ami-')),
+  )
+
+  const dataBlocks = needsAmiLookup
+    ? `data "aws_ami" "al2023" {
+  most_recent = true
+  owners      = ["amazon"]
+  filter {
+    name   = "name"
+    values = ["al2023-ami-2023*-x86_64"]
+  }
+}
+
+`
+    : ''
+
+  const providers = hasType('lambda')
+    ? `    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
+    }`
+    : `    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }`
 
   const mainTf = `# Generated by cidrunner — https://nextchans.github.io/cidrunner/
-# Goal: pass \`terraform validate\`. Placeholder values (secrets, AMIs, IAM role)
-# must be replaced before \`terraform apply\`.
+# Designed to be apply-ready: \`terraform init && terraform apply\` creates the
+# drawn architecture. Review instance sizes and the region before applying —
+# NAT Gateway, ALB, and RDS incur hourly cost.
 
 terraform {
   required_version = ">= 1.5"
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
+${providers}
   }
 }
 
@@ -91,51 +200,87 @@ provider "aws" {
   region = var.aws_region
 }
 
-${blocks.join('\n\n')}
+${dataBlocks}${blocks.join('\n\n')}${derived.length ? '\n\n# --- Derived networking (route tables, associations, subnet groups) ---\n\n' + derived.join('\n\n') : ''}
 `
 
   const vars: string[] = [
     `variable "aws_region" {
-  type    = string
-  default = "ap-northeast-2"
+  type        = string
+  description = "AWS region to deploy into"
+  default     = "ap-northeast-2"
 }`,
   ]
   if (hasType('rds')) {
     vars.push(`variable "db_password" {
-  type      = string
-  sensitive = true
-  default   = "ChangeMe123!" # placeholder — replace before use
+  type        = string
+  description = "Master password for RDS (pass with -var or TF_VAR_db_password)"
+  sensitive   = true
 }`)
   }
-  if (hasType('lambda')) {
-    vars.push(`variable "lambda_role_arn" {
-  type    = string
-  default = "arn:aws:iam::000000000000:role/lambda-exec" # placeholder
+
+  // Outputs — the things an engineer immediately wants after apply.
+  const outputs: string[] = []
+  for (const n of nodes) {
+    const name = tfName(n.id)
+    if (n.data.type === 'alb') {
+      outputs.push(`output "${name}_dns_name" {
+  description = "${n.data.label} DNS name"
+  value       = aws_lb.${name}.dns_name
 }`)
+    }
+    if (n.data.type === 'lambda') {
+      outputs.push(`output "${name}_api_endpoint" {
+  description = "${n.data.label} HTTP API endpoint"
+  value       = aws_apigatewayv2_api.${name}_api.api_endpoint
+}`)
+    }
+    if (n.data.type === 's3') {
+      outputs.push(`output "${name}_bucket" {
+  description = "${n.data.label} bucket name"
+  value       = aws_s3_bucket.${name}.id
+}`)
+    }
+    if (n.data.type === 'rds') {
+      outputs.push(`output "${name}_endpoint" {
+  description = "${n.data.label} connection endpoint"
+  value       = aws_db_instance.${name}.endpoint
+}`)
+    }
   }
 
   const readme = `# cidrunner Terraform export
 
-Generated from your cidrunner canvas. This aims to pass \`terraform validate\`,
-not \`terraform apply\` — placeholder values (DB password, Lambda IAM role,
-AMI id, Lambda deployment package) must be filled in for a real deployment.
+Generated from your cidrunner canvas. This configuration is **apply-ready**:
 
 \`\`\`bash
 terraform init
-terraform validate
+terraform plan${hasType('rds') ? ' -var db_password=YOUR_SECURE_PASSWORD' : ''}
+terraform apply${hasType('rds') ? ' -var db_password=YOUR_SECURE_PASSWORD' : ''}
 \`\`\`
+
+Notes:
+- EC2 AMIs set to \`auto\` resolve to the latest Amazon Linux 2023 via a data source.
+- Route tables and associations are derived from your topology (IGW → public,
+  NAT → private).
+${hasType('rds') ? '- RDS requires `db_password` (no default; it is marked sensitive).\n- The DB subnet group spans the subnets of the VPC that contains the RDS.\n' : ''}${hasType('lambda') ? '- Lambda ships an inline hello-world package (archive provider) and a working\n  API Gateway HTTP API — the endpoint is in the outputs.\n' : ''}- **Cost warning**: NAT Gateway, ALB, and RDS bill hourly. \`terraform destroy\`
+  when you are done.
 `
 
-  return {
+  const files: Record<string, string> = {
     'main.tf': mainTf,
     'variables.tf': vars.join('\n\n') + '\n',
     'README.md': readme,
   }
+  if (outputs.length) files['outputs.tf'] = outputs.join('\n\n') + '\n'
+  return files
 }
 
 /** Generates the Terraform files and triggers a browser zip download. */
-export async function downloadTerraformZip(nodes: ResourceNodeType[]): Promise<void> {
-  const files = generateTerraform(nodes)
+export async function downloadTerraformZip(
+  nodes: ResourceNodeType[],
+  edges: Edge[] = [],
+): Promise<void> {
+  const files = generateTerraform(nodes, edges)
   const zip = new JSZip()
   for (const [filename, content] of Object.entries(files)) {
     zip.file(filename, content)
