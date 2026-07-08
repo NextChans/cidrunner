@@ -40,6 +40,7 @@ Design and decisions live in [`docs/`](docs/):
 - **Missions & Free mode** — guided challenges (tutorial / 3-tier / serverless) or an open sandbox.
 - **Terraform export** — download a `main.tf` + `variables.tf` zip that aims to pass `terraform validate`.
 - **MVP resource set (10)** — VPC · Subnet · IGW · NAT · Security Group · ALB · EC2 · RDS · S3 · Lambda+API GW.
+- **Mobile** — building infra is a desktop-first experience, but narrow screens (<768px) get a full-viewport canvas with the palette / inspector / missions moved into overlay drawers, so a project stays viewable and demo-able on a phone. See [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md).
 
 ## Roadmap
 

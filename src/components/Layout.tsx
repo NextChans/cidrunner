@@ -1,10 +1,17 @@
 import { Waves } from 'lucide-react'
 import { Toolbar } from './Toolbar'
-import { Palette } from './Palette'
+import { MobileHeader } from './MobileHeader'
+import { Drawer } from './Drawer'
+import { Palette, PaletteBody } from './Palette'
 import { Canvas } from './Canvas'
-import { Inspector } from './Inspector'
+import { Inspector, InspectorBody } from './Inspector'
+import { MissionList } from './MissionPanel'
+import { useGraphStore } from '@/store/useGraphStore'
 
 export function Layout() {
+  const drawers = useGraphStore((s) => s.mobileDrawers)
+  const setDrawer = useGraphStore((s) => s.setDrawer)
+
   return (
     <div className="flex h-screen flex-col bg-surface text-slate-200">
       <header className="flex items-center justify-between border-b border-surface-border bg-surface-raised px-4 py-2.5">
@@ -17,16 +24,49 @@ export function Layout() {
             Phase 0
           </span>
         </div>
-        <Toolbar />
+        {/* Full toolbar on desktop; compact drawer toggles on mobile. */}
+        <div className="hidden md:block">
+          <Toolbar />
+        </div>
+        <MobileHeader />
       </header>
 
       <main className="flex min-h-0 flex-1">
+        {/* Desktop 3-pane layout (hidden on mobile). */}
         <Palette />
         <div className="min-w-0 flex-1">
           <Canvas />
         </div>
         <Inspector />
       </main>
+
+      {/* Mobile-only overlay drawers reusing the same panel bodies. */}
+      <Drawer
+        open={drawers.palette}
+        onClose={() => setDrawer('palette', false)}
+        side="left"
+        title="리소스"
+      >
+        <PaletteBody />
+      </Drawer>
+
+      <Drawer
+        open={drawers.inspector}
+        onClose={() => setDrawer('inspector', false)}
+        side="right"
+        title="인스펙터"
+      >
+        <InspectorBody />
+      </Drawer>
+
+      <Drawer
+        open={drawers.missions}
+        onClose={() => setDrawer('missions', false)}
+        side="bottom"
+        title="미션"
+      >
+        <MissionList />
+      </Drawer>
     </div>
   )
 }

@@ -33,3 +33,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0006](0006-ci-cd-workflow-split.md) | CI/Deploy workflow split & deploy secret gating | Accepted | 2026-07-08 |
 | [0007](0007-github-pages-over-cloudflare.md) | GitHub Pages over Cloudflare Pages | Accepted | 2026-07-08 |
 | [0008](0008-korean-first-ui-no-i18n.md) | Korean-first UI (hardcoded), no i18n framework | Accepted | 2026-07-08 |
+| [0009](0009-mobile-responsive-drawer-pattern.md) | Mobile responsive drawer pattern for narrow viewports | Accepted | 2026-07-08 |

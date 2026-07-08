@@ -23,13 +23,15 @@ console and docs. See [ADR 0008](decisions/0008-korean-first-ui-no-i18n.md).
 
 ```
 App
-└─ Layout                     3-pane shell
+└─ Layout                     responsive shell (3-pane ≥md / drawers <md)
    ├─ Palette         (left)    draggable list of the 10 resource types
    ├─ Canvas          (center)  React Flow editor — nodes, edges, nesting
    │  └─ ResourceNode           one node renderer, driven by ResourceMeta
    ├─ Inspector       (right)   per-resource property form (Phase 2)
    ├─ MissionPanel    (right)   mission cards, active-mission state
-   └─ Toolbar         (top)     mode toggle · Start (sim) · Export (tf)
+   ├─ Toolbar         (top)     mode toggle · Start (sim) · Export (tf) — desktop only
+   ├─ MobileHeader    (top)     <md drawer triggers (palette · missions · inspector)
+   └─ Drawer          (<md)     overlay/bottom-sheet host for the three panels
 ```
 
 | Component | Responsibility |
@@ -39,7 +41,33 @@ App
 | **ResourceNode** | Generic node view; looks up its `ResourceMeta` by `data.type` to render icon, label, and accent. |
 | **Inspector** | Edits the selected node's `data.config`; runs `ResourceMeta.validate` (Phase 2). |
 | **MissionPanel** | Shows missions; sets `activeMissionId`; displays clear state (Phase 5). |
-| **Toolbar** | Free/Challenge mode toggle; Start (Phase 3) and Export (Phase 4) actions. |
+| **Toolbar** | Free/Challenge mode toggle; Start (Phase 3) and Export (Phase 4) actions. Desktop only (`hidden md:block`). |
+| **MobileHeader** | `md:hidden` header buttons that open the palette / missions / inspector drawers. |
+| **Drawer** | Self-contained overlay/bottom-sheet used to host the three panels below `md`. |
+
+## Responsive strategy
+
+The layout has two shells split at Tailwind's default `md` breakpoint (768px);
+see [ADR 0009](decisions/0009-mobile-responsive-drawer-pattern.md).
+
+- **≥768px (desktop)** — the static 3-pane layout above: Palette (left) /
+  Canvas (center) / Inspector + MissionPanel (right).
+- **<768px (mobile)** — Canvas fills the viewport (React Flow's built-in touch
+  pan/zoom carries the "view" experience). The three panels become overlay
+  drawers: Palette (left), Inspector (right), MissionPanel (bottom sheet,
+  `max-h-[70vh]`), each opened from a `MobileHeader` button. Selecting a node
+  auto-opens the Inspector drawer.
+
+Each panel splits its inner content (`PaletteBody` / `InspectorBody` /
+`MissionList`) from its desktop `aside` wrapper, so the desktop pane and the
+mobile drawer render the same content with no duplication. Drawer open/close
+state lives in the store as `mobileDrawers` + `setDrawer`.
+
+The `Drawer` animates with **pure CSS transitions**, not Framer Motion: it stays
+mounted and, when closed, is translated off-screen *and* `pointer-events-none`,
+so a closed drawer can never intercept canvas taps regardless of animation
+state. (An `AnimatePresence` version left a tap-blocking ghost overlay under
+React 19 StrictMode — see the ADR.)
 
 ## State management
 
@@ -50,6 +78,7 @@ is the source of truth:
 - `nodes` / `edges` — the React Flow graph (`nodes` typed as `ResourceNodeType`)
 - `selectedNodeId` — drives the Inspector
 - `activeMissionId` — drives the MissionPanel
+- `mobileDrawers` — `{ palette, inspector, missions }` open flags for the `<md` drawers (`setDrawer`)
 
 Nodes carry a typed `data` payload:
 

@@ -40,6 +40,7 @@
 - **미션 & 자유 모드** — 가이드 챌린지(튜토리얼 / 3-tier / 서버리스) 또는 자유 샌드박스.
 - **Terraform 내보내기** — `terraform validate` 통과를 목표로 하는 `main.tf` + `variables.tf` zip 다운로드.
 - **MVP 리소스 10종** — VPC · Subnet · IGW · NAT · Security Group · ALB · EC2 · RDS · S3 · Lambda+API GW.
+- **모바일** — 인프라 편집은 데스크톱 우선 경험이지만, 좁은 화면(<768px)에서는 캔버스가 전체 화면을 차지하고 팔레트 / 인스펙터 / 미션이 오버레이 drawer로 이동해 폰에서도 프로젝트를 보고 데모할 수 있습니다. [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md) 참고.
 
 ## 로드맵
 
