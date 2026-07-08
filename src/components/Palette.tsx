@@ -11,7 +11,7 @@ export function PaletteBody() {
   const setDrawer = useGraphStore((s) => s.setDrawer)
 
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto p-2">
+    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2">
       {CATEGORY_ORDER.map((category) => {
         const items = resourceList.filter((m) => m.category === category)
         if (items.length === 0) return null
