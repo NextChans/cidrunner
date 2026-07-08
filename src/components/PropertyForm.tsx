@@ -1,24 +1,42 @@
 import { getResource } from '@/resources'
 import type { PropertyField } from '@/resources/types'
-import { getCidrIssues } from '@/graph/cidr'
+import { getGraphIssues } from '@/graph/checks'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
 /**
  * Renders a resource's editable properties as a form, driven entirely by
- * `ResourceMeta.fields` (Phase 2). Edits flow straight into the store;
- * per-node `validate` plus graph-level CIDR checks run on every render for
- * real-time feedback.
+ * `ResourceMeta.fields` (Phase 2). Edits flow straight into the store.
+ * Real-time feedback merges three sources: per-node `validate`, generic
+ * required-field checks, and graph-level issues (errors red, security
+ * warnings amber).
  */
 export function PropertyForm({ node }: { node: ResourceNodeType }) {
   const updateNodeConfig = useGraphStore((s) => s.updateNodeConfig)
-  // Select the cached array (or undefined) directly — defaulting to a fresh []
+  // Select cached arrays (or undefined) directly — defaulting to a fresh []
   // inside the selector would return a new reference every snapshot and loop.
-  const graphErrors = useGraphStore((s) => getCidrIssues(s.nodes).get(node.id))
+  const graphErrors = useGraphStore((s) => getGraphIssues(s.nodes, s.edges).errors.get(node.id))
+  const graphWarnings = useGraphStore((s) =>
+    getGraphIssues(s.nodes, s.edges).warnings.get(node.id),
+  )
   const meta = getResource(node.data.type)
   const fields = meta.fields ?? []
-  const errors = [...(meta.validate?.(node.data.config) ?? []), ...(graphErrors ?? [])]
 
-  if (fields.length === 0) {
+  const requiredErrors = fields
+    .filter((f) => f.required)
+    .filter((f) => {
+      const v = node.data.config[f.key]
+      return v === undefined || v === null || (typeof v === 'string' && v.trim() === '')
+    })
+    .map((f) => `${f.label}은(는) 필수 항목입니다.`)
+
+  const errors = [
+    ...requiredErrors,
+    ...(meta.validate?.(node.data.config) ?? []),
+    ...(graphErrors ?? []),
+  ]
+  const warnings = graphWarnings ?? []
+
+  if (fields.length === 0 && errors.length === 0 && warnings.length === 0) {
     return (
       <p className="text-[11px] italic text-slate-600">
         이 리소스는 편집할 속성이 없습니다.
@@ -28,22 +46,35 @@ export function PropertyForm({ node }: { node: ResourceNodeType }) {
 
   return (
     <div className="space-y-3">
-      <div className="text-[10px] uppercase tracking-wide text-slate-500">속성</div>
-
-      {fields.map((field) => (
-        <Field
-          key={field.key}
-          field={field}
-          value={node.data.config[field.key]}
-          onChange={(v) => updateNodeConfig(node.id, field.key, v)}
-        />
-      ))}
+      {fields.length > 0 && (
+        <>
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">속성</div>
+          {fields.map((field) => (
+            <Field
+              key={field.key}
+              field={field}
+              value={node.data.config[field.key]}
+              onChange={(v) => updateNodeConfig(node.id, field.key, v)}
+            />
+          ))}
+        </>
+      )}
 
       {errors.length > 0 && (
         <ul className="space-y-1 rounded-md border border-rose-900/60 bg-rose-950/30 p-2">
           {errors.map((e) => (
             <li key={e} className="text-[11px] text-rose-300">
               ⚠ {e}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {warnings.length > 0 && (
+        <ul className="space-y-1 rounded-md border border-amber-900/60 bg-amber-950/30 p-2">
+          {warnings.map((w) => (
+            <li key={w} className="text-[11px] text-amber-300">
+              🛡 {w}
             </li>
           ))}
         </ul>
@@ -80,7 +111,10 @@ function Field({
 
   return (
     <label className="block space-y-1">
-      <span className="text-xs text-slate-300">{field.label}</span>
+      <span className="text-xs text-slate-300">
+        {field.label}
+        {field.required && <span className="text-rose-400"> *</span>}
+      </span>
       {field.type === 'select' ? (
         <select
           value={String(value ?? '')}

@@ -5,6 +5,7 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  Panel,
   useReactFlow,
   applyNodeChanges,
   applyEdgeChanges,
@@ -17,6 +18,7 @@ import {
   type XYPosition,
   type ReactFlowInstance,
 } from '@xyflow/react'
+import { Map as MapIcon } from 'lucide-react'
 import { ResourceNode } from './nodes/ResourceNode'
 import { TrafficEdge } from './edges/TrafficEdge'
 import { getResource, resources, type ResourceType } from '@/resources'
@@ -70,6 +72,8 @@ export function Canvas() {
   const setNotice = useGraphStore((s) => s.setNotice)
   const stopSimulation = useGraphStore((s) => s.stopSimulation)
   const simulation = useGraphStore((s) => s.simulation)
+  const showMiniMap = useGraphStore((s) => s.showMiniMap)
+  const toggleMiniMap = useGraphStore((s) => s.toggleMiniMap)
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ resource: ResourceNode }), [])
   const edgeTypes = useMemo<EdgeTypes>(() => ({ traffic: TrafficEdge }), [])
@@ -161,13 +165,30 @@ export function Canvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#1e293b" />
         <Controls className="!bg-surface-raised !text-slate-200" />
-        <MiniMap
-          pannable
-          zoomable
-          className="!bg-surface-raised"
-          nodeColor="#334155"
-          maskColor="rgba(15, 23, 42, 0.6)"
-        />
+        {showMiniMap && (
+          <MiniMap
+            pannable
+            zoomable
+            className="!bg-surface-raised"
+            nodeColor="#334155"
+            maskColor="rgba(15, 23, 42, 0.6)"
+          />
+        )}
+        <Panel position="top-right">
+          <button
+            type="button"
+            onClick={() => toggleMiniMap()}
+            title={showMiniMap ? '미니맵 숨기기' : '미니맵 표시'}
+            className={
+              'rounded-md border border-surface-border p-1.5 transition-colors ' +
+              (showMiniMap
+                ? 'bg-accent text-slate-900'
+                : 'bg-surface-raised text-slate-400 hover:text-slate-200')
+            }
+          >
+            <MapIcon size={14} />
+          </button>
+        </Panel>
       </ReactFlow>
 
       {notice && (
@@ -183,21 +204,36 @@ export function Canvas() {
         <div
           role="status"
           className={
-            'absolute left-1/2 top-4 z-10 flex max-w-[90%] -translate-x-1/2 items-center gap-2 rounded-md border px-4 py-2 text-center text-xs shadow-lg ' +
+            'absolute left-1/2 top-4 z-10 max-w-[92%] -translate-x-1/2 rounded-md border px-4 py-2 text-xs shadow-lg ' +
             (simulation.ok
               ? 'border-accent/60 bg-emerald-950/90 text-emerald-200'
               : 'border-rose-800/70 bg-rose-950/90 text-rose-200')
           }
         >
-          <span>{simulation.ok ? '✅' : '⛔'}</span>
-          <span>{simulation.message}</span>
-          <button
-            type="button"
-            onClick={() => stopSimulation()}
-            className="ml-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide opacity-70 hover:opacity-100"
-          >
-            닫기
-          </button>
+          <div className="flex items-center justify-center gap-2">
+            <span>{simulation.ok ? '✅' : '⛔'}</span>
+            <span>{simulation.message}</span>
+            <button
+              type="button"
+              onClick={() => stopSimulation()}
+              className="ml-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide opacity-70 hover:opacity-100"
+            >
+              닫기
+            </button>
+          </div>
+          {simulation.flows.length > 0 && (
+            <ul className="mt-1.5 space-y-0.5 border-t border-white/10 pt-1.5 text-left">
+              {simulation.flows.map((flow, i) => (
+                <li key={flow.entryId} className="flex items-start gap-1.5">
+                  <span>{flow.ok ? '🟢' : '🔴'}</span>
+                  <span>
+                    {i + 1}. {flow.label}
+                    {flow.ok ? ' — 도달' : ` — ${flow.message}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

@@ -133,12 +133,20 @@ and a red outline on the node. Reusable checks live in
 rules are simplified to inbound toggles — see
 [ADR 0011](decisions/0011-inspector-property-form-and-validation.md).
 
-On top of per-node checks, [`src/graph/cidr.ts`](../src/graph/cidr.ts) runs
-**graph-level CIDR validation** (memoized per nodes-array): a subnet's CIDR must
-sit inside its parent VPC's CIDR, and sibling subnets in one VPC must not
-overlap (VPC-to-VPC overlap is allowed, as in AWS). Results feed the same
-UI surfaces and the mission `allValid` check — see
-[ADR 0015](decisions/0015-graph-level-cidr-validation.md).
+On top of per-node checks, [`src/graph/checks.ts`](../src/graph/checks.ts) runs
+**graph-level validation with two severities** (memoized per store snapshot):
+
+- **Errors (red)** — configurations AWS/Terraform would reject: CIDR
+  containment/sibling-overlap ([`src/graph/cidr.ts`](../src/graph/cidr.ts),
+  [ADR 0015](decisions/0015-graph-level-cidr-validation.md)), a NAT outside a
+  public subnet, an ALB or RDS without the multi-AZ subnets it requires.
+- **Warnings (amber)** — apply-able but insecure / non-best-practice: SSH open
+  to 0.0.0.0/0, a DB in a public subnet, disabled encryption or S3
+  public-access block, a missing Security Group attachment.
+
+Both feed the node outline, the Inspector badge + message lists (⚠ red / 🛡
+amber), and the mission context (`allValid`, `securityOk`) — see
+[ADR 0017](decisions/0017-security-model-and-severity-validation.md).
 
 ## Graph rules
 
@@ -160,37 +168,43 @@ predicates — `canContain`, `canBeTopLevel`, `canConnect`, `canBeSource`,
 
 See [ADR 0010](decisions/0010-graph-nesting-and-edge-rule-model.md).
 
-## Traffic simulation
+## Traffic simulation (playback)
 
-Pressing **Start** runs [`src/graph/simulate.ts`](../src/graph/simulate.ts): a
-greedy single-path trace from an entry node (ALB, else an unfed Lambda) along the
-edges to a sink (RDS or S3). The `SimResult` (path node/edge ids, blocking node,
-message) lives in the store as `simulation`. `TrafficEdge` renders a moving SVG
-particle along each path edge (staggered per hop); path nodes glow green and the
-blocking node pulses red, with a banner over the canvas. Scope is connectivity
-only — security-group and routing rules are not modeled. See
-[ADR 0012](decisions/0012-traffic-simulation-model.md).
+Pressing **Start** runs [`src/graph/simulate.ts`](../src/graph/simulate.ts): one
+greedy trace per **entry point** (every ALB, every Lambda with no inbound
+traffic) along the traffic edges to a sink (RDS or S3). Security-Group edges are
+*attachments*, not traffic, and are skipped (they render as dashed rose lines).
+The `SimResult` carries `flows[]` plus derived aggregates (`edgeHops`,
+`arrivals`, `blockedNodeIds`). Playback: SVG particles staggered per hop
+(0.45s), a green **arrival pulse** when the request reaches each node (data
+lands), red pulses on blocking nodes, and a banner listing every flow with its
+outcome. See [ADR 0012](decisions/0012-traffic-simulation-model.md) and
+[ADR 0018](decisions/0018-multi-flow-playback-and-palette-categories.md).
 
 ## Terraform export
 
-**Export** runs [`src/graph/terraform.ts`](../src/graph/terraform.ts). Each
-resource owns its HCL via `ResourceMeta.terraform(ctx)`; the generator walks the
-topology once to build each node's `TfContext` (a Terraform-safe name plus
-resolved `refs` — enclosing VPC/subnet and same-VPC subnets/SGs), calls the
-emitters, and assembles `main.tf` / `variables.tf` / `README.md`, zipped for
-download with JSZip. The output targets `terraform validate` (verified with
-Terraform v1.9.8), not `terraform apply` — secrets, AMI, and the Lambda role are
-placeholders. See [ADR 0013](decisions/0013-terraform-export-implementation.md).
+**Export** runs [`src/graph/terraform.ts`](../src/graph/terraform.ts) and is
+**apply-ready** ([ADR 0016](decisions/0016-apply-ready-terraform.md), extending
+[ADR 0013](decisions/0013-terraform-export-implementation.md)). Each resource
+owns its HCL via `ResourceMeta.terraform(ctx)`; the generator resolves `refs`
+(enclosing VPC/subnet, public subnets, SG attachments and ALB targets from
+edges) and **derives the plumbing the canvas doesn't draw**: route tables +
+associations (IGW → public, NAT → private), DB subnet groups, the Amazon Linux
+2023 AMI lookup, and Lambda's IAM role + inline package + full API Gateway
+chain. Output: `main.tf` / `variables.tf` / `outputs.tf` / `README.md` zipped
+via JSZip. Verified with a real `terraform init` + `validate` (v1.9.8, AWS
+provider 5.x + archive provider).
 
 ## Mission registry
 
-[`src/missions/`](../src/missions/) holds one module per mission
-(`tutorial`, `threeTier`, `serverless`) plus an `index.ts`. A `Mission`
+[`src/missions/`](../src/missions/) holds one module per mission (`tutorial`,
+`threeTier`, `serverless`, `securityHardening`) plus an `index.ts`. A `Mission`
 describes its `goal`, optional `hint`, `requiredResources`, and a `check(ctx)`
 that returns a 0–3 star rating (0 = not cleared) for the current graph. The
-MissionPanel builds the check context live — the simulation result (Phase 3) and
-a validation sweep (Phase 2) — so cards show clear state and stars as the graph
-changes. See [ADR 0014](decisions/0014-mission-clear-detection-and-stars.md).
+MissionPanel builds the check context live — the multi-flow simulation result,
+`allValid` (no errors) and `securityOk` (no security warnings) — so cards show
+clear state and stars as the graph changes. See
+[ADR 0014](decisions/0014-mission-clear-detection-and-stars.md).
 
 ## Data flow
 

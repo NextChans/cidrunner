@@ -25,3 +25,20 @@ body {
 .react-flow__attribution {
   @apply bg-transparent text-slate-600;
 }
+
+/* Simulation arrival pulse — fires once per loop when the request reaches a node */
+@keyframes sim-arrival {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+  }
+  40% {
+    box-shadow: 0 0 0 10px rgba(52, 211, 153, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+  }
+}
+
+.sim-arrival {
+  animation: sim-arrival 1.4s ease-out infinite;
+}

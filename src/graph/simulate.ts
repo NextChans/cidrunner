@@ -4,27 +4,50 @@ import type { ResourceNodeType } from '@/store/useGraphStore'
 import type { ResourceType } from '@/resources'
 
 /**
- * Result of tracing one request through the topology (Phase 3). The request
- * starts at a virtual client, enters through a front-door node (ALB or Lambda),
- * and should reach a data sink (RDS or S3): client → LB → app → DB.
+ * Traffic simulation (Phase 3, extended to multi-flow — ADR 0018). Pressing
+ * Start traces a request from EVERY entry point (each ALB, each Lambda with no
+ * inbound traffic) along the traffic edges to a data sink (RDS or S3). Edges
+ * whose source is a Security Group are *attachments*, not traffic, and are
+ * ignored here (ADR 0017).
  */
-export interface SimResult {
+
+/** Seconds per hop — drives particle stagger and arrival pulses. */
+export const HOP_SECONDS = 0.45
+
+/** One traced request, from one entry. */
+export interface SimFlow {
+  entryId: string
   ok: boolean
-  /** Node ids on the traced path, in visit order (for highlighting). */
+  /** Node ids on the traced path, in visit order. */
   pathNodeIds: string[]
-  /** Edge ids on the traced path, in visit order (for particle animation). */
+  /** Edge ids on the traced path, in visit order. */
   pathEdgeIds: string[]
   /** The node where the path broke, if it failed. */
   blockedNodeId: string | null
-  /** Player-facing Korean summary of the run. */
+  /** Player-facing line, e.g. `ALB → EC2 Instance → RDS Database`. */
+  label: string
   message: string
+}
+
+export interface SimResult {
+  ok: boolean
+  flows: SimFlow[]
+  /** Aggregate player-facing summary. */
+  message: string
+  /** Union of all flows' path nodes (highlighting). */
+  pathNodeIds: string[]
+  /** Union of all flows' path edges. */
+  pathEdgeIds: string[]
+  /** All blocking nodes across flows. */
+  blockedNodeIds: string[]
+  /** edge id → hop index within its flow (particle stagger). */
+  edgeHops: Record<string, number>
+  /** node id → seconds until the request reaches it (arrival pulse). */
+  arrivals: Record<string, number>
 }
 
 /** Types that terminate a successful request (the "DB / storage" tier). */
 const SINKS: ReadonlySet<ResourceType> = new Set<ResourceType>(['rds', 's3'])
-
-/** Front-door types where client traffic can enter. */
-const ENTRIES: ReadonlySet<ResourceType> = new Set<ResourceType>(['alb', 'lambda'])
 
 function blockedMessage(type: ResourceType): string {
   switch (type) {
@@ -39,31 +62,12 @@ function blockedMessage(type: ResourceType): string {
   }
 }
 
-/**
- * Traces a single request greedily from the chosen entry along directed edges
- * until it reaches a sink (success) or runs out of forward edges (blocked).
- */
-export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
-  const byId = new Map(nodes.map((n) => [n.id, n]))
-  const outgoing = (id: string) => edges.filter((e) => e.source === id)
-
-  // Pick an entry: prefer an ALB, else a Lambda that receives no traffic.
-  const albs = nodes.filter((n) => n.data.type === 'alb')
-  const lambdaEntries = nodes.filter(
-    (n) => n.data.type === 'lambda' && !edges.some((e) => e.target === n.id),
-  )
-  const entry = albs[0] ?? lambdaEntries[0] ?? null
-
-  if (!entry) {
-    return {
-      ok: false,
-      pathNodeIds: [],
-      pathEdgeIds: [],
-      blockedNodeId: null,
-      message: '트래픽 진입점이 없습니다. ALB 또는 Lambda를 추가하세요.',
-    }
-  }
-
+/** Traces one request greedily from `entry` along traffic edges. */
+function traceFlow(
+  entry: ResourceNodeType,
+  byId: Map<string, ResourceNodeType>,
+  trafficEdges: Edge[],
+): SimFlow {
   const pathNodeIds: string[] = []
   const pathEdgeIds: string[] = []
   const visited = new Set<string>()
@@ -75,17 +79,19 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
 
     if (SINKS.has(current.data.type)) {
       return {
+        entryId: entry.id,
         ok: true,
         pathNodeIds,
         pathEdgeIds,
         blockedNodeId: null,
-        message: '요청이 정상적으로 목적지까지 도달했습니다! 🎉',
+        label: pathNodeIds.map((id) => byId.get(id)?.data.label ?? id).join(' → '),
+        message: '도달',
       }
     }
 
-    // Step to the first unvisited forward neighbour.
     let chosen: { edge: Edge; node: ResourceNodeType } | undefined
-    for (const edge of outgoing(current.id)) {
+    for (const edge of trafficEdges) {
+      if (edge.source !== current.id) continue
       const node = byId.get(edge.target)
       if (node && !visited.has(node.id)) {
         chosen = { edge, node }
@@ -95,10 +101,12 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
 
     if (!chosen) {
       return {
+        entryId: entry.id,
         ok: false,
         pathNodeIds,
         pathEdgeIds,
         blockedNodeId: current.id,
+        label: pathNodeIds.map((id) => byId.get(id)?.data.label ?? id).join(' → '),
         message: blockedMessage(current.data.type),
       }
     }
@@ -107,16 +115,72 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
     current = chosen.node
   }
 
+  // Unreachable, but keeps the types honest.
   return {
+    entryId: entry.id,
     ok: false,
     pathNodeIds,
     pathEdgeIds,
     blockedNodeId: entry.id,
+    label: entry.data.label,
     message: '경로를 완성할 수 없습니다.',
   }
 }
 
-/** Whether a resource type can act as a traffic entry (front door). */
-export function isEntryType(type: ResourceType): boolean {
-  return ENTRIES.has(type)
+/** Runs the simulation over the whole graph: one flow per entry point. */
+export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  // Security Group edges are attachments, not traffic.
+  const trafficEdges = edges.filter((e) => byId.get(e.source)?.data.type !== 'sg')
+
+  const entries = [
+    ...nodes.filter((n) => n.data.type === 'alb'),
+    ...nodes.filter(
+      (n) =>
+        n.data.type === 'lambda' && !trafficEdges.some((e) => e.target === n.id),
+    ),
+  ]
+
+  if (entries.length === 0) {
+    return {
+      ok: false,
+      flows: [],
+      message: '트래픽 진입점이 없습니다. ALB 또는 Lambda를 추가하세요.',
+      pathNodeIds: [],
+      pathEdgeIds: [],
+      blockedNodeIds: [],
+      edgeHops: {},
+      arrivals: {},
+    }
+  }
+
+  const flows = entries.map((entry) => traceFlow(entry, byId, trafficEdges))
+
+  const pathNodeIds = [...new Set(flows.flatMap((f) => f.pathNodeIds))]
+  const pathEdgeIds = [...new Set(flows.flatMap((f) => f.pathEdgeIds))]
+  const blockedNodeIds = flows
+    .map((f) => f.blockedNodeId)
+    .filter((id): id is string => id !== null)
+
+  const edgeHops: Record<string, number> = {}
+  const arrivals: Record<string, number> = {}
+  for (const flow of flows) {
+    flow.pathEdgeIds.forEach((edgeId, i) => {
+      if (!(edgeId in edgeHops)) edgeHops[edgeId] = i
+    })
+    flow.pathNodeIds.forEach((nodeId, i) => {
+      const t = i * HOP_SECONDS
+      if (!(nodeId in arrivals) || arrivals[nodeId] > t) arrivals[nodeId] = t
+    })
+  }
+
+  const okCount = flows.filter((f) => f.ok).length
+  const ok = okCount === flows.length
+  const message = ok
+    ? flows.length === 1
+      ? '요청이 정상적으로 목적지까지 도달했습니다! 🎉'
+      : `모든 요청(${flows.length}개 경로)이 목적지에 도달했습니다! 🎉`
+    : `${flows.length}개 경로 중 ${flows.length - okCount}개가 차단되었습니다.`
+
+  return { ok, flows, message, pathNodeIds, pathEdgeIds, blockedNodeIds, edgeHops, arrivals }
 }

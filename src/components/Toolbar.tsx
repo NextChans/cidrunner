@@ -62,7 +62,8 @@ export function Toolbar() {
       <button
         type="button"
         onClick={() => {
-          void downloadTerraformZip(useGraphStore.getState().nodes)
+          const { nodes, edges } = useGraphStore.getState()
+          void downloadTerraformZip(nodes, edges)
         }}
         className="flex items-center gap-1.5 rounded-md border border-surface-border px-3 py-1.5 text-xs text-slate-200 transition-colors hover:bg-slate-700/60"
       >

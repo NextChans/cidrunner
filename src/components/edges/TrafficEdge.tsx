@@ -1,13 +1,16 @@
 import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/react'
 import { useGraphStore } from '@/store/useGraphStore'
+import { HOP_SECONDS } from '@/graph/simulate'
 
 /**
- * Edge renderer that draws a moving particle along its path while it is part of
- * a running traffic simulation (Phase 3). Particles are staggered by the edge's
- * position in the traced path so the request appears to flow hop by hop.
+ * Edge renderer. Security-Group edges (source = SG) render as a dashed rose
+ * *attachment* line — they carry no traffic (ADR 0017). Traffic edges draw a
+ * moving particle while part of a running simulation, staggered by their hop
+ * index so the request appears to flow hop by hop (ADR 0018).
  */
 export function TrafficEdge({
   id,
+  source,
   sourceX,
   sourceY,
   targetX,
@@ -17,6 +20,9 @@ export function TrafficEdge({
   markerEnd,
 }: EdgeProps) {
   const sim = useGraphStore((s) => s.simulation)
+  const isAttachment = useGraphStore(
+    (s) => s.nodes.find((n) => n.id === source)?.data.type === 'sg',
+  )
   const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
@@ -26,7 +32,17 @@ export function TrafficEdge({
     targetPosition,
   })
 
-  const hop = sim?.pathEdgeIds.indexOf(id) ?? -1
+  if (isAttachment) {
+    return (
+      <BaseEdge
+        id={`attach-${id}`}
+        path={edgePath}
+        style={{ stroke: '#fb7185', strokeWidth: 1.5, strokeDasharray: '4 4', opacity: 0.7 }}
+      />
+    )
+  }
+
+  const hop = sim?.edgeHops[id] ?? -1
   const active = hop >= 0
   const pathId = `traffic-path-${id}`
 
@@ -42,7 +58,7 @@ export function TrafficEdge({
         <circle r={4} fill="#34d399">
           <animateMotion
             dur="1.4s"
-            begin={`${hop * 0.45}s`}
+            begin={`${hop * HOP_SECONDS}s`}
             repeatCount="indefinite"
             rotate="auto"
           >

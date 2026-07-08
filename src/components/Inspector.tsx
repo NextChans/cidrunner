@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react'
 import { getResource } from '@/resources'
-import { getCidrIssues } from '@/graph/cidr'
+import { getGraphIssues } from '@/graph/checks'
 import { useGraphStore } from '@/store/useGraphStore'
 import { MissionPanel } from './MissionPanel'
 import { PropertyForm } from './PropertyForm'
@@ -11,8 +11,16 @@ export function InspectorBody() {
     s.nodes.find((n) => n.id === s.selectedNodeId),
   )
   const removeNode = useGraphStore((s) => s.removeNode)
+  const updateNodeLabel = useGraphStore((s) => s.updateNodeLabel)
   const graphErrorCount = useGraphStore((s) =>
-    s.selectedNodeId ? (getCidrIssues(s.nodes).get(s.selectedNodeId)?.length ?? 0) : 0,
+    s.selectedNodeId
+      ? (getGraphIssues(s.nodes, s.edges).errors.get(s.selectedNodeId)?.length ?? 0)
+      : 0,
+  )
+  const graphWarningCount = useGraphStore((s) =>
+    s.selectedNodeId
+      ? (getGraphIssues(s.nodes, s.edges).warnings.get(s.selectedNodeId)?.length ?? 0)
+      : 0,
   )
 
   return (
@@ -29,23 +37,42 @@ export function InspectorBody() {
                 const Icon = meta.icon
                 const invalid =
                   graphErrorCount > 0 ||
-                  (meta.validate?.(node.data.config) ?? []).length > 0
+                  (meta.validate?.(node.data.config) ?? []).length > 0 ||
+                  node.data.label.trim() === ''
                 return (
                   <>
                     <Icon size={18} className={meta.color} />
                     <span className="text-sm font-medium text-slate-100">
-                      {node.data.label}
+                      {node.data.label || '(이름 없음)'}
                     </span>
-                    {invalid && (
+                    {invalid ? (
                       <span className="rounded-full bg-rose-900/70 px-2 py-0.5 text-[10px] font-semibold text-rose-200">
                         오류
                       </span>
-                    )}
+                    ) : graphWarningCount > 0 ? (
+                      <span className="rounded-full bg-amber-900/70 px-2 py-0.5 text-[10px] font-semibold text-amber-200">
+                        경고
+                      </span>
+                    ) : null}
                   </>
                 )
               })()}
             </div>
           </div>
+
+          <label className="block space-y-1">
+            <span className="text-xs text-slate-300">이름</span>
+            <input
+              type="text"
+              value={node.data.label}
+              placeholder="리소스 이름"
+              onChange={(e) => updateNodeLabel(node.id, e.target.value)}
+              className="w-full rounded-md border border-surface-border bg-surface px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-accent"
+            />
+            {node.data.label.trim() === '' && (
+              <span className="block text-[11px] text-rose-300">⚠ 이름을 입력하세요.</span>
+            )}
+          </label>
 
           <dl className="space-y-1 text-xs">
             <div className="flex justify-between">

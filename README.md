@@ -15,12 +15,13 @@ blocking resource lights up. Clear guided missions, or build freely — then
 **export** your design as ready-to-run Terraform.
 
 > [!NOTE]
-> **Status: MVP feature-complete (Phases 0–5).**
-> Build a topology (drag-and-drop, nesting, rule-checked edges), edit properties
-> with real-time validation, **Start** to simulate traffic
-> (`client → LB → app → DB`), clear guided **missions** with a star rating, and
-> **export** a `terraform validate`-passing zip. Polish and more resources/missions
-> are future work.
+> **Status: v2 — an AWS engineer simulation.**
+> Build a topology from a categorized palette, name resources and edit required
+> properties with two-severity real-time validation (red errors / amber security
+> warnings), attach **Security Groups by drawing edges**, press **Start** to play
+> back every traffic flow (particles, arrival pulses, per-flow outcomes), clear
+> best-practice **missions** (including a security-hardening challenge), and
+> **export apply-ready Terraform** — `terraform apply` creates the real thing.
 
 > [!NOTE]
 > **UI language: Korean.** The in-app UI is Korean (hardcoded, no i18n
@@ -38,10 +39,11 @@ Design and decisions live in [`docs/`](docs/):
 
 ## Concept
 
-- **Block-style editor** — a React Flow canvas where AWS resources are draggable nodes.
-- **Traffic simulation** — press Start and animated particles trace the request path; bottlenecks highlight.
-- **Missions & Free mode** — guided challenges (tutorial / 3-tier / serverless) or an open sandbox.
-- **Terraform export** — download a `main.tf` + `variables.tf` zip that aims to pass `terraform validate`.
+- **Block-style editor** — a React Flow canvas with a categorized palette (networking / compute / database / storage / security); resources nest and connect under real AWS rules.
+- **Security as gameplay** — attach Security Groups by drawing edges; encryption and public-access toggles; amber warnings for anything insecure.
+- **Traffic playback** — press Start and every flow (ALB → EC2 → RDS, Lambda → S3, …) animates with particles and arrival pulses; blocked paths highlight the blocking node.
+- **Missions & Free mode** — best-practice challenges (tutorial / HA 3-tier / serverless / security hardening) with 0–3 star ratings, or an open sandbox.
+- **Apply-ready Terraform export** — `main.tf`, `variables.tf`, `outputs.tf` with derived route tables, DB subnet groups, IAM, and a working API Gateway; `terraform apply` creates real resources.
 - **MVP resource set (10)** — VPC · Subnet · IGW · NAT · Security Group · ALB · EC2 · RDS · S3 · Lambda+API GW.
 - **Mobile** — building infra is a desktop-first experience, but narrow screens (<768px) get a full-viewport canvas with the palette / inspector / missions moved into overlay drawers, so a project stays viewable and demo-able on a phone. See [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md).
 

@@ -35,6 +35,8 @@ interface GraphState {
   mobileDrawers: MobileDrawers
   /** Result of the last/current traffic simulation run (Phase 3), or null. */
   simulation: SimResult | null
+  /** MiniMap visibility — defaults off on small screens where it hides the canvas. */
+  showMiniMap: boolean
 
   setMode: (mode: Mode) => void
   /** Click-to-add: places the node into a valid container automatically. */
@@ -44,6 +46,8 @@ interface GraphState {
   removeNode: (id: string) => void
   /** Updates a single key in a node's `data.config` (Inspector edits). */
   updateNodeConfig: (id: string, key: string, value: unknown) => void
+  /** Renames a node (player-facing label, used for Terraform tags). */
+  updateNodeLabel: (id: string, label: string) => void
   setNodes: (nodes: ResourceNodeType[]) => void
   setEdges: (edges: Edge[]) => void
   setSelected: (id: string | null) => void
@@ -54,6 +58,7 @@ interface GraphState {
   runSimulation: () => void
   /** Clears the current simulation highlight. */
   stopSimulation: () => void
+  toggleMiniMap: () => void
   reset: () => void
 }
 
@@ -76,7 +81,7 @@ const initialNodes: ResourceNodeType[] = [
     data: {
       type: 'subnet',
       label: 'Public Subnet',
-      config: { cidr_block: '10.0.1.0/24', public: true },
+      config: { cidr_block: '10.0.1.0/24', az: 'a', public: true },
     },
   },
   {
@@ -88,7 +93,7 @@ const initialNodes: ResourceNodeType[] = [
     data: {
       type: 'ec2',
       label: 'EC2 Instance',
-      config: { instance_type: 't3.micro', ami: 'ami-0abcd1234ef567890' },
+      config: { instance_type: 't3.micro', ami: 'auto' },
     },
   },
 ]
@@ -143,6 +148,7 @@ export const useGraphStore = create<GraphState>((set) => ({
   notice: null,
   mobileDrawers: { palette: false, inspector: false, missions: false },
   simulation: null,
+  showMiniMap: !isMobileViewport(),
 
   setMode: (mode) => set({ mode }),
 
@@ -212,6 +218,13 @@ export const useGraphStore = create<GraphState>((set) => ({
       ),
     })),
 
+  updateNodeLabel: (id, label) =>
+    set((state) => ({
+      nodes: state.nodes.map((n) =>
+        n.id === id ? { ...n, data: { ...n.data, label } } : n,
+      ),
+    })),
+
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
 
@@ -237,6 +250,8 @@ export const useGraphStore = create<GraphState>((set) => ({
     set((state) => ({ simulation: simulate(state.nodes, state.edges) })),
 
   stopSimulation: () => set({ simulation: null }),
+
+  toggleMiniMap: () => set((state) => ({ showMiniMap: !state.showMiniMap })),
 
   reset: () =>
     set({
