@@ -74,6 +74,7 @@ export function Canvas() {
   const simulation = useGraphStore((s) => s.simulation)
   const showMiniMap = useGraphStore((s) => s.showMiniMap)
   const toggleMiniMap = useGraphStore((s) => s.toggleMiniMap)
+  const setContextMenu = useGraphStore((s) => s.setContextMenu)
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ resource: ResourceNode }), [])
   const edgeTypes = useMemo<EdgeTypes>(() => ({ traffic: TrafficEdge }), [])
@@ -171,7 +172,15 @@ export function Canvas() {
         onConnect={onConnect}
         onNodeClick={(_, node) => setSelected(node.id)}
         onPaneClick={() => setSelected(null)}
+        onNodeContextMenu={(e, node) => {
+          e.preventDefault()
+          setContextMenu({ nodeId: node.id, x: e.clientX, y: e.clientY })
+        }}
+        onPaneContextMenu={() => setContextMenu(null)}
         fitView
+        // Culls off-viewport nodes/edges so large graphs (100+ nodes) stay
+        // responsive on pan/zoom (ADR 0029).
+        onlyRenderVisibleElements
         proOptions={{ hideAttribution: false }}
         defaultEdgeOptions={{ type: 'traffic', animated: true }}
       >

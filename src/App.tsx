@@ -1,21 +1,13 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { Layout } from './components/Layout'
-import { Onboarding } from './components/Onboarding'
 import { designFromHash } from '@/graph/share'
-import { redoDesign, undoDesign, useGraphStore } from '@/store/useGraphStore'
+import { useGraphStore } from '@/store/useGraphStore'
 
-/** True when the user is typing in a form control (skip global shortcuts). */
-function isEditableTarget(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null
-  if (!el) return false
-  return (
-    el.tagName === 'INPUT' ||
-    el.tagName === 'TEXTAREA' ||
-    el.tagName === 'SELECT' ||
-    el.isContentEditable
-  )
-}
+// First-visit-only overlay — split out of the main bundle (ADR 0029).
+const Onboarding = lazy(() =>
+  import('./components/Onboarding').then((m) => ({ default: m.Onboarding })),
+)
 
 /**
  * True when the canvas deviates from the untouched seed graph — the bar for
@@ -66,28 +58,12 @@ function App() {
     return () => window.removeEventListener('hashchange', loadFromHash)
   }, [])
 
-  // Global undo/redo shortcuts: Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl/Cmd+Y.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || isEditableTarget(e.target)) return
-      const key = e.key.toLowerCase()
-      if (key === 'z') {
-        e.preventDefault()
-        if (e.shiftKey) redoDesign()
-        else undoDesign()
-      } else if (key === 'y') {
-        e.preventDefault()
-        redoDesign()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
-
   return (
     <ReactFlowProvider>
       <Layout />
-      <Onboarding suppressed={sharedLoaded} />
+      <Suspense fallback={null}>
+        <Onboarding suppressed={sharedLoaded} />
+      </Suspense>
     </ReactFlowProvider>
   )
 }

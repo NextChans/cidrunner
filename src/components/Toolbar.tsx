@@ -11,6 +11,7 @@ import {
   FileUp,
   Undo2,
   Redo2,
+  Keyboard,
 } from 'lucide-react'
 import { redoDesign, undoDesign, useGraphStore, type Mode } from '@/store/useGraphStore'
 import { downloadTerraformZip } from '@/graph/terraform'
@@ -44,6 +45,7 @@ export function Toolbar() {
   const stopSimulation = useGraphStore((s) => s.stopSimulation)
   const setNotice = useGraphStore((s) => s.setNotice)
   const loadDesign = useGraphStore((s) => s.loadDesign)
+  const setShortcutHelp = useGraphStore((s) => s.setShortcutHelp)
   const canUndo = useStore(useGraphStore.temporal, (s) => s.pastStates.length > 0)
   const canRedo = useStore(useGraphStore.temporal, (s) => s.futureStates.length > 0)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -185,6 +187,16 @@ export function Toolbar() {
       >
         <Download size={14} />
         Terraform 내보내기
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setShortcutHelp(true)}
+        className={iconBtn}
+        title="키보드 단축키 (?)"
+        aria-label="키보드 단축키"
+      >
+        <Keyboard size={14} />
       </button>
     </div>
   )

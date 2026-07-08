@@ -33,7 +33,10 @@
 - 각 스프린트 완료 시 관련 ADR 신규 작성
 - PHASES.md에 각 스프린트 History 항목 추가
 - 코드 변경 시 관련 docs 같이 update (CONTRIBUTING.md 준수)
-- Trunk-based 유지, PR 없이 main 직접 push
+- ~~Trunk-based 유지, PR 없이 main 직접 push~~ → **Sprint B부터 feature branch → PR →
+  merge 워크플로로 전환** (main 직접 push 금지). Sprint A까지는 trunk-based(main 직접
+  push)였고, Sprint B에서 리뷰 게이트·CI green 확인을 위해 PR 기반으로 바꿨다. Sprint C도
+  동일 워크플로를 따른다.
 
 ---
 
@@ -79,3 +82,30 @@ push 금지 규칙 적용).
 - **Kinesis 보류** — 스트림 단독은 도달할 싱크가 없어 시뮬이 막힘. 데이터 레이크 미션·
   스트림 소비 모델과 함께 3차 배치로.
 - **라이브 사이트** https://nextchans.github.io/cidrunner/ (merge 후 배포 반영 확인).
+
+---
+
+## Sprint C 결과 (완료: 2026-07-09 저녁)
+
+Sprint C 완료. `tsc -b` clean · Vitest 80/80 통과 · `oxlint` clean · `vite build` 성공
+(**500 kB 경고 해소**) · 로컬 dev 단축키·우클릭·성능 확인. feature branch → PR → merge
+워크플로로 진행.
+
+- **키보드 단축키** — `useKeyboardShortcuts` 훅(ReactFlowProvider 내부 마운트)으로 통합:
+  Undo(⌘Z)·Redo(⌘⇧Z/⌘Y)·복제(⌘D)·삭제(Del/Backspace)·선택 해제/닫기(Esc)·화면 맞춤(R)·
+  시뮬 시작·중지(S)·Terraform 내보내기(E)·도움말(?). 입력창 포커스 시 비활성(Esc 예외).
+  툴바에 단축키 버튼 + `ShortcutHelp` 모달. ADR 0028.
+- **노드 우클릭 컨텍스트 메뉴** — `NodeContextMenu`(속성 편집·복제·엣지 지우기·부모에서
+  분리·삭제). 스토어에 `contextMenu` 상태. 클릭 지점 앵커 + 뷰포트 클램프, 바깥 클릭·Esc로
+  닫힘. ADR 0028.
+- **성능·번들** — React Flow `onlyRenderVisibleElements`로 대형 그래프 컬링. Vite(rolldown)
+  `codeSplitting.groups`로 react-flow·vendor 청크 분리, JSZip은 export 시점 lazy import,
+  Onboarding·ShortcutHelp·NodeContextMenu는 `React.lazy`. **단일 574.76 kB → 최대 청크
+  195.63 kB**, 500 kB 경고 소멸. ADR 0029.
+- **인터랙티브 튜토리얼** — 미션에 backward-compatible `steps?: TutorialStep[]` 추가,
+  튜토리얼 미션만 채움. 활성 시 실시간 체크리스트로 "다음 단계" 강조. 기존 clear 로직
+  무변경. ADR 0030.
+- **CI Node 20 deprecation 해소** — `actions/checkout` v4→v5, `actions/setup-node` v4→v5
+  (node24 런타임 기반), CI Node 20→22.
+- **문서 정합화** — 이 미팅 doc의 "trunk-based·PR 없이 push" 규칙을 Sprint B 전환 사실에
+  맞춰 정정.

@@ -28,6 +28,13 @@ export type ResourceNodeType = Node<NodeData>
 export type DrawerKey = 'palette' | 'inspector' | 'missions'
 export type MobileDrawers = Record<DrawerKey, boolean>
 
+/** Open right-click menu on a node — screen-space anchor (ADR 0028). */
+export interface ContextMenuState {
+  nodeId: string
+  x: number
+  y: number
+}
+
 /** Matches Tailwind's default `md` breakpoint: anything below 768px is mobile. */
 function isMobileViewport() {
   return typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
@@ -46,6 +53,10 @@ interface GraphState {
   simulation: SimResult | null
   /** MiniMap visibility — defaults off on small screens where it hides the canvas. */
   showMiniMap: boolean
+  /** Open node context menu (right-click), or null when closed (ADR 0028). */
+  contextMenu: ContextMenuState | null
+  /** Whether the keyboard-shortcut help modal is open (ADR 0028). */
+  showShortcutHelp: boolean
 
   setMode: (mode: Mode) => void
   /** Click-to-add: places the node into a valid container automatically. */
@@ -53,6 +64,17 @@ interface GraphState {
   /** Drop-to-add: places the node at `position`, optionally inside `parentId`. */
   addNodeAt: (type: ResourceType, position: XYPosition, parentId?: string) => void
   removeNode: (id: string) => void
+  /**
+   * Deletes the current selection: the selected node (+descendants), any
+   * React-Flow-selected nodes, and any selected edges (Delete/Backspace).
+   */
+  deleteSelection: () => void
+  /** Clones a node (and its descendants) with fresh ids, offset and selected. */
+  duplicateNode: (id: string) => void
+  /** Removes every edge touching a node (context-menu "엣지 지우기"). */
+  clearNodeEdges: (id: string) => void
+  /** Detaches a node from its parent, converting to an absolute position. */
+  detachNode: (id: string) => void
   /** Updates a single key in a node's `data.config` (Inspector edits). */
   updateNodeConfig: (id: string, key: string, value: unknown) => void
   /** Renames a node (player-facing label, used for Terraform tags). */
@@ -74,6 +96,8 @@ interface GraphState {
   /** Clears the current simulation highlight. */
   stopSimulation: () => void
   toggleMiniMap: () => void
+  setContextMenu: (menu: ContextMenuState | null) => void
+  setShortcutHelp: (open: boolean) => void
   reset: () => void
 }
 
@@ -197,6 +221,8 @@ export const useGraphStore = create<GraphState>()(
   mobileDrawers: { palette: false, inspector: false, missions: false },
   simulation: null,
   showMiniMap: !isMobileViewport(),
+  contextMenu: null,
+  showShortcutHelp: false,
 
   setMode: (mode) => set({ mode }),
 
@@ -257,6 +283,118 @@ export const useGraphStore = create<GraphState>()(
             ? null
             : state.selectedNodeId,
         simulation: null,
+      }
+    }),
+
+  deleteSelection: () =>
+    set((state) => {
+      const roots = new Set<string>()
+      if (state.selectedNodeId) roots.add(state.selectedNodeId)
+      for (const n of state.nodes) if (n.selected) roots.add(n.id)
+      const selectedEdgeIds = new Set(
+        state.edges.filter((e) => e.selected).map((e) => e.id),
+      )
+      if (roots.size === 0 && selectedEdgeIds.size === 0) return state
+      const doomed = new Set<string>()
+      for (const id of roots) {
+        for (const d of withDescendants(state.nodes, id)) doomed.add(d)
+      }
+      return {
+        nodes: state.nodes.filter((n) => !doomed.has(n.id)),
+        edges: state.edges.filter(
+          (e) =>
+            !selectedEdgeIds.has(e.id) &&
+            !doomed.has(e.source) &&
+            !doomed.has(e.target),
+        ),
+        selectedNodeId:
+          state.selectedNodeId && doomed.has(state.selectedNodeId)
+            ? null
+            : state.selectedNodeId,
+        simulation: null,
+        contextMenu: null,
+      }
+    }),
+
+  duplicateNode: (id) =>
+    set((state) => {
+      const subtree = withDescendants(state.nodes, id)
+      // Mint fresh ids for the whole subtree first, so parent links remap.
+      const idMap = new Map<string, string>()
+      for (const n of state.nodes) {
+        if (!subtree.has(n.id)) continue
+        nodeSeq += 1
+        idMap.set(n.id, `${n.data.type}-${nodeSeq}`)
+      }
+      const clones: ResourceNodeType[] = []
+      for (const n of state.nodes) {
+        const newId = idMap.get(n.id)
+        if (!newId) continue
+        const clone: ResourceNodeType = {
+          ...n,
+          id: newId,
+          selected: false,
+          // Nudge only the subtree root; descendants keep parent-relative coords.
+          position:
+            n.id === id
+              ? { x: n.position.x + 32, y: n.position.y + 32 }
+              : { ...n.position },
+          data: { ...n.data, config: { ...n.data.config } },
+        }
+        if (n.style) clone.style = { ...n.style }
+        // Re-point at the cloned parent if it is part of the subtree; the root
+        // keeps its original parent so it lands beside the source.
+        const mappedParent = n.parentId ? idMap.get(n.parentId) : undefined
+        if (mappedParent) clone.parentId = mappedParent
+        clones.push(clone)
+      }
+      // Carry over edges internal to the subtree (e.g. a duplicated container).
+      const clonedEdges: Edge[] = []
+      for (const e of state.edges) {
+        const s = idMap.get(e.source)
+        const t = idMap.get(e.target)
+        if (s && t) clonedEdges.push({ ...e, id: `e-${s}-${t}`, source: s, target: t })
+      }
+      const rootNewId = idMap.get(id) ?? state.selectedNodeId
+      return {
+        nodes: [...state.nodes, ...clones],
+        edges: [...state.edges, ...clonedEdges],
+        selectedNodeId: rootNewId,
+        simulation: null,
+        contextMenu: null,
+      }
+    }),
+
+  clearNodeEdges: (id) =>
+    set((state) => ({
+      edges: state.edges.filter((e) => e.source !== id && e.target !== id),
+      simulation: null,
+      contextMenu: null,
+    })),
+
+  detachNode: (id) =>
+    set((state) => {
+      const node = state.nodes.find((n) => n.id === id)
+      if (!node || !node.parentId) return state
+      // Fold the parent chain into an absolute position so the node stays put.
+      const byId = new Map(state.nodes.map((n) => [n.id, n]))
+      let { x, y } = node.position
+      let pid: string | undefined = node.parentId
+      while (pid) {
+        const parent = byId.get(pid)
+        if (!parent) break
+        x += parent.position.x
+        y += parent.position.y
+        pid = parent.parentId
+      }
+      return {
+        nodes: state.nodes.map((n) =>
+          n.id === id
+            ? { ...n, parentId: undefined, extent: undefined, position: { x, y } }
+            : n,
+        ),
+        simulation: null,
+        contextMenu: null,
       }
     }),
 
@@ -325,6 +463,9 @@ export const useGraphStore = create<GraphState>()(
 
   toggleMiniMap: () => set((state) => ({ showMiniMap: !state.showMiniMap })),
 
+  setContextMenu: (contextMenu) => set({ contextMenu }),
+  setShortcutHelp: (showShortcutHelp) => set({ showShortcutHelp }),
+
   reset: () =>
     set({
       nodes: initialNodes,
@@ -334,6 +475,7 @@ export const useGraphStore = create<GraphState>()(
       notice: null,
       mobileDrawers: { palette: false, inspector: false, missions: false },
       simulation: null,
+      contextMenu: null,
     }),
       }),
       {

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Waves } from 'lucide-react'
 import { Toolbar } from './Toolbar'
 import { MobileHeader } from './MobileHeader'
@@ -6,11 +7,21 @@ import { Palette, PaletteBody } from './Palette'
 import { Canvas } from './Canvas'
 import { Inspector, InspectorBody } from './Inspector'
 import { MissionList } from './MissionPanel'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useGraphStore } from '@/store/useGraphStore'
+
+// Split out of the main bundle (ADR 0029): each is only fetched when first shown.
+const ShortcutHelp = lazy(() => import('./ShortcutHelp'))
+const NodeContextMenu = lazy(() => import('./NodeContextMenu'))
 
 export function Layout() {
   const drawers = useGraphStore((s) => s.mobileDrawers)
   const setDrawer = useGraphStore((s) => s.setDrawer)
+  const showShortcutHelp = useGraphStore((s) => s.showShortcutHelp)
+  const contextMenu = useGraphStore((s) => s.contextMenu)
+
+  // Mounted here (inside ReactFlowProvider) so `R` can reach the flow instance.
+  useKeyboardShortcuts()
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface text-slate-200">
@@ -67,6 +78,11 @@ export function Layout() {
       >
         <MissionList />
       </Drawer>
+
+      <Suspense fallback={null}>
+        {contextMenu && <NodeContextMenu />}
+        {showShortcutHelp && <ShortcutHelp />}
+      </Suspense>
     </div>
   )
 }

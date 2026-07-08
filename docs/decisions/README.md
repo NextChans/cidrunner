@@ -52,3 +52,6 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0025](0025-terraform-apply-audit.md) | Terraform apply-readiness 감사 (Sprint A) | Accepted | 2026-07-09 |
 | [0026](0026-resource-expansion-2.md) | Resource expansion batch 2 — ECS · EKS · SNS · EFS · ElastiCache · CloudWatch (extends 0022) | Accepted | 2026-07-09 |
 | [0027](0027-mission-expansion-2.md) | Mission expansion batch 2 — 컨테이너 · 글로벌 동적 웹 · 이벤트 드리븐 · 재난 복구 | Accepted | 2026-07-09 |
+| [0028](0028-keyboard-shortcuts-and-context-menu.md) | 키보드 단축키 & 노드 우클릭 컨텍스트 메뉴 | Accepted | 2026-07-09 |
+| [0029](0029-perf-code-splitting.md) | 성능 — 번들 code-splitting & 대형 그래프 렌더링 | Accepted | 2026-07-09 |
+| [0030](0030-interactive-tutorial-steps.md) | 인터랙티브 튜토리얼 — 단계별 자가 점검 힌트 | Accepted | 2026-07-09 |

@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react'
 import clsx from 'clsx'
-import { Target, Star } from 'lucide-react'
+import { Target, Star, CheckCircle2, Circle, ArrowRightCircle } from 'lucide-react'
 import { missions } from '@/missions'
-import type { MissionCheckContext } from '@/missions/types'
+import type { Mission, MissionCheckContext } from '@/missions/types'
 import { getResource } from '@/resources'
 import { simulate } from '@/graph/simulate'
 import { getGraphIssues } from '@/graph/checks'
@@ -20,6 +20,47 @@ function Stars({ earned }: { earned: number }) {
         />
       ))}
     </span>
+  )
+}
+
+/**
+ * Live, self-checking walkthrough for the active mission (ADR 0030). Renders
+ * `mission.steps` as a checklist; each step re-evaluates against `ctx`, so
+ * completed steps tick off and the first unfinished step is highlighted as the
+ * "next" instruction while the player builds.
+ */
+function TutorialSteps({ steps, ctx }: { steps: NonNullable<Mission['steps']>; ctx: MissionCheckContext }) {
+  const nextIndex = steps.findIndex((s) => !s.done(ctx))
+  return (
+    <ol className="mt-2 space-y-1 border-t border-white/10 pt-2">
+      {steps.map((step, i) => {
+        const done = step.done(ctx)
+        const isNext = i === nextIndex
+        const Icon = done ? CheckCircle2 : isNext ? ArrowRightCircle : Circle
+        return (
+          <li
+            key={i}
+            className={clsx(
+              'flex items-start gap-1.5 text-[11px] leading-snug',
+              done
+                ? 'text-slate-500 line-through'
+                : isNext
+                  ? 'font-medium text-accent-soft'
+                  : 'text-slate-400',
+            )}
+          >
+            <Icon
+              size={13}
+              className={clsx(
+                'mt-px shrink-0',
+                done ? 'text-accent' : isNext ? 'text-accent-soft' : 'text-slate-600',
+              )}
+            />
+            <span>{step.text}</span>
+          </li>
+        )
+      })}
+    </ol>
   )
 }
 
@@ -114,6 +155,7 @@ export function MissionList() {
             </div>
             <p className="mt-1 text-[11px] text-slate-400">{mission.description}</p>
             <p className="mt-2 text-[11px] text-accent-soft">🎯 {mission.goal}</p>
+            {active && mission.steps && <TutorialSteps steps={mission.steps} ctx={ctx} />}
             {cleared && stars < 3 && mission.hint && (
               <p className="mt-1 text-[11px] text-slate-500">💡 {mission.hint}</p>
             )}
