@@ -20,8 +20,7 @@ export function validateCidr(value: unknown): string | null {
   if (prefix < 16 || prefix > 28) {
     return 'AWS VPC/Subnet 프리픽스는 /16–/28 범위여야 합니다.'
   }
-  const ip =
-    ((octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]) >>> 0
+  const ip = octets.reduce((acc, o) => ((acc << 8) | o) >>> 0, 0) >>> 0
   const size = 2 ** (32 - prefix)
   const base = (ip & ~((size - 1) >>> 0)) >>> 0
   if (ip !== base) {

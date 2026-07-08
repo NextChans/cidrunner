@@ -26,7 +26,9 @@ export function parseCidr(value: unknown): CidrRange | null {
   const octets = [m[1], m[2], m[3], m[4]].map(Number)
   const prefix = Number(m[5])
   if (octets.some((o) => o > 255) || prefix > 32) return null
-  const ip = ((octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]) >>> 0
+  // Fold the four octets into a u32 via reduce — avoids indexed access so it
+  // stays clean under noUncheckedIndexedAccess.
+  const ip = octets.reduce((acc, o) => ((acc << 8) | o) >>> 0, 0) >>> 0
   // Note: JS shifts are mod 32, so /0 needs its own case.
   const size = prefix === 0 ? 0x1_0000_0000 : 2 ** (32 - prefix)
   const start = prefix === 0 ? 0 : (ip & ~((size - 1) >>> 0)) >>> 0
@@ -71,7 +73,7 @@ export function cidrIssues(nodes: ResourceNodeType[]): Map<string, string[]> {
     for (let j = i + 1; j < subnets.length; j++) {
       const a = subnets[i]
       const b = subnets[j]
-      if (!a.range || !b.range) continue
+      if (!a || !b || !a.range || !b.range) continue
       if (!a.node.parentId || a.node.parentId !== b.node.parentId) continue
       if (overlaps(a.range, b.range)) {
         const msg = (other: ResourceNodeType) =>

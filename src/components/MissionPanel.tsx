@@ -106,7 +106,7 @@ export function MissionList() {
                   title="최고 기록"
                 >
                   최고
-                  <Stars earned={bestStars[mission.id]} />
+                  <Stars earned={bestStars[mission.id] ?? 0} />
                 </span>
               ) : (
                 <Stars earned={0} />

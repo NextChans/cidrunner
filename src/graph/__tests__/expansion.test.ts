@@ -46,7 +46,7 @@ describe('resource expansion (ADR 0022)', () => {
     const sim = simulate(nodes, edges)
     expect(sim.ok).toBe(true)
     expect(sim.flows).toHaveLength(1)
-    expect(sim.flows[0].pathNodeIds).toEqual(['route53-1', 'cloudfront-2', 's3-3'])
+    expect(sim.flows[0]!.pathNodeIds).toEqual(['route53-1', 'cloudfront-2', 's3-3'])
   })
 
   it('simulates the async pipeline; a queue-fed lambda is not its own entry', () => {
@@ -54,7 +54,7 @@ describe('resource expansion (ADR 0022)', () => {
     const sim = simulate(nodes, edges)
     expect(sim.ok).toBe(true)
     expect(sim.flows).toHaveLength(1)
-    expect(sim.flows[0].pathNodeIds).toEqual(['lambda-1', 'sqs-2', 'lambda-3', 'dynamodb-4'])
+    expect(sim.flows[0]!.pathNodeIds).toEqual(['lambda-1', 'sqs-2', 'lambda-3', 'dynamodb-4'])
   })
 
   it('blocks at an SQS with no consumer and at a CloudFront with no origin', () => {
@@ -63,11 +63,11 @@ describe('resource expansion (ADR 0022)', () => {
       [E('e1', 'lambda-1', 'sqs-2')],
     )
     expect(noConsumer.ok).toBe(false)
-    expect(noConsumer.flows[0].blockedNodeId).toBe('sqs-2')
+    expect(noConsumer.flows[0]!.blockedNodeId).toBe('sqs-2')
 
     const noOrigin = simulate([N('cloudfront-1', 'cloudfront')], [])
     expect(noOrigin.ok).toBe(false)
-    expect(noOrigin.flows[0].blockedNodeId).toBe('cloudfront-1')
+    expect(noOrigin.flows[0]!.blockedNodeId).toBe('cloudfront-1')
   })
 
   it('checks: CF without origin is an error; R53/SQS dangling are warnings', () => {
@@ -82,7 +82,7 @@ describe('resource expansion (ADR 0022)', () => {
 
   it('emits Terraform for the static-site pattern (OAI + alias record)', () => {
     const { nodes, edges } = staticSite()
-    const main = generateTerraform(nodes, edges)['main.tf']
+    const main = generateTerraform(nodes, edges)['main.tf']!
     expect(main).toContain('resource "aws_cloudfront_origin_access_identity" "cloudfront_2_oai"')
     expect(main).toContain('s3_origin_config')
     expect(main).toContain('resource "aws_route53_zone" "route53_1"')

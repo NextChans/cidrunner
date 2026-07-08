@@ -2,13 +2,21 @@ import { Zap } from 'lucide-react'
 import type { ResourceMeta } from './types'
 import { collect, validatePattern, validateRange } from './validators'
 
+interface InlineSource {
+  filename: string
+  content: string
+}
+
+/** Default (Node.js) inline package — also the fallback for unknown runtimes. */
+const NODEJS_SOURCE: InlineSource = {
+  filename: 'index.js',
+  content:
+    "exports.handler = async () => ({ statusCode: 200, body: 'Hello from cidrunner' });",
+}
+
 /** Per-runtime inline hello-world source, zipped by the archive provider. */
-const INLINE_SOURCE: Record<string, { filename: string; content: string }> = {
-  'nodejs20.x': {
-    filename: 'index.js',
-    content:
-      "exports.handler = async () => ({ statusCode: 200, body: 'Hello from cidrunner' });",
-  },
+const INLINE_SOURCE: Record<string, InlineSource> = {
+  'nodejs20.x': NODEJS_SOURCE,
   'python3.12': {
     filename: 'index.py',
     content:
@@ -64,7 +72,7 @@ export const lambda: ResourceMeta = {
     ),
   terraform: ({ name, awsName, config, refs, displayName }) => {
     const runtime = typeof config.runtime === 'string' ? config.runtime : 'nodejs20.x'
-    const src = INLINE_SOURCE[runtime] ?? INLINE_SOURCE['nodejs20.x']
+    const src = INLINE_SOURCE[runtime] ?? NODEJS_SOURCE
     // A queue-fed Lambda needs SQS receive/delete permissions on its role.
     const sqsPolicy = refs.sqsSources?.length
       ? `

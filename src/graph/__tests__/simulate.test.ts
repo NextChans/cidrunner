@@ -9,14 +9,14 @@ describe('simulate', () => {
     const sim = simulate(nodes, edges)
     expect(sim.ok).toBe(true)
     expect(sim.flows).toHaveLength(1)
-    expect(sim.flows[0].pathNodeIds).toEqual(['alb1', 'ec21', 'rds1'])
-    expect(sim.flows[0].pathEdgeIds).toEqual(['e1', 'e2'])
+    expect(sim.flows[0]!.pathNodeIds).toEqual(['alb1', 'ec21', 'rds1'])
+    expect(sim.flows[0]!.pathEdgeIds).toEqual(['e1', 'e2'])
   })
 
   it('reports the blocking node when the path breaks', () => {
     const sim = simulate([N('alb1', 'alb'), N('ec21', 'ec2')], [E('e1', 'alb1', 'ec21')])
     expect(sim.ok).toBe(false)
-    expect(sim.flows[0].blockedNodeId).toBe('ec21')
+    expect(sim.flows[0]!.blockedNodeId).toBe('ec21')
     expect(sim.blockedNodeIds).toContain('ec21')
   })
 
@@ -51,7 +51,7 @@ describe('simulate', () => {
       [E('e1', 'alb1', 'ec21'), E('e2', 'ec21', 'rds1'), E('r1', 'rds1', 'rds2')],
     )
     expect(repl.ok).toBe(true)
-    expect(repl.flows[0].pathNodeIds).toEqual(['alb1', 'ec21', 'rds1'])
+    expect(repl.flows[0]!.pathNodeIds).toEqual(['alb1', 'ec21', 'rds1'])
   })
 
   it('computes hop-staggered arrivals along the path', () => {

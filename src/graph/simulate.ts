@@ -187,7 +187,8 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
     })
     flow.pathNodeIds.forEach((nodeId, i) => {
       const t = i * HOP_SECONDS
-      if (!(nodeId in arrivals) || arrivals[nodeId] > t) arrivals[nodeId] = t
+      const prev = arrivals[nodeId]
+      if (prev === undefined || prev > t) arrivals[nodeId] = t
     })
   }
 

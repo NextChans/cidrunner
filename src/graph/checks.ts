@@ -169,7 +169,7 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
     for (let j = i + 1; j < vpcRanges.length; j++) {
       const a = vpcRanges[i]
       const b = vpcRanges[j]
-      if (!a.range || !b.range) continue
+      if (!a || !b || !a.range || !b.range) continue
       if (a.range.start <= b.range.end && b.range.start <= a.range.end) {
         const msg = (other: ResourceNodeType) =>
           `다른 VPC(${other.data.label}, ${other.data.config.cidr_block})와 CIDR이 겹칩니다 — 피어링/VPN 연결 시 라우팅이 불가합니다.`

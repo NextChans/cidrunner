@@ -6,7 +6,7 @@ describe('generateTerraform', () => {
   it('emits every expected resource for the best-practice topology', () => {
     const { nodes, edges } = bestPracticeTopology()
     const files = generateTerraform(nodes, edges)
-    const main = files['main.tf']
+    const main = files['main.tf']!
 
     // Derived plumbing (ADR 0016).
     expect(main).toContain('resource "aws_route_table" "vpc_1_public"')
@@ -29,7 +29,7 @@ describe('generateTerraform', () => {
     expect(files['outputs.tf']).toContain('output "lambda_12_api_endpoint"')
 
     // Braces balance — a cheap structural sanity check.
-    const all = main + files['variables.tf'] + (files['outputs.tf'] ?? '')
+    const all = main + (files['variables.tf'] ?? '') + (files['outputs.tf'] ?? '')
     expect((all.match(/{/g) ?? []).length).toBe((all.match(/}/g) ?? []).length)
     expect(all).not.toContain('REPLACE_ME')
   })
@@ -43,7 +43,7 @@ describe('generateTerraform', () => {
       N('rds-2', 'rds', 's2', { engine: 'mysql', instance_class: 'db.t3.micro' }, 'Replica'),
     ]
     const files = generateTerraform(nodes, [E('r1', 'rds-1', 'rds-2')])
-    const main = files['main.tf']
+    const main = files['main.tf']!
 
     const replicaBlock = main.split('resource "aws_db_instance" "rds_2"')[1]?.split('\n}')[0] ?? ''
     expect(replicaBlock).toContain('replicate_source_db = aws_db_instance.rds_1.identifier')

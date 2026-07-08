@@ -135,7 +135,7 @@ export function sanitizeSnapshot(raw: unknown): LoadedDesign | null {
 /** Parses a design out of `location.hash` (`#g=…`), if present and valid. */
 export function designFromHash(hash: string): LoadedDesign | null {
   const match = hash.match(/^#g=(.+)$/)
-  if (!match) return null
+  if (!match || match[1] === undefined) return null
   const json = b64urlDecode(match[1])
   if (!json) return null
   try {
