@@ -94,6 +94,15 @@ interface NodeData {
 Nesting uses React Flow's native `parentId` + `extent: 'parent'` (a Subnet's
 `parentId` is its VPC, and so on).
 
+**Persistence & sharing** ([ADR 0020](decisions/0020-save-and-share.md)): the
+store is wrapped in zustand's `persist` — durable design state
+(`nodes`/`edges`/`mode`/`activeMissionId`) autosaves to localStorage (versioned,
+with a migrate hook); transient UI never persists. Designs also serialize to a
+versioned JSON snapshot carried in a shareable `#g=` URL fragment or a
+downloadable `.json` file; incoming snapshots are rebuilt field-by-field from a
+whitelist ([`src/graph/share.ts`](../src/graph/share.ts)). Graph modules are
+unit-tested with Vitest in CI ([ADR 0021](decisions/0021-test-safety-net.md)).
+
 ## Resource registry
 
 [`src/resources/`](../src/resources/) holds one module per resource plus an

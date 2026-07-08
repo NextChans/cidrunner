@@ -1,10 +1,17 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { Edge, Node, XYPosition } from '@xyflow/react'
 import { getResource, type ResourceType } from '@/resources'
 import { canBeTopLevel, canContain, requiredParentLabel } from '@/graph/rules'
 import { simulate, type SimResult } from '@/graph/simulate'
 
 export type Mode = 'free' | 'challenge'
+
+/** Transient toast: errors are rose, info (e.g. "link copied") is emerald. */
+export interface Notice {
+  text: string
+  kind: 'error' | 'info'
+}
 
 export interface NodeData {
   type: ResourceType
@@ -31,7 +38,7 @@ interface GraphState {
   selectedNodeId: string | null
   activeMissionId: string | null
   /** Transient, player-facing message (e.g. a rejected drop/edge). */
-  notice: string | null
+  notice: Notice | null
   mobileDrawers: MobileDrawers
   /** Result of the last/current traffic simulation run (Phase 3), or null. */
   simulation: SimResult | null
@@ -52,8 +59,10 @@ interface GraphState {
   setEdges: (edges: Edge[]) => void
   setSelected: (id: string | null) => void
   setActiveMission: (id: string | null) => void
-  setNotice: (notice: string | null) => void
+  setNotice: (text: string | null, kind?: Notice['kind']) => void
   setDrawer: (which: DrawerKey, open: boolean) => void
+  /** Replaces the whole design (shared URL / JSON import). */
+  loadDesign: (nodes: ResourceNodeType[], edges: Edge[]) => void
   /** Runs the traffic simulation over the current graph and stores the result. */
   runSimulation: () => void
   /** Clears the current simulation highlight. */
@@ -98,8 +107,17 @@ const initialNodes: ResourceNodeType[] = [
   },
 ]
 
-// Monotonic counter so newly-added nodes never collide with seeded ids.
+// Monotonic counter so newly-added nodes never collide with seeded ids. It is
+// re-seeded from the highest existing suffix on rehydrate/import, so restored
+// designs never mint duplicate ids.
 let nodeSeq = initialNodes.length
+
+function bumpNodeSeq(nodes: ResourceNodeType[]) {
+  for (const n of nodes) {
+    const tail = Number(n.id.split('-').pop())
+    if (Number.isFinite(tail) && tail > nodeSeq) nodeSeq = tail
+  }
+}
 
 /** Builds a resource node, applying a container's default size when relevant. */
 function makeNode(
@@ -139,7 +157,9 @@ function withDescendants(nodes: ResourceNodeType[], rootId: string): Set<string>
   return ids
 }
 
-export const useGraphStore = create<GraphState>((set) => ({
+export const useGraphStore = create<GraphState>()(
+  persist(
+    (set) => ({
   mode: 'free',
   nodes: initialNodes,
   edges: [],
@@ -170,7 +190,10 @@ export const useGraphStore = create<GraphState>((set) => ({
       if (!parent) {
         const need = requiredParentLabel(type)
         return {
-          notice: `${getResource(type).label}은(는) ${need} 안에만 놓을 수 있습니다. 먼저 ${need}을(를) 추가하세요.`,
+          notice: {
+            text: `${getResource(type).label}은(는) ${need} 안에만 놓을 수 있습니다. 먼저 ${need}을(를) 추가하세요.`,
+            kind: 'error' as const,
+          },
         }
       }
       const siblings = state.nodes.filter((n) => n.parentId === parent.id).length
@@ -241,10 +264,22 @@ export const useGraphStore = create<GraphState>((set) => ({
     }),
 
   setActiveMission: (activeMissionId) => set({ activeMissionId }),
-  setNotice: (notice) => set({ notice }),
+  setNotice: (text, kind = 'error') => set({ notice: text === null ? null : { text, kind } }),
 
   setDrawer: (which, open) =>
     set((state) => ({ mobileDrawers: { ...state.mobileDrawers, [which]: open } })),
+
+  loadDesign: (nodes, edges) => {
+    bumpNodeSeq(nodes)
+    set({
+      nodes,
+      edges,
+      selectedNodeId: null,
+      activeMissionId: null,
+      simulation: null,
+      notice: null,
+    })
+  },
 
   runSimulation: () =>
     set((state) => ({ simulation: simulate(state.nodes, state.edges) })),
@@ -263,4 +298,22 @@ export const useGraphStore = create<GraphState>((set) => ({
       mobileDrawers: { palette: false, inspector: false, missions: false },
       simulation: null,
     }),
-}))
+    }),
+    {
+      // Autosave (ADR 0020): the design survives refresh/close. Only durable
+      // design state is persisted — transient UI (selection, notices, drawers,
+      // simulation) always starts fresh.
+      name: 'cidrunner-design',
+      version: 1,
+      partialize: (s) => ({
+        nodes: s.nodes,
+        edges: s.edges,
+        mode: s.mode,
+        activeMissionId: s.activeMissionId,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state) bumpNodeSeq(state.nodes)
+      },
+    },
+  ),
+)

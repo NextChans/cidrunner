@@ -27,5 +27,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Test (vitest — graph modules)
+        run: npm test
+
       - name: Build (type-check + production build)
         run: npm run build
