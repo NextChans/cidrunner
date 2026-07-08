@@ -1,7 +1,7 @@
 # Architecture
 
-> **Draft.** This reflects the Phase 0 skeleton. It will be refined as
-> simulation (Phase 3) and export (Phase 4) land.
+> Reflects the MVP (Phases 0–5): editor, property validation, traffic
+> simulation, Terraform export, and the mission system.
 
 ## Overview
 
@@ -179,8 +179,11 @@ placeholders. See [ADR 0013](decisions/0013-terraform-export-implementation.md).
 
 [`src/missions/`](../src/missions/) holds one module per mission
 (`tutorial`, `threeTier`, `serverless`) plus an `index.ts`. A `Mission`
-describes its `goal`, optional `hint`, and `requiredResources` used by the
-Phase 3+ clear check.
+describes its `goal`, optional `hint`, `requiredResources`, and a `check(ctx)`
+that returns a 0–3 star rating (0 = not cleared) for the current graph. The
+MissionPanel builds the check context live — the simulation result (Phase 3) and
+a validation sweep (Phase 2) — so cards show clear state and stars as the graph
+changes. See [ADR 0014](decisions/0014-mission-clear-detection-and-stars.md).
 
 ## Data flow
 

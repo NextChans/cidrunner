@@ -123,17 +123,21 @@ output. See ADR 0013.
 
 ---
 
-## Phase 5 — Mission system ⏳
+## Phase 5 — Mission system ✅
 
 **Goal.** Deliver the game layer on top of the editor.
 
 **Definition of Done.**
-- 3 missions (tutorial / 3-tier / serverless) are completable end-to-end.
-- Clear detection + star rating on completion.
+- ✅ 3 missions (tutorial / 3-tier / serverless) are completable end-to-end.
+- ✅ Clear detection + 0–3 star rating, computed live and shown on the mission
+  cards (filled stars + a "완료" badge).
 
-**Status.** ⏳ Planned.
+**Status.** ✅ Complete — each mission owns a `check(ctx)` returning a star rating
+(0 = not cleared). The check reuses the simulation result (ADR 0012) and the
+validation sweep (ADR 0011). See ADR 0014.
 
-**Related.** [ADR 0003 — Mission system in MVP](decisions/0003-mission-system-in-mvp.md)
+**Related.** [ADR 0014 — Mission clear detection & star rating](decisions/0014-mission-clear-detection-and-stars.md) ·
+[ADR 0003 — Mission system in MVP](decisions/0003-mission-system-in-mvp.md)
 
 ---
 
@@ -147,3 +151,4 @@ output. See ADR 0013.
 | 2026-07-08 | Phase 2 completed: Inspector property form + real-time validation; ADR 0011 added. |
 | 2026-07-08 | Phase 3 completed: traffic simulation (path trace + particle animation); ADR 0012 added. |
 | 2026-07-08 | Phase 4 completed: Terraform export (validate-passing HCL + zip); ADR 0013 added. |
+| 2026-07-08 | Phase 5 completed: mission clear detection + star rating; ADR 0014 added. MVP feature-complete. |

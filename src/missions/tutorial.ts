@@ -8,4 +8,20 @@ export const tutorial: Mission = {
   goal: 'VPC 1개 안에 퍼블릭 Subnet 1개를 배치하세요.',
   hint: 'Subnet은 VPC 안에 있어야 CIDR 범위를 할당받습니다.',
   requiredResources: ['vpc', 'subnet'],
+  // ★1 VPC에 퍼블릭 Subnet · ★2 설정 오류 없음 · ★3 IGW로 인터넷 연결
+  check: ({ nodes, allValid }) => {
+    const vpc = nodes.find((n) => n.data.type === 'vpc')
+    if (!vpc) return 0
+    const hasPublicSubnet = nodes.some(
+      (n) =>
+        n.data.type === 'subnet' &&
+        n.parentId === vpc.id &&
+        n.data.config.public === true,
+    )
+    if (!hasPublicSubnet) return 0
+    let stars = 1
+    if (allValid) stars += 1
+    if (nodes.some((n) => n.data.type === 'igw' && n.parentId === vpc.id)) stars += 1
+    return stars
+  },
 }
