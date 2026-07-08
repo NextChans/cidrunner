@@ -21,7 +21,7 @@ export function Layout() {
             cidrunner
           </h1>
           <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-400">
-            Phase 1
+            MVP
           </span>
         </div>
         {/* Full toolbar on desktop; compact drawer toggles on mobile. */}

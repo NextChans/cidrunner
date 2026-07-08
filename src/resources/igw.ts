@@ -11,6 +11,8 @@ export const igw: ResourceMeta = {
   defaults: {},
   // Attaches to the VPC boundary.
   allowedParents: ['vpc'],
-  // Phase 4: emit aws_internet_gateway HCL.
-  terraform: () => '',
+  terraform: ({ name, awsName, refs }) => `resource "aws_internet_gateway" "${name}" {
+  vpc_id = aws_vpc.${refs.vpc ?? 'REPLACE_ME'}.id
+  tags = { Name = "${awsName}" }
+}`,
 }

@@ -14,11 +14,13 @@ flow `client → load balancer → app → database`. If the path is broken, the
 blocking resource lights up. Clear guided missions, or build freely — then
 **export** your design as ready-to-run Terraform.
 
-> [!WARNING]
-> **Status: early development — not usable yet.**
-> Through **Phase 1**: you can build a topology (drag-and-drop from the palette,
-> nest resources, wire rule-checked edges), but there is no property editing,
-> simulation, or Terraform generation yet. See the roadmap.
+> [!NOTE]
+> **Status: MVP feature-complete (Phases 0–5).**
+> Build a topology (drag-and-drop, nesting, rule-checked edges), edit properties
+> with real-time validation, **Start** to simulate traffic
+> (`client → LB → app → DB`), clear guided **missions** with a star rating, and
+> **export** a `terraform validate`-passing zip. Polish and more resources/missions
+> are future work.
 
 > [!NOTE]
 > **UI language: Korean.** The in-app UI is Korean (hardcoded, no i18n
@@ -48,11 +50,11 @@ Design and decisions live in [`docs/`](docs/):
 | Phase | Scope | Status |
 | ----- | ----- | ------ |
 | **Phase 0** | Scaffolding + skeleton UI (layout, palette, canvas, store) | ✅ done |
-| **Phase 1** | Drag-and-drop from palette, node nesting, edge rules | ✅ current |
-| **Phase 2** | Inspector property editing per resource | ⬜ planned |
-| **Phase 3** | Traffic simulation + mission validation | ⬜ planned |
-| **Phase 4** | Terraform generation + zip export | ⬜ planned |
-| **Phase 5** | Polish, sharing, more resources & missions | ⬜ planned |
+| **Phase 1** | Drag-and-drop from palette, node nesting, edge rules | ✅ done |
+| **Phase 2** | Inspector property editing per resource | ✅ done |
+| **Phase 3** | Traffic simulation | ✅ done |
+| **Phase 4** | Terraform generation + zip export | ✅ done |
+| **Phase 5** | Mission system (clear detection + star rating) | ✅ done |
 
 Detailed definitions of done and current status are in
 [docs/PHASES.md](docs/PHASES.md); the design trade-offs behind these choices are

@@ -22,6 +22,52 @@ export type ResourceType =
  */
 export type ParentKind = ResourceType | 'canvas'
 
+/**
+ * A single editable property, rendered as a form control in the Inspector
+ * (Phase 2). The form is generated from a resource's `fields`, so the Inspector
+ * stays data-driven rather than hard-coding a form per resource.
+ */
+export interface PropertyField {
+  /** Key into the node's `data.config`. */
+  key: string
+  /** Human-facing label (Korean). */
+  label: string
+  type: 'text' | 'number' | 'boolean' | 'select'
+  /** Options for a `'select'` field. */
+  options?: readonly { value: string; label: string }[]
+  /** Placeholder shown in empty text/number inputs. */
+  placeholder?: string
+  /** Short helper text under the control. */
+  help?: string
+  /** Bounds for a `'number'` field. */
+  min?: number
+  max?: number
+}
+
+/**
+ * Everything a resource needs to emit valid Terraform (Phase 4). The generator
+ * builds this per node, resolving `refs` from the graph topology (parent chain
+ * and same-VPC siblings) so emitters never have to walk the graph themselves.
+ */
+export interface TfContext {
+  /** Terraform-safe local name (resource label), e.g. `subnet_1`. */
+  name: string
+  /** Value safe for AWS `name` attributes (alphanumeric + hyphen), e.g. `subnet-1`. */
+  awsName: string
+  /** The node's `data.config`. */
+  config: Record<string, unknown>
+  refs: {
+    /** Local name of the enclosing VPC (for subnet/igw/sg/alb). */
+    vpc?: string
+    /** Local name of the enclosing subnet (for ec2/rds/nat). */
+    subnet?: string
+    /** Local names of all subnets in the same VPC (for alb). */
+    subnets?: string[]
+    /** Local names of all security groups in the same VPC (for alb). */
+    securityGroups?: string[]
+  }
+}
+
 export interface ResourceMeta {
   type: ResourceType
   /** Human-facing label shown in the palette and on the node. */
@@ -55,13 +101,19 @@ export interface ResourceMeta {
    */
   connectsTo?: readonly ResourceType[]
   /**
-   * Emits the Terraform HCL for this resource.
-   * Phase 4 concern — currently a no-op returning an empty string.
+   * Editable properties shown in the Inspector (Phase 2). Omit or leave empty
+   * for resources with no user-editable configuration (e.g. IGW, NAT).
    */
-  terraform: (id: string, config: Record<string, unknown>) => string
+  fields?: readonly PropertyField[]
   /**
-   * Returns a list of validation error messages (empty = valid).
-   * Phase 3 concern — optional and unimplemented for now.
+   * Emits the Terraform HCL block(s) for this resource (Phase 4). The generator
+   * resolves cross-resource references from the graph topology and passes them
+   * in via `TfContext.refs`. See ADR 0013.
+   */
+  terraform: (ctx: TfContext) => string
+  /**
+   * Returns a list of validation error messages (empty = valid), run in real
+   * time as the Inspector edits `config` (Phase 2).
    */
   validate?: (config: Record<string, unknown>) => string[]
 }

@@ -62,65 +62,82 @@ correctly (VPC ▸ Subnet ▸ EC2/RDS …), and constrain edges by direction/typ
 
 ---
 
-## Phase 2 — Inspector property editor & validation ⏳
+## Phase 2 — Inspector property editor & validation ✅
 
 **Goal.** Edit resource configuration and validate it in real time.
 
 **Definition of Done.**
-- Selecting a node shows a per-resource property form in the Inspector.
-- Each resource seeds sensible default values (`ResourceMeta.defaults`).
-- Real-time validation surfaces errors as red badges / tooltips
-  (via `ResourceMeta.validate`).
+- ✅ Selecting a node shows a per-resource property form in the Inspector,
+  generated from a data-driven `ResourceMeta.fields` descriptor.
+- ✅ Each resource seeds sensible default values (`ResourceMeta.defaults`).
+- ✅ Real-time validation (`ResourceMeta.validate`) surfaces errors as a red
+  badge + message list in the Inspector and a red outline on the node.
 
-**Status.** ⏳ Planned.
+**Status.** ✅ Complete — form and validation are declared on `ResourceMeta`
+(`fields` / `validate`), edited through `updateNodeConfig`, with reusable
+checkers in `src/resources/validators.ts`. SG rules are simplified to inbound
+toggles (see ADR 0011).
 
-**Related.** ADR TBD — validation rule model.
+**Related.** [ADR 0011 — Inspector property form & validation model](decisions/0011-inspector-property-form-and-validation.md)
 
 ---
 
-## Phase 3 — Traffic simulation ⏳
+## Phase 3 — Traffic simulation ✅
 
 **Goal.** Animate a request flowing through the topology and highlight failures.
 
 **Definition of Done.**
-- **Start** button animates particles `client → LB → target → DB`.
-- When a rule is violated (broken path, missing route/SG), the blocking point is
-  highlighted with a failure message.
+- ✅ **Start** button traces `client → LB → app → DB` and animates particles
+  along the path edges (SVG `animateMotion`, staggered per hop).
+- ✅ When the path is broken, the blocking node is highlighted (red pulse) with a
+  Korean failure message; path nodes glow green on success.
 
-**Status.** ⏳ Planned.
+**Status.** ✅ Complete — `src/graph/simulate.ts` does a greedy single-path trace
+(entry = ALB/Lambda, sink = RDS/S3); `TrafficEdge` animates particles; the store
+holds the `simulation` result. Scope: connectivity only — SG/route rules are not
+modeled (see ADR 0012).
 
-**Related.** [ADR 0003 — Mission system in MVP](decisions/0003-mission-system-in-mvp.md)
+**Related.** [ADR 0012 — Traffic simulation model](decisions/0012-traffic-simulation-model.md) ·
+[ADR 0003 — Mission system in MVP](decisions/0003-mission-system-in-mvp.md)
 (mission clear checks build on the simulator).
 
 ---
 
-## Phase 4 — Terraform HCL export ⏳
+## Phase 4 — Terraform HCL export ✅
 
 **Goal.** Turn a valid design into runnable Terraform.
 
 **Definition of Done.**
-- **Export** button downloads a zip in the browser.
-- Output passes `terraform validate` for the minimum set
-  (VPC / Subnet / SG / ALB / EC2 / RDS).
-- `terraform apply` is explicitly **not** a goal.
+- ✅ **Export** button downloads a `main.tf` / `variables.tf` / `README.md` zip
+  in the browser (JSZip).
+- ✅ Output passes `terraform validate` — verified with Terraform v1.9.8 on the
+  full 10-resource topology (superset of VPC / Subnet / SG / ALB / EC2 / RDS).
+- ✅ `terraform apply` is explicitly **not** a goal (placeholder secrets/AMI/IAM).
 
-**Status.** ⏳ Planned.
+**Status.** ✅ Complete — per-resource emitters (`ResourceMeta.terraform(ctx)`)
+own their HCL; `src/graph/terraform.ts` resolves topology references and zips the
+output. See ADR 0013.
 
-**Related.** [ADR 0005 — Terraform generation approach](decisions/0005-terraform-generation-approach.md)
+**Related.** [ADR 0005 — Terraform generation approach](decisions/0005-terraform-generation-approach.md) ·
+[ADR 0013 — Terraform export implementation](decisions/0013-terraform-export-implementation.md)
 
 ---
 
-## Phase 5 — Mission system ⏳
+## Phase 5 — Mission system ✅
 
 **Goal.** Deliver the game layer on top of the editor.
 
 **Definition of Done.**
-- 3 missions (tutorial / 3-tier / serverless) are completable end-to-end.
-- Clear detection + star rating on completion.
+- ✅ 3 missions (tutorial / 3-tier / serverless) are completable end-to-end.
+- ✅ Clear detection + 0–3 star rating, computed live and shown on the mission
+  cards (filled stars + a "완료" badge).
 
-**Status.** ⏳ Planned.
+**Status.** ✅ Complete — each mission owns a `check(ctx)` returning a star rating
+(0 = not cleared). The check reuses the simulation result (ADR 0012) and the
+validation sweep (ADR 0011). See ADR 0014.
 
-**Related.** [ADR 0003 — Mission system in MVP](decisions/0003-mission-system-in-mvp.md)
+**Related.** [ADR 0014 — Mission clear detection & star rating](decisions/0014-mission-clear-detection-and-stars.md) ·
+[ADR 0003 — Mission system in MVP](decisions/0003-mission-system-in-mvp.md)
 
 ---
 
@@ -131,3 +148,7 @@ correctly (VPC ▸ Subnet ▸ EC2/RDS …), and constrain edges by direction/typ
 | 2026-07-08 | Phase 0 completed (`7bfbd38`). Docs skeleton + ADRs 0001–0005 added. |
 | 2026-07-08 | Deploy migrated to GitHub Pages; ADR 0007 added. |
 | 2026-07-08 | Phase 1 completed: palette drag-and-drop, nesting & edge rules; ADR 0010 added. |
+| 2026-07-08 | Phase 2 completed: Inspector property form + real-time validation; ADR 0011 added. |
+| 2026-07-08 | Phase 3 completed: traffic simulation (path trace + particle animation); ADR 0012 added. |
+| 2026-07-08 | Phase 4 completed: Terraform export (validate-passing HCL + zip); ADR 0013 added. |
+| 2026-07-08 | Phase 5 completed: mission clear detection + star rating; ADR 0014 added. MVP feature-complete. |

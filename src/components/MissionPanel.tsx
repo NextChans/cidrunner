@@ -1,21 +1,52 @@
+import { useMemo } from 'react'
 import clsx from 'clsx'
-import { Target } from 'lucide-react'
+import { Target, Star } from 'lucide-react'
 import { missions } from '@/missions'
+import type { MissionCheckContext } from '@/missions/types'
+import { getResource } from '@/resources'
+import { simulate } from '@/graph/simulate'
 import { useGraphStore } from '@/store/useGraphStore'
+
+/** Three star slots, filling `earned` of them. */
+function Stars({ earned }: { earned: number }) {
+  return (
+    <span className="flex items-center gap-0.5" aria-label={`${earned}개의 별 획득`}>
+      {[0, 1, 2].map((i) => (
+        <Star
+          key={i}
+          size={13}
+          className={i < earned ? 'fill-accent text-accent' : 'text-slate-600'}
+        />
+      ))}
+    </span>
+  )
+}
 
 /** The mission cards list — shared by the desktop panel and the mobile bottom sheet. */
 export function MissionList() {
   const mode = useGraphStore((s) => s.mode)
+  const nodes = useGraphStore((s) => s.nodes)
+  const edges = useGraphStore((s) => s.edges)
   const activeMissionId = useGraphStore((s) => s.activeMissionId)
   const setActiveMission = useGraphStore((s) => s.setActiveMission)
   const setMode = useGraphStore((s) => s.setMode)
 
   const disabled = mode !== 'challenge'
 
+  // Live clear-check context: simulate the graph and sweep validation once.
+  const ctx = useMemo<MissionCheckContext>(() => {
+    const allValid = nodes.every(
+      (n) => (getResource(n.data.type).validate?.(n.data.config) ?? []).length === 0,
+    )
+    return { nodes, edges, sim: simulate(nodes, edges), allValid }
+  }, [nodes, edges])
+
   return (
     <div className="space-y-2 overflow-y-auto px-3 pb-3">
       {missions.map((mission) => {
         const active = activeMissionId === mission.id
+        const stars = mission.check?.(ctx) ?? 0
+        const cleared = stars >= 1
         return (
           <button
             key={mission.id}
@@ -28,24 +59,38 @@ export function MissionList() {
             className={clsx(
               'w-full rounded-md border p-3 text-left transition-colors',
               disabled && 'cursor-not-allowed opacity-50',
-              active
-                ? 'border-accent bg-accent-dim/20'
-                : 'border-surface-border hover:border-slate-500',
+              cleared
+                ? 'border-accent-soft bg-accent-dim/20'
+                : active
+                  ? 'border-accent bg-accent-dim/20'
+                  : 'border-surface-border hover:border-slate-500',
             )}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-2 text-sm font-medium text-slate-100">
                 <Target size={14} className="text-accent-soft" />
                 {mission.title}
               </span>
-              {active && (
+              {cleared ? (
+                <span className="flex items-center gap-1.5">
+                  <Stars earned={stars} />
+                  <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-slate-900">
+                    완료
+                  </span>
+                </span>
+              ) : active ? (
                 <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-slate-900">
                   진행 중
                 </span>
+              ) : (
+                <Stars earned={0} />
               )}
             </div>
             <p className="mt-1 text-[11px] text-slate-400">{mission.description}</p>
             <p className="mt-2 text-[11px] text-accent-soft">🎯 {mission.goal}</p>
+            {cleared && stars < 3 && mission.hint && (
+              <p className="mt-1 text-[11px] text-slate-500">💡 {mission.hint}</p>
+            )}
           </button>
         )
       })}

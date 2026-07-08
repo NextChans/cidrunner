@@ -35,3 +35,7 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0008](0008-korean-first-ui-no-i18n.md) | Korean-first UI (hardcoded), no i18n framework | Accepted | 2026-07-08 |
 | [0009](0009-mobile-responsive-drawer-pattern.md) | Mobile responsive drawer pattern for narrow viewports | Accepted | 2026-07-08 |
 | [0010](0010-graph-nesting-and-edge-rule-model.md) | Graph nesting & edge rule model | Accepted | 2026-07-08 |
+| [0011](0011-inspector-property-form-and-validation.md) | Inspector property form & validation model | Accepted | 2026-07-08 |
+| [0012](0012-traffic-simulation-model.md) | Traffic simulation model | Accepted | 2026-07-08 |
+| [0013](0013-terraform-export-implementation.md) | Terraform export implementation (refines 0005) | Accepted | 2026-07-08 |
+| [0014](0014-mission-clear-detection-and-stars.md) | Mission clear detection & star rating | Accepted | 2026-07-08 |

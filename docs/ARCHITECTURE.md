@@ -1,7 +1,7 @@
 # Architecture
 
-> **Draft.** This reflects the Phase 0 skeleton. It will be refined as
-> simulation (Phase 3) and export (Phase 4) land.
+> Reflects the MVP (Phases 0–5): editor, property validation, traffic
+> simulation, Terraform export, and the mission system.
 
 ## Overview
 
@@ -113,13 +113,25 @@ interface ResourceMeta {
   container?: boolean                          // holds child nodes (VPC, Subnet)
   defaultSize?: { width; height }              // container size on create
   connectsTo?: ResourceType[]                  // directional edge targets
+  fields?: PropertyField[]                     // Inspector form descriptor (Phase 2)
   terraform: (id, config) => string            // Phase 4 — stubbed
-  validate?: (config) => string[]              // Phase 2/3 — optional
+  validate?: (config) => string[]              // real-time validation (Phase 2)
 }
 ```
 
 The MVP set is fixed at **10** resources — see
 [ADR 0001](decisions/0001-mvp-scope-and-resource-list.md).
+
+## Property editing & validation
+
+The Inspector's form is data-driven (Phase 2): `PropertyForm` reads a resource's
+`fields` (`text` / `number` / `boolean` / `select`) and writes edits back through
+the store's `updateNodeConfig`. `ResourceMeta.validate` runs on every render for
+real-time feedback — errors show as a red badge + message list in the Inspector
+and a red outline on the node. Reusable checks live in
+[`src/resources/validators.ts`](../src/resources/validators.ts). Security Group
+rules are simplified to inbound toggles — see
+[ADR 0011](decisions/0011-inspector-property-form-and-validation.md).
 
 ## Graph rules
 
@@ -141,12 +153,37 @@ predicates — `canContain`, `canBeTopLevel`, `canConnect`, `canBeSource`,
 
 See [ADR 0010](decisions/0010-graph-nesting-and-edge-rule-model.md).
 
+## Traffic simulation
+
+Pressing **Start** runs [`src/graph/simulate.ts`](../src/graph/simulate.ts): a
+greedy single-path trace from an entry node (ALB, else an unfed Lambda) along the
+edges to a sink (RDS or S3). The `SimResult` (path node/edge ids, blocking node,
+message) lives in the store as `simulation`. `TrafficEdge` renders a moving SVG
+particle along each path edge (staggered per hop); path nodes glow green and the
+blocking node pulses red, with a banner over the canvas. Scope is connectivity
+only — security-group and routing rules are not modeled. See
+[ADR 0012](decisions/0012-traffic-simulation-model.md).
+
+## Terraform export
+
+**Export** runs [`src/graph/terraform.ts`](../src/graph/terraform.ts). Each
+resource owns its HCL via `ResourceMeta.terraform(ctx)`; the generator walks the
+topology once to build each node's `TfContext` (a Terraform-safe name plus
+resolved `refs` — enclosing VPC/subnet and same-VPC subnets/SGs), calls the
+emitters, and assembles `main.tf` / `variables.tf` / `README.md`, zipped for
+download with JSZip. The output targets `terraform validate` (verified with
+Terraform v1.9.8), not `terraform apply` — secrets, AMI, and the Lambda role are
+placeholders. See [ADR 0013](decisions/0013-terraform-export-implementation.md).
+
 ## Mission registry
 
 [`src/missions/`](../src/missions/) holds one module per mission
 (`tutorial`, `threeTier`, `serverless`) plus an `index.ts`. A `Mission`
-describes its `goal`, optional `hint`, and `requiredResources` used by the
-Phase 3+ clear check.
+describes its `goal`, optional `hint`, `requiredResources`, and a `check(ctx)`
+that returns a 0–3 star rating (0 = not cleared) for the current graph. The
+MissionPanel builds the check context live — the simulation result (Phase 3) and
+a validation sweep (Phase 2) — so cards show clear state and stars as the graph
+changes. See [ADR 0014](decisions/0014-mission-clear-detection-and-stars.md).
 
 ## Data flow
 
