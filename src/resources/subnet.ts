@@ -5,7 +5,7 @@ import type { ResourceMeta } from './types'
 export const subnet: ResourceMeta = {
   type: 'subnet',
   label: 'Subnet',
-  description: 'CIDR slice of a VPC',
+  description: 'VPC의 CIDR 구간',
   icon: Box,
   color: 'text-sky-400',
   defaults: {

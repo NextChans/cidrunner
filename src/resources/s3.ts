@@ -5,7 +5,7 @@ import type { ResourceMeta } from './types'
 export const s3: ResourceMeta = {
   type: 's3',
   label: 'S3 Bucket',
-  description: 'Object storage',
+  description: '오브젝트 스토리지',
   icon: HardDrive,
   color: 'text-teal-400',
   defaults: {

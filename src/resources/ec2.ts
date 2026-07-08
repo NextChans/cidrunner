@@ -5,7 +5,7 @@ import type { ResourceMeta } from './types'
 export const ec2: ResourceMeta = {
   type: 'ec2',
   label: 'EC2 Instance',
-  description: 'Application compute',
+  description: '애플리케이션 컴퓨팅',
   icon: Server,
   color: 'text-orange-400',
   defaults: {

@@ -19,6 +19,11 @@ blocking resource lights up. Clear guided missions, or build freely — then
 > This is **Phase 0**: scaffolding and a skeleton UI only. There is no working
 > simulation, property editing, or Terraform generation yet. See the roadmap.
 
+> [!NOTE]
+> **UI language: Korean.** The in-app UI is Korean (hardcoded, no i18n
+> framework); AWS resource names and technical terms stay in English. See
+> [ADR 0008](docs/decisions/0008-korean-first-ui-no-i18n.md).
+
 ## Documentation
 
 Design and decisions live in [`docs/`](docs/):

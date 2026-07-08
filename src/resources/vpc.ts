@@ -5,7 +5,7 @@ import type { ResourceMeta } from './types'
 export const vpc: ResourceMeta = {
   type: 'vpc',
   label: 'VPC',
-  description: 'Isolated virtual network',
+  description: '격리된 가상 네트워크',
   icon: Boxes,
   color: 'text-emerald-400',
   defaults: {

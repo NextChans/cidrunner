@@ -5,7 +5,7 @@ import type { ResourceMeta } from './types'
 export const sg: ResourceMeta = {
   type: 'sg',
   label: 'Security Group',
-  description: 'Stateful firewall',
+  description: '스테이트풀 방화벽',
   icon: Shield,
   color: 'text-rose-400',
   defaults: {

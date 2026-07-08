@@ -5,7 +5,7 @@ import type { ResourceMeta } from './types'
 export const alb: ResourceMeta = {
   type: 'alb',
   label: 'Load Balancer',
-  description: 'L7 traffic distribution',
+  description: 'L7 트래픽 분산',
   icon: Scale,
   color: 'text-violet-400',
   defaults: {

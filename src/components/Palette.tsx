@@ -7,7 +7,7 @@ export function Palette() {
   return (
     <aside className="flex w-[200px] shrink-0 flex-col border-r border-surface-border bg-surface-raised">
       <div className="border-b border-surface-border px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-        Resources
+        리소스
       </div>
       <div className="flex-1 space-y-1 overflow-y-auto p-2">
         {resourceList.map((meta) => {

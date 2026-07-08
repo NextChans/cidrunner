@@ -15,6 +15,10 @@ The user builds an AWS topology as a graph of nodes (resources) and edges
 (connections), optionally under a mission's win condition, then exports the
 result as Terraform.
 
+The UI language is **Korean**, hardcoded — no i18n framework. AWS resource names
+and technical terms (VPC, Subnet, EC2, …) stay in English to match the AWS
+console and docs. See [ADR 0008](decisions/0008-korean-first-ui-no-i18n.md).
+
 ## Component map
 
 ```

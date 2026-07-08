@@ -14,7 +14,7 @@ export function MissionPanel() {
   return (
     <div className="border-t border-surface-border">
       <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-        Missions
+        미션
       </div>
       <div className="max-h-[40vh] space-y-2 overflow-y-auto px-3 pb-3">
         {missions.map((mission) => {
@@ -43,7 +43,7 @@ export function MissionPanel() {
                 </span>
                 {active && (
                   <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-slate-900">
-                    진행중
+                    진행 중
                   </span>
                 )}
               </div>
@@ -54,7 +54,7 @@ export function MissionPanel() {
         })}
         {disabled && (
           <p className="px-1 pt-1 text-[11px] italic text-slate-600">
-            Switch to Challenge mode to start a mission.
+            미션을 시작하려면 챌린지 모드로 전환하세요.
           </p>
         )}
       </div>

@@ -5,7 +5,7 @@ import type { ResourceMeta } from './types'
 export const igw: ResourceMeta = {
   type: 'igw',
   label: 'Internet Gateway',
-  description: 'VPC ↔ internet edge',
+  description: 'VPC ↔ 인터넷 경계',
   icon: Globe,
   color: 'text-blue-400',
   defaults: {},

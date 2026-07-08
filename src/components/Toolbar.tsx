@@ -4,6 +4,11 @@ import { useGraphStore, type Mode } from '@/store/useGraphStore'
 
 const MODES: Mode[] = ['free', 'challenge']
 
+const MODE_LABELS: Record<Mode, string> = {
+  free: '자유 모드',
+  challenge: '챌린지 모드',
+}
+
 export function Toolbar() {
   const mode = useGraphStore((s) => s.mode)
   const setMode = useGraphStore((s) => s.setMode)
@@ -19,13 +24,13 @@ export function Toolbar() {
             type="button"
             onClick={() => setMode(m)}
             className={clsx(
-              'px-3 py-1.5 capitalize transition-colors',
+              'px-3 py-1.5 transition-colors',
               mode === m
                 ? 'bg-accent text-slate-900 font-semibold'
                 : 'text-slate-400 hover:bg-slate-700/60',
             )}
           >
-            {m}
+            {MODE_LABELS[m]}
           </button>
         ))}
       </div>
@@ -39,7 +44,7 @@ export function Toolbar() {
         className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-slate-900 transition-colors hover:bg-accent-soft"
       >
         <Play size={14} />
-        Start
+        시작
       </button>
 
       <button
@@ -48,7 +53,7 @@ export function Toolbar() {
         className="flex items-center gap-1.5 rounded-md border border-surface-border px-3 py-1.5 text-xs text-slate-200 transition-colors hover:bg-slate-700/60"
       >
         <RotateCcw size={14} />
-        Reset
+        초기화
       </button>
 
       <button
@@ -58,7 +63,7 @@ export function Toolbar() {
         className="flex items-center gap-1.5 rounded-md border border-surface-border px-3 py-1.5 text-xs text-slate-200 transition-colors hover:bg-slate-700/60"
       >
         <Download size={14} />
-        Export .tf
+        Terraform 내보내기
       </button>
     </div>
   )

@@ -5,7 +5,7 @@ import type { ResourceMeta } from './types'
 export const rds: ResourceMeta = {
   type: 'rds',
   label: 'RDS Database',
-  description: 'Managed relational DB',
+  description: '관리형 관계형 DB',
   icon: Database,
   color: 'text-indigo-400',
   defaults: {

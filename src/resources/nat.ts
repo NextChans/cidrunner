@@ -5,7 +5,7 @@ import type { ResourceMeta } from './types'
 export const nat: ResourceMeta = {
   type: 'nat',
   label: 'NAT Gateway',
-  description: 'Private subnet egress',
+  description: '프라이빗 서브넷 아웃바운드',
   icon: Waypoints,
   color: 'text-amber-400',
   defaults: {},

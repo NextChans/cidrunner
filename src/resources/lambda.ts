@@ -5,7 +5,7 @@ import type { ResourceMeta } from './types'
 export const lambda: ResourceMeta = {
   type: 'lambda',
   label: 'Lambda + API GW',
-  description: 'Serverless function',
+  description: '서버리스 함수',
   icon: Zap,
   color: 'text-yellow-400',
   defaults: {
