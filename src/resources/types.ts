@@ -1,8 +1,9 @@
 import type { LucideIcon } from 'lucide-react'
 
 /**
- * The 10 AWS resource primitives the MVP supports.
- * Kept intentionally small — one block per real-world concept.
+ * The AWS resource primitives the game supports — one block per real-world
+ * concept. The original 10-block MVP set (ADR 0001) was expanded to 14 in
+ * batch 1 (ADR 0022: DynamoDB, CloudFront, Route 53, SQS).
  */
 export type ResourceType =
   | 'vpc'
@@ -15,15 +16,26 @@ export type ResourceType =
   | 'rds'
   | 's3'
   | 'lambda'
+  | 'dynamodb'
+  | 'cloudfront'
+  | 'route53'
+  | 'sqs'
 
 /** Palette groups, mirroring how the AWS console organizes services. */
-export type ResourceCategory = 'network' | 'compute' | 'database' | 'storage' | 'security'
+export type ResourceCategory =
+  | 'network'
+  | 'compute'
+  | 'database'
+  | 'storage'
+  | 'integration'
+  | 'security'
 
 export const CATEGORY_LABELS: Record<ResourceCategory, string> = {
   network: '네트워킹',
   compute: '컴퓨팅',
   database: '데이터베이스',
   storage: '스토리지',
+  integration: '앱 통합',
   security: '보안',
 }
 
@@ -33,6 +45,7 @@ export const CATEGORY_ORDER: readonly ResourceCategory[] = [
   'compute',
   'database',
   'storage',
+  'integration',
   'security',
 ]
 
@@ -96,6 +109,14 @@ export interface TfContext {
     targets?: string[]
     /** Local name of the source RDS when this node is a read replica (rds → rds edge). */
     replicaSource?: string
+    /** CloudFront origin (first cloudfront → alb/s3/lambda edge). */
+    originTarget?: { kind: ResourceType; name: string }
+    /** Route 53 alias record target (first route53 → cloudfront/alb edge). */
+    aliasTarget?: { kind: ResourceType; name: string }
+    /** Local names of Lambda consumers of this queue (sqs → lambda edges). */
+    consumers?: string[]
+    /** Local names of SQS queues feeding this Lambda (sqs → lambda edges). */
+    sqsSources?: string[]
   }
 }
 

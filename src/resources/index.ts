@@ -9,6 +9,10 @@ import { ec2 } from './ec2'
 import { rds } from './rds'
 import { s3 } from './s3'
 import { lambda } from './lambda'
+import { dynamodb } from './dynamodb'
+import { cloudfront } from './cloudfront'
+import { route53 } from './route53'
+import { sqs } from './sqs'
 
 /** Registry mapping each resource type to its metadata. */
 export const resources: Record<ResourceType, ResourceMeta> = {
@@ -22,20 +26,28 @@ export const resources: Record<ResourceType, ResourceMeta> = {
   rds,
   s3,
   lambda,
+  dynamodb,
+  cloudfront,
+  route53,
+  sqs,
 }
 
-/** Palette-ordered list of resource metas. */
+/** Palette-ordered list of resource metas (grouped by category in the UI). */
 export const resourceList: ResourceMeta[] = [
   vpc,
   subnet,
   igw,
   nat,
-  sg,
+  route53,
+  cloudfront,
   alb,
   ec2,
-  rds,
-  s3,
   lambda,
+  rds,
+  dynamodb,
+  s3,
+  sqs,
+  sg,
 ]
 
 export function getResource(type: ResourceType): ResourceMeta {

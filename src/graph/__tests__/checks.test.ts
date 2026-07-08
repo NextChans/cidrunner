@@ -52,6 +52,21 @@ describe('graphIssues', () => {
     expect(issues.warnings.get('s3-1')?.join()).toContain('퍼블릭 액세스')
   })
 
+  it('warns (not errors) when two VPCs share overlapping CIDRs', () => {
+    const issues = graphIssues(
+      [
+        N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+        N('vpc-2', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+        N('vpc-3', 'vpc', undefined, { cidr_block: '172.16.0.0/16' }),
+      ],
+      [],
+    )
+    expect(issues.errors.size).toBe(0)
+    expect(issues.warnings.get('vpc-1')?.join()).toContain('피어링')
+    expect(issues.warnings.get('vpc-2')?.join()).toContain('겹칩니다')
+    expect(issues.warnings.has('vpc-3')).toBe(false)
+  })
+
   it('validates replication links: engine mismatch is an error, same AZ a warning', () => {
     const nodes = [
       N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),

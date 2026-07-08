@@ -14,9 +14,9 @@ export const ec2: ResourceMeta = {
     instance_type: 't3.micro',
     ami: 'auto',
   },
-  // Compute lives inside a subnet; talks to databases and storage.
+  // Compute lives inside a subnet; talks to databases, storage, and queues.
   allowedParents: ['subnet'],
-  connectsTo: ['rds', 's3'],
+  connectsTo: ['rds', 's3', 'dynamodb', 'sqs'],
   fields: [
     {
       key: 'instance_type',

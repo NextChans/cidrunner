@@ -34,9 +34,9 @@ export const lambda: ResourceMeta = {
     handler: 'index.handler',
     memory_mb: 128,
   },
-  // Serverless — sits at the top level; reaches databases and storage.
+  // Serverless — sits at the top level; reaches databases, storage, and queues.
   allowedParents: ['canvas'],
-  connectsTo: ['rds', 's3'],
+  connectsTo: ['rds', 's3', 'dynamodb', 'sqs'],
   fields: [
     {
       key: 'runtime',
@@ -62,9 +62,18 @@ export const lambda: ResourceMeta = {
       validatePattern(c.handler, /^\S+$/, '핸들러를 입력하세요 (예: index.handler).'),
       validateRange(c.memory_mb, 128, 10240, '메모리'),
     ),
-  terraform: ({ name, awsName, config, displayName }) => {
+  terraform: ({ name, awsName, config, refs, displayName }) => {
     const runtime = typeof config.runtime === 'string' ? config.runtime : 'nodejs20.x'
     const src = INLINE_SOURCE[runtime] ?? INLINE_SOURCE['nodejs20.x']
+    // A queue-fed Lambda needs SQS receive/delete permissions on its role.
+    const sqsPolicy = refs.sqsSources?.length
+      ? `
+
+resource "aws_iam_role_policy_attachment" "${name}_sqs" {
+  role       = aws_iam_role.${name}_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+}`
+      : ''
     return `resource "aws_iam_role" "${name}_role" {
   name_prefix = "${awsName.slice(0, 24)}-"
   assume_role_policy = jsonencode({
@@ -80,7 +89,7 @@ export const lambda: ResourceMeta = {
 resource "aws_iam_role_policy_attachment" "${name}_logs" {
   role       = aws_iam_role.${name}_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
+}${sqsPolicy}
 
 data "archive_file" "${name}_zip" {
   type        = "zip"
