@@ -129,14 +129,19 @@ export function MissionList() {
   )
 }
 
-/** Desktop mission section, nested at the bottom of the Inspector aside. */
+/**
+ * Desktop mission section, nested at the bottom of the Inspector aside. The
+ * section is capped at 40vh and scrolls INTERNALLY — the wrapper needs its own
+ * overflow, otherwise the (now six) mission cards pour out of the aside and
+ * grow the whole page (the scroll bug fixed in ADR 0023 follow-up).
+ */
 export function MissionPanel() {
   return (
-    <div className="border-t border-surface-border">
-      <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+    <div className="flex max-h-[40vh] shrink-0 flex-col border-t border-surface-border">
+      <div className="shrink-0 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
         미션
       </div>
-      <div className="max-h-[40vh]">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <MissionList />
       </div>
     </div>

@@ -13,7 +13,7 @@ export function Layout() {
   const setDrawer = useGraphStore((s) => s.setDrawer)
 
   return (
-    <div className="flex h-screen flex-col bg-surface text-slate-200">
+    <div className="flex h-screen flex-col overflow-hidden bg-surface text-slate-200">
       <header className="flex items-center justify-between border-b border-surface-border bg-surface-raised px-4 py-2.5">
         <div className="flex items-center gap-2">
           <Waves size={20} className="text-accent" />
