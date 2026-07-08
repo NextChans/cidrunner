@@ -81,12 +81,20 @@ npm run preview  # serve the production build locally
 npm run lint     # oxlint
 ```
 
-## Deployment (Cloudflare Pages)
+## CI & Deployment
 
-CI is configured in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
-to build and deploy to Cloudflare Pages on every push to `main`.
+Two GitHub Actions workflows (see
+[ADR 0006](docs/decisions/0006-ci-cd-workflow-split.md)):
 
-To enable it, add these repository secrets
+- **[`ci.yml`](.github/workflows/ci.yml)** — runs on every push to `main` and on
+  every pull request. Installs deps, lints, type-checks, and builds. **Requires
+  no secrets**, so CI stays green even before Cloudflare is configured.
+- **[`deploy.yml`](.github/workflows/deploy.yml)** — runs on push to `main` (and
+  manual dispatch) and deploys to Cloudflare Pages. The deploy step is **gated
+  on the Cloudflare secrets**: if they are absent the job logs a warning and
+  still succeeds, so a missing secret never surfaces as a failed run.
+
+To enable deploys, add these repository secrets
 (**Settings → Secrets and variables → Actions**):
 
 | Secret | Where to find it |
@@ -95,11 +103,12 @@ To enable it, add these repository secrets
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID |
 
 Then create a Pages project named **`cidrunner`** once (or let the first
-deploy create it). Build output directory is `dist`.
+deploy create it). Build output directory is `dist`. Once both secrets exist,
+the next push to `main` deploys automatically — no workflow change needed.
 
 > Prefer the dashboard integration? You can instead connect this repo directly
 > in the Cloudflare Pages dashboard with build command `npm run build` and
-> output directory `dist`, and delete the workflow file.
+> output directory `dist`, and delete `deploy.yml`.
 
 ## Project structure
 

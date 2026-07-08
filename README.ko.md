@@ -81,12 +81,20 @@ npm run preview  # 프로덕션 빌드 로컬 서빙
 npm run lint     # oxlint
 ```
 
-## 배포 (Cloudflare Pages)
+## CI & 배포
 
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)에 `main` 브랜치
-push마다 빌드 후 Cloudflare Pages로 배포하는 CI가 구성되어 있습니다.
+GitHub Actions 워크플로가 두 개로 나뉘어 있습니다
+(자세한 근거는 [ADR 0006](docs/decisions/0006-ci-cd-workflow-split.md)):
 
-활성화하려면 저장소 시크릿을 등록하세요
+- **[`ci.yml`](.github/workflows/ci.yml)** — `main` push와 모든 pull request에서
+  실행. 의존성 설치 → lint → 타입체크 → 빌드를 수행합니다. **시크릿이 전혀
+  필요 없어서**, Cloudflare 설정 전에도 CI는 초록불을 유지합니다.
+- **[`deploy.yml`](.github/workflows/deploy.yml)** — `main` push(및 수동 실행)에서
+  Cloudflare Pages로 배포합니다. 배포 단계는 **Cloudflare 시크릿 존재 여부로
+  게이팅**되어, 시크릿이 없으면 경고만 남기고 job은 성공으로 끝납니다. 즉
+  시크릿 부재가 실패한 run으로 나타나지 않습니다.
+
+배포를 활성화하려면 저장소 시크릿을 등록하세요
 (**Settings → Secrets and variables → Actions**):
 
 | 시크릿 | 위치 |
@@ -96,10 +104,12 @@ push마다 빌드 후 Cloudflare Pages로 배포하는 CI가 구성되어 있습
 
 그다음 **`cidrunner`**라는 이름의 Pages 프로젝트를 한 번 생성하거나, 첫
 배포가 자동으로 생성하도록 두면 됩니다. 빌드 산출물 디렉토리는 `dist`입니다.
+시크릿 두 개가 등록되면 다음 `main` push부터 자동으로 배포됩니다(워크플로
+수정 불필요).
 
 > 대시보드 연동을 선호한다면, Cloudflare Pages 대시보드에서 이 저장소를 직접
-> 연결하고 빌드 명령 `npm run build`, 출력 디렉토리 `dist`로 설정한 뒤 워크플로
-> 파일을 삭제해도 됩니다.
+> 연결하고 빌드 명령 `npm run build`, 출력 디렉토리 `dist`로 설정한 뒤
+> `deploy.yml`을 삭제해도 됩니다.
 
 ## 프로젝트 구조
 

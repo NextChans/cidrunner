@@ -30,3 +30,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0003](0003-mission-system-in-mvp.md) | Mission system in the MVP | Accepted | 2026-07-08 |
 | [0004](0004-tech-stack.md) | Tech stack | Accepted | 2026-07-08 |
 | [0005](0005-terraform-generation-approach.md) | Terraform generation approach | Accepted | 2026-07-08 |
+| [0006](0006-ci-cd-workflow-split.md) | CI/Deploy workflow split & deploy secret gating | Accepted | 2026-07-08 |

@@ -25,12 +25,15 @@ tooling, state layer, and a non-functional three-pane UI.
 - Mission panel renders the 3 seed missions as cards.
 - Toolbar stub (mode toggle, Start/Export buttons — non-functional).
 - Zustand `useGraphStore` holds nodes / edges / mode / selection.
-- Cloudflare Pages deploy workflow committed.
+- CI configured: a `ci.yml` build/lint/type-check gate (always runs) and a
+  `deploy.yml` Cloudflare Pages deploy that is gated on the CF secrets.
 
-**Status.** ✅ Complete — shipped in `7bfbd38`.
+**Status.** ✅ Complete — scaffold shipped in `7bfbd38`; CI split and lockfile
+fix followed (see ADR 0006).
 
 **Related.** [ADR 0004 — Tech stack](decisions/0004-tech-stack.md) ·
-[ADR 0002 — React Flow over Blockly](decisions/0002-react-flow-over-blockly.md)
+[ADR 0002 — React Flow over Blockly](decisions/0002-react-flow-over-blockly.md) ·
+[ADR 0006 — CI/Deploy workflow split](decisions/0006-ci-cd-workflow-split.md)
 
 ---
 
