@@ -245,3 +245,20 @@ flowchart LR
    dependencies from the graph topology (e.g. a Subnet's `vpc_id` from its
    parent), and zips the result — see
    [ADR 0005](decisions/0005-terraform-generation-approach.md).
+
+## Build & performance
+
+The production build ships as split chunks rather than one bundle
+([ADR 0029](decisions/0029-perf-code-splitting.md)). `vite.config.ts` configures
+rolldown's `codeSplitting.groups` to isolate `react-flow` and a catch-all
+`vendor` chunk, keeping every chunk under the 500 kB warning threshold. Code only
+needed on demand is lazy-loaded: **JSZip** (`await import('jszip')` inside the
+Terraform export path) and the **Onboarding**, **ShortcutHelp**, and
+**NodeContextMenu** components (`React.lazy`). On the canvas, React Flow runs with
+`onlyRenderVisibleElements` so off-viewport nodes are culled and large graphs
+(100+ nodes) stay responsive on pan/zoom.
+
+Global keyboard shortcuts live in `useKeyboardShortcuts` (mounted inside the
+`ReactFlowProvider` so `R`/fit-view reaches the flow instance); all editing
+actions mutate only `nodes`/`edges`, so they ride the existing zundo undo history
+for free — see [ADR 0028](decisions/0028-keyboard-shortcuts-and-context-menu.md).

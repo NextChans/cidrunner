@@ -23,6 +23,18 @@ export interface MissionCheckContext {
 }
 
 /**
+ * One step of an interactive, self-checking walkthrough (ADR 0030). `done`
+ * re-evaluates against the live graph, so the MissionPanel can tick steps off
+ * and surface the next instruction as the player builds.
+ */
+export interface TutorialStep {
+  /** Imperative, player-facing instruction for this step. */
+  text: string
+  /** True once the current graph satisfies this step. */
+  done: (ctx: MissionCheckContext) => boolean
+}
+
+/**
  * A challenge-mode objective. `check` returns a 0–3 star rating for the current
  * graph; 0 means not yet cleared, ≥1 means the objective is met (Phase 5).
  */
@@ -34,6 +46,11 @@ export interface Mission {
   goal: string
   /** Optional nudge shown when the player is stuck. */
   hint?: string
+  /**
+   * Optional step-by-step walkthrough (ADR 0030). Backward-compatible: only the
+   * tutorial mission fills this; missions without it behave exactly as before.
+   */
+  steps?: TutorialStep[]
   /** Resources expected to appear in a correct solution. */
   requiredResources?: ResourceType[]
   /** Clear detection + star rating (0–3). Omit for descriptive-only missions. */

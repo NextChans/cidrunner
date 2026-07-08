@@ -1,4 +1,3 @@
-import JSZip from 'jszip'
 import type { Edge } from '@xyflow/react'
 import { getResource, type ResourceType } from '@/resources'
 import type { ResourceNodeType } from '@/store/useGraphStore'
@@ -421,6 +420,9 @@ export async function downloadTerraformZip(
   edges: Edge[] = [],
 ): Promise<void> {
   const files = generateTerraform(nodes, edges)
+  // Lazy-load JSZip so the ~100 kB library ships in its own chunk, fetched only
+  // when the user actually exports (ADR 0029).
+  const { default: JSZip } = await import('jszip')
   const zip = new JSZip()
   for (const [filename, content] of Object.entries(files)) {
     zip.file(filename, content)

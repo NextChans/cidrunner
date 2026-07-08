@@ -45,6 +45,8 @@
 - **미션 & 자유 모드** — 베스트 프랙티스 챌린지 10종(튜토리얼 / 고가용성 3-tier / 서버리스 / 글로벌 정적 웹 / 비동기 파이프라인 / 컨테이너 워크로드 / 글로벌 동적 웹 / 이벤트 드리븐 팬아웃 / 시큐리티 하드닝 / 재난 복구)과 별점(0–3), 또는 자유 샌드박스.
 - **저장 & 공유** — 설계가 브라우저에 자동 저장되어 새로고침에도 유지되고, URL 하나 또는 JSON 파일로 공유됩니다(미션 컨텍스트 포함, 불러오기 전 기존 작업 확인). 계정·백엔드 불필요.
 - **에디터 기본기** — undo/redo(Ctrl+Z, 제스처당 1스텝), 첫 방문 튜토리얼 안내, 미션별 별점 최고기록.
+- **키보드 단축키 & 컨텍스트 메뉴** — undo/redo(⌘Z / ⌘⇧Z)·복제(⌘D)·삭제·화면 맞춤(R)·시뮬(S)·내보내기(E)·도움말(?) 전역 단축키, 노드 우클릭으로 속성 편집 / 복제 / 엣지 지우기 / 부모 분리 / 삭제. [ADR 0028](docs/decisions/0028-keyboard-shortcuts-and-context-menu.md) 참고.
+- **인터랙티브 튜토리얼** — 첫 미션이 실시간 자가 점검 단계 목록을 보여주며, 설계를 진행하면 완료 단계가 꺼지고 다음 할 일이 강조됩니다. [ADR 0030](docs/decisions/0030-interactive-tutorial-steps.md) 참고.
 - **apply 가능한 Terraform 내보내기** — 라우트 테이블·DB Subnet Group·IAM·API Gateway까지 유도 생성된 `main.tf`/`variables.tf`/`outputs.tf`. `terraform apply` 하면 실제 리소스가 생성됩니다.
 - **리소스 20종** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda+API GW · RDS(+읽기 복제본) · ElastiCache · DynamoDB · S3 · EFS · SQS · SNS · CloudWatch · Security Group.
 - **모바일** — 인프라 편집은 데스크톱 우선 경험이지만, 좁은 화면(<768px)에서는 캔버스가 전체 화면을 차지하고 팔레트 / 인스펙터 / 미션이 오버레이 drawer로 이동해 폰에서도 프로젝트를 보고 데모할 수 있습니다. [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md) 참고.
