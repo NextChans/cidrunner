@@ -5,6 +5,7 @@ import { missions } from '@/missions'
 import type { MissionCheckContext } from '@/missions/types'
 import { getResource } from '@/resources'
 import { simulate } from '@/graph/simulate'
+import { getCidrIssues } from '@/graph/cidr'
 import { useGraphStore } from '@/store/useGraphStore'
 
 /** Three star slots, filling `earned` of them. */
@@ -33,10 +34,14 @@ export function MissionList() {
 
   const disabled = mode !== 'challenge'
 
-  // Live clear-check context: simulate the graph and sweep validation once.
+  // Live clear-check context: simulate the graph and sweep validation once
+  // (per-node config checks plus graph-level CIDR conflicts).
   const ctx = useMemo<MissionCheckContext>(() => {
+    const cidr = getCidrIssues(nodes)
     const allValid = nodes.every(
-      (n) => (getResource(n.data.type).validate?.(n.data.config) ?? []).length === 0,
+      (n) =>
+        (getResource(n.data.type).validate?.(n.data.config) ?? []).length === 0 &&
+        (cidr.get(n.id)?.length ?? 0) === 0,
     )
     return { nodes, edges, sim: simulate(nodes, edges), allValid }
   }, [nodes, edges])

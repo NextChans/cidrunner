@@ -152,3 +152,4 @@ validation sweep (ADR 0011). See ADR 0014.
 | 2026-07-08 | Phase 3 completed: traffic simulation (path trace + particle animation); ADR 0012 added. |
 | 2026-07-08 | Phase 4 completed: Terraform export (validate-passing HCL + zip); ADR 0013 added. |
 | 2026-07-08 | Phase 5 completed: mission clear detection + star rating; ADR 0014 added. MVP feature-complete. |
+| 2026-07-08 | Post-MVP: resizable containers (NodeResizer); graph-level CIDR validation (ADR 0015). |

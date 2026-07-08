@@ -3,6 +3,7 @@ import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react'
 import clsx from 'clsx'
 import { getResource } from '@/resources'
 import { canBeSource, canBeTarget } from '@/graph/rules'
+import { getCidrIssues } from '@/graph/cidr'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
 /** Containers can't shrink below this, so their header and children stay visible. */
@@ -21,7 +22,8 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
   const Icon = meta.icon
   const showSource = canBeSource(data.type)
   const showTarget = canBeTarget(data.type)
-  const invalid = (meta.validate?.(data.config) ?? []).length > 0
+  const cidrInvalid = useGraphStore((s) => (getCidrIssues(s.nodes).get(id)?.length ?? 0) > 0)
+  const invalid = cidrInvalid || (meta.validate?.(data.config) ?? []).length > 0
   const sim = useGraphStore((s) => s.simulation)
   const blocked = sim?.blockedNodeId === id
   const onPath = !blocked && (sim?.pathNodeIds.includes(id) ?? false)

@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react'
 import { getResource } from '@/resources'
+import { getCidrIssues } from '@/graph/cidr'
 import { useGraphStore } from '@/store/useGraphStore'
 import { MissionPanel } from './MissionPanel'
 import { PropertyForm } from './PropertyForm'
@@ -10,6 +11,9 @@ export function InspectorBody() {
     s.nodes.find((n) => n.id === s.selectedNodeId),
   )
   const removeNode = useGraphStore((s) => s.removeNode)
+  const graphErrorCount = useGraphStore((s) =>
+    s.selectedNodeId ? (getCidrIssues(s.nodes).get(s.selectedNodeId)?.length ?? 0) : 0,
+  )
 
   return (
     <div className="flex-1 overflow-y-auto p-4">
@@ -23,7 +27,9 @@ export function InspectorBody() {
               {(() => {
                 const meta = getResource(node.data.type)
                 const Icon = meta.icon
-                const invalid = (meta.validate?.(node.data.config) ?? []).length > 0
+                const invalid =
+                  graphErrorCount > 0 ||
+                  (meta.validate?.(node.data.config) ?? []).length > 0
                 return (
                   <>
                     <Icon size={18} className={meta.color} />
