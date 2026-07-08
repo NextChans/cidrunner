@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import type { Edge, Node } from '@xyflow/react'
+import type { Edge, Node, XYPosition } from '@xyflow/react'
 import { getResource, type ResourceType } from '@/resources'
+import { canBeTopLevel, canContain, requiredParentLabel } from '@/graph/rules'
 
 export type Mode = 'free' | 'challenge'
 
@@ -19,30 +20,37 @@ interface GraphState {
   edges: Edge[]
   selectedNodeId: string | null
   activeMissionId: string | null
+  /** Transient, player-facing message (e.g. a rejected drop/edge). */
+  notice: string | null
 
   setMode: (mode: Mode) => void
+  /** Click-to-add: places the node into a valid container automatically. */
   addNode: (type: ResourceType) => void
+  /** Drop-to-add: places the node at `position`, optionally inside `parentId`. */
+  addNodeAt: (type: ResourceType, position: XYPosition, parentId?: string) => void
   removeNode: (id: string) => void
   setNodes: (nodes: ResourceNodeType[]) => void
   setEdges: (edges: Edge[]) => void
   setSelected: (id: string | null) => void
   setActiveMission: (id: string | null) => void
+  setNotice: (notice: string | null) => void
   reset: () => void
 }
 
-/** Seed graph: a VPC container with a Subnet and an EC2 instance inside. */
+/** Seed graph: a VPC ▸ public Subnet ▸ EC2, demonstrating valid nesting. */
 const initialNodes: ResourceNodeType[] = [
   {
     id: 'vpc-1',
     type: 'resource',
-    position: { x: 80, y: 60 },
-    style: { width: 420, height: 300 },
+    position: { x: 80, y: 40 },
+    style: { width: 480, height: 340 },
     data: { type: 'vpc', label: 'VPC', config: { cidr_block: '10.0.0.0/16' } },
   },
   {
     id: 'subnet-1',
     type: 'resource',
-    position: { x: 40, y: 80 },
+    position: { x: 40, y: 70 },
+    style: { width: 320, height: 190 },
     parentId: 'vpc-1',
     extent: 'parent',
     data: {
@@ -54,8 +62,8 @@ const initialNodes: ResourceNodeType[] = [
   {
     id: 'ec2-1',
     type: 'resource',
-    position: { x: 220, y: 80 },
-    parentId: 'vpc-1',
+    position: { x: 40, y: 70 },
+    parentId: 'subnet-1',
     extent: 'parent',
     data: { type: 'ec2', label: 'EC2 Instance', config: { instance_type: 't3.micro' } },
   },
@@ -64,43 +72,107 @@ const initialNodes: ResourceNodeType[] = [
 // Monotonic counter so newly-added nodes never collide with seeded ids.
 let nodeSeq = initialNodes.length
 
+/** Builds a resource node, applying a container's default size when relevant. */
+function makeNode(
+  type: ResourceType,
+  position: XYPosition,
+  parentId?: string,
+): ResourceNodeType {
+  const meta = getResource(type)
+  nodeSeq += 1
+  const node: ResourceNodeType = {
+    id: `${type}-${nodeSeq}`,
+    type: 'resource',
+    position,
+    data: { type, label: meta.label, config: { ...meta.defaults } },
+  }
+  if (meta.defaultSize) node.style = { ...meta.defaultSize }
+  if (parentId) {
+    node.parentId = parentId
+    node.extent = 'parent'
+  }
+  return node
+}
+
+/** Collects a node id plus all of its (transitive) descendants. */
+function withDescendants(nodes: ResourceNodeType[], rootId: string): Set<string> {
+  const ids = new Set<string>([rootId])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const n of nodes) {
+      if (n.parentId && ids.has(n.parentId) && !ids.has(n.id)) {
+        ids.add(n.id)
+        grew = true
+      }
+    }
+  }
+  return ids
+}
+
 export const useGraphStore = create<GraphState>((set) => ({
   mode: 'free',
   nodes: initialNodes,
   edges: [],
   selectedNodeId: null,
   activeMissionId: null,
+  notice: null,
 
   setMode: (mode) => set({ mode }),
 
   addNode: (type) =>
     set((state) => {
-      const meta = getResource(type)
-      nodeSeq += 1
-      const id = `${type}-${nodeSeq}`
-      // Fan new nodes out slightly so they don't stack on one spot.
-      const offset = (state.nodes.length % 6) * 28
-      const node: ResourceNodeType = {
-        id,
-        type: 'resource',
-        position: { x: 560 + offset, y: 120 + offset },
-        data: { type, label: meta.label, config: { ...meta.defaults } },
+      // Top-level resources fan out onto open canvas.
+      if (canBeTopLevel(type)) {
+        const offset = (state.nodes.length % 6) * 28
+        const node = makeNode(type, { x: 560 + offset, y: 120 + offset })
+        return { nodes: [...state.nodes, node], selectedNodeId: node.id, notice: null }
       }
-      return { nodes: [...state.nodes, node], selectedNodeId: id }
+      // Nested resources need an existing valid container.
+      const parent = state.nodes.find((n) => canContain(n.data.type, type))
+      if (!parent) {
+        const need = requiredParentLabel(type)
+        return {
+          notice: `${getResource(type).label}은(는) ${need} 안에만 놓을 수 있습니다. 먼저 ${need}을(를) 추가하세요.`,
+        }
+      }
+      const siblings = state.nodes.filter((n) => n.parentId === parent.id).length
+      const fan = (siblings % 4) * 22
+      const node = makeNode(type, { x: 24 + fan, y: 48 + fan }, parent.id)
+      return { nodes: [...state.nodes, node], selectedNodeId: node.id, notice: null }
+    }),
+
+  addNodeAt: (type, position, parentId) =>
+    set((state) => {
+      const node = makeNode(type, position, parentId)
+      return { nodes: [...state.nodes, node], selectedNodeId: node.id, notice: null }
     }),
 
   removeNode: (id) =>
-    set((state) => ({
-      nodes: state.nodes.filter((n) => n.id !== id && n.parentId !== id),
-      edges: state.edges.filter((e) => e.source !== id && e.target !== id),
-      selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
-    })),
+    set((state) => {
+      const doomed = withDescendants(state.nodes, id)
+      return {
+        nodes: state.nodes.filter((n) => !doomed.has(n.id)),
+        edges: state.edges.filter((e) => !doomed.has(e.source) && !doomed.has(e.target)),
+        selectedNodeId:
+          state.selectedNodeId && doomed.has(state.selectedNodeId)
+            ? null
+            : state.selectedNodeId,
+      }
+    }),
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
   setSelected: (selectedNodeId) => set({ selectedNodeId }),
   setActiveMission: (activeMissionId) => set({ activeMissionId }),
+  setNotice: (notice) => set({ notice }),
 
   reset: () =>
-    set({ nodes: initialNodes, edges: [], selectedNodeId: null, activeMissionId: null }),
+    set({
+      nodes: initialNodes,
+      edges: [],
+      selectedNodeId: null,
+      activeMissionId: null,
+      notice: null,
+    }),
 }))

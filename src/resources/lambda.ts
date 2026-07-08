@@ -13,6 +13,9 @@ export const lambda: ResourceMeta = {
     handler: 'index.handler',
     memory_mb: 128,
   },
+  // Serverless — sits at the top level; reaches databases and storage.
+  allowedParents: ['canvas'],
+  connectsTo: ['rds', 's3'],
   // Phase 4: emit aws_lambda_function + aws_apigatewayv2_* HCL.
   terraform: () => '',
 }

@@ -12,6 +12,9 @@ export const alb: ResourceMeta = {
     internal: false,
     listener_port: 80,
   },
+  // Spans a VPC's subnets; forwards traffic to compute targets.
+  allowedParents: ['vpc'],
+  connectsTo: ['ec2', 'lambda'],
   // Phase 4: emit aws_lb + target group + listener HCL.
   terraform: () => '',
 }

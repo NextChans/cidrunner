@@ -12,6 +12,8 @@ export const sg: ResourceMeta = {
     ingress: [],
     egress: [],
   },
+  // A VPC-scoped firewall.
+  allowedParents: ['vpc'],
   // Phase 4: emit aws_security_group HCL.
   terraform: () => '',
 }

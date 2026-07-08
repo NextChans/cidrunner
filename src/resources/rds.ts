@@ -13,6 +13,8 @@ export const rds: ResourceMeta = {
     instance_class: 'db.t3.micro',
     multi_az: false,
   },
+  // Databases live inside a (private) subnet.
+  allowedParents: ['subnet'],
   // Phase 4: emit aws_db_instance HCL.
   terraform: () => '',
 }

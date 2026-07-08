@@ -12,6 +12,9 @@ export const ec2: ResourceMeta = {
     instance_type: 't3.micro',
     ami: 'ami-xxxxxxxx',
   },
+  // Compute lives inside a subnet; talks to databases and storage.
+  allowedParents: ['subnet'],
+  connectsTo: ['rds', 's3'],
   // Phase 4: emit aws_instance HCL.
   terraform: () => '',
 }

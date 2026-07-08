@@ -16,7 +16,8 @@ export function Palette() {
             <button
               key={meta.type}
               type="button"
-              // Phase 1: wire up onDragStart → canvas onDrop. Click-to-add for now.
+              // Drag onto the canvas to place (nesting-aware), or click to
+              // auto-place into a valid container.
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData('application/cidrunner', meta.type)

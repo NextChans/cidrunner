@@ -11,6 +11,8 @@ export const s3: ResourceMeta = {
   defaults: {
     versioning: false,
   },
+  // A regional bucket — not inside a VPC.
+  allowedParents: ['canvas'],
   // Phase 4: emit aws_s3_bucket HCL.
   terraform: () => '',
 }
