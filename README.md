@@ -39,14 +39,14 @@ Design and decisions live in [`docs/`](docs/):
 
 ## Concept
 
-- **Block-style editor** — a React Flow canvas with a categorized palette (networking / compute / database / storage / security); resources nest and connect under real AWS rules.
+- **Block-style editor** — a React Flow canvas with a categorized palette (networking / compute / database / storage / integration / management / security); resources nest and connect under real AWS rules.
 - **Security as gameplay** — attach Security Groups by drawing edges; encryption and public-access toggles; amber warnings for anything insecure.
 - **Traffic playback** — press Start and every flow (ALB → EC2 → RDS, Lambda → S3, …) animates with particles and arrival pulses; blocked paths highlight the blocking node.
-- **Missions & Free mode** — best-practice challenges (tutorial / HA 3-tier / serverless / security hardening) with 0–3 star ratings, or an open sandbox.
+- **Missions & Free mode** — 10 best-practice challenges (tutorial / HA 3-tier / serverless / static CDN / async pipeline / container workload / global dynamic web / event-driven fan-out / security hardening / disaster recovery) with 0–3 star ratings, or an open sandbox.
 - **Save & Share** — designs autosave to the browser (survive refresh) and share as a single URL or a JSON file (mission context included, load asks before replacing your work); no account, no backend.
 - **Editor fundamentals** — undo/redo (Ctrl+Z, one step per gesture), a first-visit tutorial hand-off, and per-mission best-star records.
 - **Apply-ready Terraform export** — `main.tf`, `variables.tf`, `outputs.tf` with derived route tables, DB subnet groups, IAM, and a working API Gateway; `terraform apply` creates real resources.
-- **Resource set (14)** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · Lambda+API GW · RDS (+read replica) · DynamoDB · S3 · SQS · Security Group.
+- **Resource set (20)** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda+API GW · RDS (+read replica) · ElastiCache · DynamoDB · S3 · EFS · SQS · SNS · CloudWatch · Security Group.
 - **Mobile** — building infra is a desktop-first experience, but narrow screens (<768px) get a full-viewport canvas with the palette / inspector / missions moved into overlay drawers, so a project stays viewable and demo-able on a phone. See [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md).
 
 ## Roadmap
@@ -130,8 +130,8 @@ src/
 ├─ store/useGraphStore.ts   # Zustand — nodes / edges / mode
 ├─ components/              # Layout, Canvas, Palette, Inspector, MissionPanel, Toolbar
 │  └─ nodes/ResourceNode.tsx
-├─ resources/              # 14 resource metas + registry (apply-ready terraform emitters)
-└─ missions/               # tutorial / 3-tier / serverless / security / static-CDN / async-pipeline
+├─ resources/              # 20 resource metas + registry (apply-ready terraform emitters)
+└─ missions/               # 10 missions: tutorial / 3-tier / serverless / static-CDN / async-pipeline / container / global-web / event-driven / security / disaster-recovery
 ```
 
 ## License

@@ -42,11 +42,11 @@
 - **블록형 에디터** — 카테고리(네트워킹/컴퓨팅/데이터베이스/스토리지/보안)로 정리된 팔레트와 실제 AWS 규칙을 따르는 중첩·연결.
 - **보안이 곧 게임** — Security Group을 엣지로 그려서 연결하고, 암호화·퍼블릭 차단 토글을 다룹니다. 위험한 구성은 주황 경고로 표시됩니다.
 - **트래픽 재생** — Start를 누르면 모든 플로우(ALB → EC2 → RDS, Lambda → S3 …)가 파티클과 도착 펄스로 재생되고, 막힌 경로는 병목 노드가 하이라이트됩니다.
-- **미션 & 자유 모드** — 베스트 프랙티스 챌린지(튜토리얼 / 고가용성 3-tier / 서버리스 / 시큐리티 하드닝)와 별점(0–3), 또는 자유 샌드박스.
+- **미션 & 자유 모드** — 베스트 프랙티스 챌린지 10종(튜토리얼 / 고가용성 3-tier / 서버리스 / 글로벌 정적 웹 / 비동기 파이프라인 / 컨테이너 워크로드 / 글로벌 동적 웹 / 이벤트 드리븐 팬아웃 / 시큐리티 하드닝 / 재난 복구)과 별점(0–3), 또는 자유 샌드박스.
 - **저장 & 공유** — 설계가 브라우저에 자동 저장되어 새로고침에도 유지되고, URL 하나 또는 JSON 파일로 공유됩니다(미션 컨텍스트 포함, 불러오기 전 기존 작업 확인). 계정·백엔드 불필요.
 - **에디터 기본기** — undo/redo(Ctrl+Z, 제스처당 1스텝), 첫 방문 튜토리얼 안내, 미션별 별점 최고기록.
 - **apply 가능한 Terraform 내보내기** — 라우트 테이블·DB Subnet Group·IAM·API Gateway까지 유도 생성된 `main.tf`/`variables.tf`/`outputs.tf`. `terraform apply` 하면 실제 리소스가 생성됩니다.
-- **리소스 14종** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · Lambda+API GW · RDS(+읽기 복제본) · DynamoDB · S3 · SQS · Security Group.
+- **리소스 20종** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda+API GW · RDS(+읽기 복제본) · ElastiCache · DynamoDB · S3 · EFS · SQS · SNS · CloudWatch · Security Group.
 - **모바일** — 인프라 편집은 데스크톱 우선 경험이지만, 좁은 화면(<768px)에서는 캔버스가 전체 화면을 차지하고 팔레트 / 인스펙터 / 미션이 오버레이 drawer로 이동해 폰에서도 프로젝트를 보고 데모할 수 있습니다. [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md) 참고.
 
 ## 로드맵
@@ -130,8 +130,8 @@ src/
 ├─ store/useGraphStore.ts   # Zustand — nodes / edges / mode
 ├─ components/              # Layout, Canvas, Palette, Inspector, MissionPanel, Toolbar
 │  └─ nodes/ResourceNode.tsx
-├─ resources/              # 리소스 14종 meta + 레지스트리 (apply-ready terraform 생성기)
-└─ missions/               # 튜토리얼 / 3-tier / 서버리스 / 보안 / 정적CDN / 비동기파이프라인
+├─ resources/              # 리소스 20종 meta + 레지스트리 (apply-ready terraform 생성기)
+└─ missions/               # 미션 10종: 튜토리얼 / 3-tier / 서버리스 / 정적CDN / 비동기파이프라인 / 컨테이너 / 글로벌동적웹 / 이벤트드리븐 / 보안 / 재난복구
 ```
 
 ## 라이선스

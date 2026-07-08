@@ -158,6 +158,69 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
         push(warnings, node.id, '큐를 소비할 Lambda가 연결되어 있지 않습니다.')
       }
     }
+
+    // ElastiCache needs a subnet group across ≥2 AZs, like RDS (ADR 0026).
+    if (t === 'elasticache') {
+      const vpc = vpcOf(node)
+      if (vpc) {
+        const subnets = subnetsIn(vpc.id)
+        if (subnets.length < 2 || distinctAzs(subnets) < 2) {
+          push(
+            errors,
+            node.id,
+            'ElastiCache는 서로 다른 AZ의 Subnet 2개 이상이 필요합니다 (Cache Subnet Group).',
+          )
+        }
+      }
+      const parent = node.parentId ? byId.get(node.parentId) : undefined
+      if (parent?.data.type === 'subnet' && parent.data.config.public === true) {
+        push(warnings, node.id, '캐시가 퍼블릭 Subnet에 있습니다 — 프라이빗 Subnet 권장.')
+      }
+      if (attachedSGs(node.id).length === 0) {
+        push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
+      }
+    }
+
+    // EFS mount targets need an SG; encryption-at-rest is best practice.
+    if (t === 'efs') {
+      if (cfg.encrypted === false) push(warnings, node.id, '저장 데이터 암호화가 꺼져 있습니다.')
+      if (attachedSGs(node.id).length === 0) {
+        push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
+      }
+    }
+
+    // A Fargate service needs an SG for its ENIs.
+    if (t === 'ecs' && attachedSGs(node.id).length === 0) {
+      push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
+    }
+
+    // EKS control plane + node group span ≥2 AZ subnets.
+    if (t === 'eks') {
+      const vpc = vpcOf(node)
+      if (vpc) {
+        const subnets = subnetsIn(vpc.id)
+        if (subnets.length < 2 || distinctAzs(subnets) < 2) {
+          push(errors, node.id, 'EKS는 서로 다른 AZ의 Subnet 2개 이상이 필요합니다.')
+        }
+      }
+    }
+
+    if (t === 'sns') {
+      const hasSubscriber = edges.some(
+        (e) =>
+          e.source === node.id && ['sqs', 'lambda'].includes(byId.get(e.target)?.data.type ?? ''),
+      )
+      if (!hasSubscriber) {
+        push(warnings, node.id, '토픽을 구독할 대상(SQS/Lambda)이 연결되어 있지 않습니다.')
+      }
+    }
+
+    if (t === 'cloudwatch') {
+      const hasTarget = edges.some((e) => e.source === node.id)
+      if (!hasTarget) {
+        push(warnings, node.id, '모니터링할 대상이 연결되어 있지 않습니다 (엣지로 연결).')
+      }
+    }
   }
 
   // VPC-to-VPC CIDR overlap: AWS allows it, so it is not an error (ADR 0015),

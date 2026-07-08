@@ -3,7 +3,8 @@ import type { LucideIcon } from 'lucide-react'
 /**
  * The AWS resource primitives the game supports — one block per real-world
  * concept. The original 10-block MVP set (ADR 0001) was expanded to 14 in
- * batch 1 (ADR 0022: DynamoDB, CloudFront, Route 53, SQS).
+ * batch 1 (ADR 0022: DynamoDB, CloudFront, Route 53, SQS) and to 20 in batch 2
+ * (ADR 0026: ECS, EKS, SNS, EFS, ElastiCache, CloudWatch).
  */
 export type ResourceType =
   | 'vpc'
@@ -13,13 +14,19 @@ export type ResourceType =
   | 'sg'
   | 'alb'
   | 'ec2'
+  | 'ecs'
+  | 'eks'
   | 'rds'
+  | 'elasticache'
   | 's3'
+  | 'efs'
   | 'lambda'
   | 'dynamodb'
   | 'cloudfront'
   | 'route53'
   | 'sqs'
+  | 'sns'
+  | 'cloudwatch'
 
 /** Palette groups, mirroring how the AWS console organizes services. */
 export type ResourceCategory =
@@ -28,6 +35,7 @@ export type ResourceCategory =
   | 'database'
   | 'storage'
   | 'integration'
+  | 'management'
   | 'security'
 
 export const CATEGORY_LABELS: Record<ResourceCategory, string> = {
@@ -36,6 +44,7 @@ export const CATEGORY_LABELS: Record<ResourceCategory, string> = {
   database: '데이터베이스',
   storage: '스토리지',
   integration: '앱 통합',
+  management: '관리·모니터링',
   security: '보안',
 }
 
@@ -46,6 +55,7 @@ export const CATEGORY_ORDER: readonly ResourceCategory[] = [
   'database',
   'storage',
   'integration',
+  'management',
   'security',
 ]
 
@@ -103,6 +113,13 @@ export interface TfContext {
     subnets?: string[]
     /** Local names of the *public* subnets in the same VPC (for external ALB). */
     publicSubnets?: string[]
+    /** Local names of the *private* subnets in the same VPC (for containers). */
+    privateSubnets?: string[]
+    /**
+     * One subnet per distinct AZ in the same VPC — EFS mount targets are unique
+     * per AZ, so mounting into two same-AZ subnets fails `apply`.
+     */
+    azUniqueSubnets?: string[]
     /** Local names of security groups attached to this node via SG edges. */
     securityGroups?: string[]
     /** Local names of EC2 instances this ALB forwards to (alb → ec2 edges). */
@@ -117,6 +134,10 @@ export interface TfContext {
     consumers?: string[]
     /** Local names of SQS queues feeding this Lambda (sqs → lambda edges). */
     sqsSources?: string[]
+    /** SNS subscribers (sns → sqs/lambda edges): each fans out to one endpoint. */
+    subscribers?: { kind: ResourceType; name: string }[]
+    /** CloudWatch monitor targets (cloudwatch → ec2/rds/alb/lambda edges). */
+    monitorTargets?: { kind: ResourceType; name: string }[]
   }
 }
 

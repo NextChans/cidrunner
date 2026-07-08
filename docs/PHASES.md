@@ -168,3 +168,4 @@ validation sweep (ADR 0011). See ADR 0014.
 | 2026-07-08 | CIDR 검증 apply 기준 강화: 호스트 비트 검사(정정 제안 포함) + AWS /16–/28 프리픽스 (ADR 0011 갱신). |
 | 2026-07-08 | Editor Fundamentals 스프린트 (제품 미팅 #2): undo/redo, 첫 방문 온보딩, 공유 안전화(+미션 컨텍스트), 별점 최고기록, sanitize 리하이드레이트 (ADR 0023). |
 | 2026-07-09 | Sprint A (부채 정리 & QA): TS strict 강화 — `noImplicitReturns` + `noUncheckedIndexedAccess` (ADR 0024); TF apply-readiness 감사 — blocker 0건, `REPLACE_ME` loud 마커 유지 (ADR 0025); 테스트 8→11 파일·42→59 케이스; 문서-코드 mismatch 5건 수정 (Phase 4 노트·ARCHITECTURE 시그니처·README/README.ko 구조·미션 목록). |
+| 2026-07-09 | Sprint B (콘텐츠 확장 2차): 리소스 14→20종 — ECS·EKS·ElastiCache·EFS·SNS·CloudWatch(+새 `관리·모니터링` 카테고리) (ADR 0026); 미션 6→10종 — 컨테이너 워크로드·글로벌 동적 웹·이벤트 드리븐 팬아웃·재난 복구(Multi-AZ) (ADR 0027); 테스트 59→74 케이스. Kinesis는 데이터 레이크 미션과 함께 3차 배치로 보류. feature branch → PR → merge 워크플로로 진행. |

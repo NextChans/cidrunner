@@ -44,7 +44,7 @@ export const lambda: ResourceMeta = {
   },
   // Serverless — sits at the top level; reaches databases, storage, and queues.
   allowedParents: ['canvas'],
-  connectsTo: ['rds', 's3', 'dynamodb', 'sqs'],
+  connectsTo: ['rds', 's3', 'dynamodb', 'sqs', 'sns', 'elasticache'],
   fields: [
     {
       key: 'runtime',
