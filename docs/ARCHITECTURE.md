@@ -339,6 +339,14 @@ permission — [ADR 0046](decisions/0046-lambda-apigw-split.md)). Output:
 via JSZip. Verified with a real `terraform init` + `validate` (v1.9.8, AWS
 provider 5.x + archive provider).
 
+Beyond validating, a TF review closed the "validates but doesn't actually run"
+gap ([ADR 0055](decisions/0055-terraform-apply-wiring.md)): the generator now
+derives **tiered SG-to-SG ingress** from the traffic topology (app SG ← ALB SG
+on :80, DB SG ← app SG on :3306), places the **DB subnet group and EKS node
+group in private subnets**, and manages **RDS credentials via Secrets Manager**
+(`manage_master_user_password`, no plaintext) with a 7-day backup window. Wiring
+HTTPS/WAF/authorizer/alarm-actions from edges remains a follow-up.
+
 ## Mission registry
 
 [`src/missions/`](../src/missions/) holds one module per mission (12 total:

@@ -67,17 +67,21 @@ export const rds: ResourceMeta = {
 }`
     }
     const subnetGroup = refs.vpc ? `\n  db_subnet_group_name = aws_db_subnet_group.${refs.vpc}_dbsg.name` : ''
+    // Credentials via RDS-managed Secrets Manager (no plaintext in tfstate, auto
+    // rotation) — ADR 0055. `deletion_protection`/final snapshot are left
+    // teardown-friendly for the game; production would enable them.
     return `resource "aws_db_instance" "${name}" {
-  identifier          = "${awsName}"
-  allocated_storage   = ${Number(config.allocated_storage ?? 20)}
-  engine              = "${config.engine ?? 'mysql'}"
-  instance_class      = "${config.instance_class ?? 'db.t3.micro'}"
-  username            = "dbadmin"
-  password            = var.db_password
-  multi_az            = ${config.multi_az ? 'true' : 'false'}
-  storage_encrypted   = ${config.storage_encrypted === false ? 'false' : 'true'}
-  publicly_accessible = false
-  skip_final_snapshot = true${subnetGroup}${sgLine}
+  identifier                  = "${awsName}"
+  allocated_storage           = ${Number(config.allocated_storage ?? 20)}
+  engine                      = "${config.engine ?? 'mysql'}"
+  instance_class              = "${config.instance_class ?? 'db.t3.micro'}"
+  username                    = "dbadmin"
+  manage_master_user_password = true
+  multi_az                    = ${config.multi_az ? 'true' : 'false'}
+  storage_encrypted           = ${config.storage_encrypted === false ? 'false' : 'true'}
+  backup_retention_period     = 7
+  publicly_accessible         = false
+  skip_final_snapshot         = true${subnetGroup}${sgLine}
   tags = { Name = "${displayName}" }
 }`
   },

@@ -93,6 +93,52 @@ export function generateTerraform(
       .filter((e) => e.source === nodeId && kinds.includes(typeOf(e.target) as ResourceType))
       .map((e) => ({ kind: typeOf(e.target) as ResourceType, name: tfName(e.target) }))
 
+  // The port a resource listens on, for tiered SG ingress (ADR 0055).
+  const servicePort = (n: ResourceNodeType): number | null => {
+    switch (n.data.type) {
+      case 'ec2':
+      case 'ecs':
+      case 'eks':
+        return 80
+      case 'rds':
+        return String(n.data.config.engine) === 'postgres' ? 5432 : 3306
+      case 'elasticache':
+        return 6379
+      case 'efs':
+        return 2049
+      default:
+        return null
+    }
+  }
+  // Tiered SG-to-SG ingress for an SG: for every resource it is attached to,
+  // allow the SGs of whoever sends that resource traffic, on the target's port
+  // (ALB SG → app:80, app SG → rds:3306, …). ADR 0055.
+  const sgIngressFor = (sgId: string) => {
+    const rules: { fromSg: string; port: number; desc: string }[] = []
+    const seen = new Set<string>()
+    for (const attach of edges) {
+      if (attach.source !== sgId) continue // this SG's attachment edges (sg → resource)
+      const target = byId.get(attach.target)
+      if (!target) continue
+      const port = servicePort(target)
+      if (port === null) continue
+      for (const t of edges) {
+        if (t.target !== target.id) continue // traffic edges INTO the attached resource
+        const srcType = typeOf(t.source)
+        if (srcType === undefined || srcType === 'sg' || srcType === 'cloudwatch' || srcType === 'rds') {
+          continue
+        }
+        for (const ssg of attachedSGs(t.source)) {
+          const key = `${ssg}:${port}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          rules.push({ fromSg: ssg, port, desc: `from ${srcType} on ${port}` })
+        }
+      }
+    }
+    return rules
+  }
+
   const subnetsIn = (vpcId: string) =>
     nodes.filter((n) => n.data.type === 'subnet' && vpcOf(n)?.id === vpcId)
   /** One subnet per distinct AZ (EFS mount targets are unique per AZ). */
@@ -158,6 +204,7 @@ export function generateTerraform(
             node.data.type === 'apigw'
               ? firstTargetOf(node.id, ['lambda'])?.name
               : undefined,
+          sgIngress: node.data.type === 'sg' ? sgIngressFor(node.id) : undefined,
           subscribers:
             node.data.type === 'sns' ? targetsOf(node.id, ['sqs', 'lambda']) : undefined,
           monitorTargets:
@@ -225,11 +272,14 @@ export function generateTerraform(
       }
     }
 
-    // DB subnet group (RDS requires subnets across ≥2 AZs — enforced by checks).
+    // DB subnet group — PRIVATE subnets only (a DB must never land in a public
+    // subnet); fall back to all subnets only if the VPC has no private ones
+    // (ADR 0055). RDS still requires ≥2 AZs — enforced by checks.
     if (hasRds && vSubnets.length > 0) {
+      const dbSubnets = privateSubnets.length >= 2 ? privateSubnets : vSubnets
       derived.push(`resource "aws_db_subnet_group" "${v}_dbsg" {
   name_prefix = "${awsName(vpc.id).toLowerCase()}-"
-  subnet_ids  = [${vSubnets.map((s) => `aws_subnet.${tfName(s.id)}.id`).join(', ')}]
+  subnet_ids  = [${dbSubnets.map((s) => `aws_subnet.${tfName(s.id)}.id`).join(', ')}]
 }`)
     }
 
@@ -243,8 +293,6 @@ export function generateTerraform(
   }
 
   const hasType = (t: ResourceType) => nodes.some((n) => n.data.type === t)
-  // A replica inherits credentials — db_password is only for primaries.
-  const hasPrimaryRds = nodes.some((n) => n.data.type === 'rds' && !isReplica(n))
   const needsAmiLookup = nodes.some(
     (n) =>
       n.data.type === 'ec2' &&
@@ -304,13 +352,8 @@ ${dataBlocks}${blocks.join('\n\n')}${derived.length ? '\n\n# --- Derived network
   default     = "ap-northeast-2"
 }`,
   ]
-  if (hasPrimaryRds) {
-    vars.push(`variable "db_password" {
-  type        = string
-  description = "Master password for RDS (pass with -var or TF_VAR_db_password)"
-  sensitive   = true
-}`)
-  }
+  // RDS credentials are now managed by AWS Secrets Manager
+  // (`manage_master_user_password`) — no db_password variable / plaintext (ADR 0055).
 
   // Outputs — the things an engineer immediately wants after apply.
   const outputs: string[] = []
@@ -450,15 +493,15 @@ Generated from your cidrunner canvas. This configuration is **apply-ready**:
 
 \`\`\`bash
 terraform init
-terraform plan${hasType('rds') ? ' -var db_password=YOUR_SECURE_PASSWORD' : ''}
-terraform apply${hasType('rds') ? ' -var db_password=YOUR_SECURE_PASSWORD' : ''}
+terraform plan
+terraform apply
 \`\`\`
 
 Notes:
 - EC2 AMIs set to \`auto\` resolve to the latest Amazon Linux 2023 via a data source.
 - Route tables and associations are derived from your topology (IGW → public,
   NAT → private).
-${hasType('rds') ? '- RDS requires `db_password` (no default; it is marked sensitive).\n- The DB subnet group spans the subnets of the VPC that contains the RDS.\n' : ''}${hasType('lambda') ? '- Lambda ships an inline hello-world package (archive provider) and an IAM\n  execution role.\n' : ''}${hasType('apigw') ? '- API Gateway proxies to the Lambda it is connected to (apigw → lambda edge)\n  via an AWS_PROXY `{proxy+}` integration — the invoke URL is in the outputs.\n' : ''}- **Cost warning**: NAT Gateway, ALB, and RDS bill hourly. \`terraform destroy\`
+${hasType('rds') ? '- RDS credentials are managed by AWS Secrets Manager (`manage_master_user_password`)\n  — no plaintext password. The DB subnet group spans the VPC\'s PRIVATE subnets;\n  Security Groups allow the app tier in on the DB port.\n' : ''}${hasType('lambda') ? '- Lambda ships an inline hello-world package (archive provider) and an IAM\n  execution role.\n' : ''}${hasType('apigw') ? '- API Gateway proxies to the Lambda it is connected to (apigw → lambda edge)\n  via an AWS_PROXY `{proxy+}` integration — the invoke URL is in the outputs.\n' : ''}- **Cost warning**: NAT Gateway, ALB, and RDS bill hourly. \`terraform destroy\`
   when you are done.
 `
 

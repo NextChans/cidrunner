@@ -24,9 +24,10 @@ describe('generateTerraform', () => {
     expect(main).toMatch(/security_groups\s+= \[aws_security_group\.sg_7\.id\]/)
     expect(main).toContain('vpc_security_group_ids = [aws_security_group.sg_7.id]')
 
-    // Sensitive variable and outputs.
-    expect(files['variables.tf']).toContain('variable "db_password"')
-    expect(files['variables.tf']).not.toContain('default   = "ChangeMe')
+    // Credentials are RDS-managed (Secrets Manager) — no db_password variable (ADR 0055).
+    expect(files['variables.tf']).not.toContain('variable "db_password"')
+    expect(main).toContain('manage_master_user_password = true')
+    expect(main).not.toContain('var.db_password')
     expect(files['outputs.tf']).toContain('output "alb_8_dns_name"')
     expect(files['outputs.tf']).toContain('output "lambda_12_function_arn"')
 
@@ -54,7 +55,8 @@ describe('generateTerraform', () => {
     expect(replicaBlock).not.toContain('db_subnet_group_name')
 
     const primaryBlock = main.split('resource "aws_db_instance" "rds_1"')[1]?.split('\n}')[0] ?? ''
-    expect(primaryBlock).toContain('password            = var.db_password')
+    expect(primaryBlock).toContain('manage_master_user_password = true')
+    expect(primaryBlock).toContain('backup_retention_period     = 7')
   })
 
   it('honours a hand-set AMI and skips the lookup when unused', () => {
@@ -125,6 +127,45 @@ describe('generateTerraform', () => {
     const subnetBlock = main.split('resource "aws_subnet" "subnet_1"')[1]?.split('\n}')[0] ?? ''
     expect(subnetBlock).toContain('vpc_id                  = aws_vpc.vpc_1.id')
     expect(main).not.toContain('REPLACE_ME')
+  })
+
+  it('wires tiered SG ingress and a private DB subnet group (ADR 0055)', () => {
+    const nodes = [
+      N('vpc', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+      N('pa', 'subnet', 'vpc', { cidr_block: '10.0.1.0/24', az: 'a', public: true }),
+      N('pb', 'subnet', 'vpc', { cidr_block: '10.0.2.0/24', az: 'b', public: true }),
+      N('da', 'subnet', 'vpc', { cidr_block: '10.0.3.0/24', az: 'a', public: false }),
+      N('db2', 'subnet', 'vpc', { cidr_block: '10.0.4.0/24', az: 'b', public: false }),
+      N('igw', 'igw', 'vpc', {}),
+      N('sgweb', 'sg', 'vpc', { allow_http: true, allow_https: true, allow_ssh: false }),
+      N('sgapp', 'sg', 'vpc', { allow_http: false, allow_https: false, allow_ssh: false }),
+      N('sgdb', 'sg', 'vpc', { allow_http: false, allow_https: false, allow_ssh: false }),
+      N('alb', 'alb', 'vpc', { internal: false, listener_port: 80 }),
+      N('ec2', 'ec2', 'da', { instance_type: 't3.micro', ami: 'auto' }),
+      N('rds', 'rds', 'db2', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true }),
+    ]
+    const edges = [
+      E('a1', 'sgweb', 'alb'), E('a2', 'sgapp', 'ec2'), E('a3', 'sgdb', 'rds'),
+      E('t1', 'alb', 'ec2'), E('t2', 'ec2', 'rds'),
+    ]
+    const main = generateTerraform(nodes, edges)['main.tf']!
+    const block = (id: string) =>
+      main.split(`resource "aws_security_group" "${id}"`)[1]?.split('\nresource ')[0] ?? ''
+
+    // App SG lets the ALB SG in on :80; DB SG lets the app SG in on :3306.
+    const app = block('sgapp')
+    expect(app).toContain('from_port       = 80')
+    expect(app).toContain('security_groups = [aws_security_group.sgweb.id]')
+    const db = block('sgdb')
+    expect(db).toContain('from_port       = 3306')
+    expect(db).toContain('security_groups = [aws_security_group.sgapp.id]')
+
+    // DB subnet group spans only the PRIVATE subnets.
+    const dbsg = main.split('resource "aws_db_subnet_group"')[1]?.split('\n}')[0] ?? ''
+    expect(dbsg).toContain('aws_subnet.da.id')
+    expect(dbsg).toContain('aws_subnet.db2.id')
+    expect(dbsg).not.toContain('aws_subnet.pa.id')
+    expect(dbsg).not.toContain('aws_subnet.pb.id')
   })
 
   it('omits rds-only artifacts when the graph has no primary RDS', () => {
