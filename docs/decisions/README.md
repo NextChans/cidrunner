@@ -82,3 +82,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0055](0055-terraform-apply-wiring.md) | Terraform 동작·배치 결함 수정 — 티어드 SG · 프라이빗 배치 · SM 관리형 자격증명 (TF 리뷰, extends 0016·0017·0025) | Accepted | 2026-07-09 |
 | [0056](0056-security-attachment-wiring-and-readiness-manifest.md) | 보안 attachment 배선(HTTPS·WAF·Cognito authorizer)과 프로덕션 준비도 manifest (TF 리뷰 재분류, extends 0035·0046·0055) | Accepted | 2026-07-09 |
 | [0057](0057-ops-challenge-star-gates.md) | 운영 챌린지 티어 — 비용·카오스를 별점 게이트로 (extends 0051-0053) | Accepted | 2026-07-09 |
+| [0058](0058-playback-audio.md) | 재생 사운드 — 홉 틱·도착 차임·차단 버즈, Web Audio 합성 (extends 0012·0047-0049) | Accepted | 2026-07-09 |

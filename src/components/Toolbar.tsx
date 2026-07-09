@@ -11,6 +11,8 @@ import {
   FileUp,
   Undo2,
   Redo2,
+  Volume2,
+  VolumeX,
   Keyboard,
   Trophy,
   Images,
@@ -46,6 +48,8 @@ export function Toolbar() {
   const running = useGraphStore((s) => s.simulation !== null)
   const runSimulation = useGraphStore((s) => s.runSimulation)
   const stopSimulation = useGraphStore((s) => s.stopSimulation)
+  const soundOn = useGraphStore((s) => s.soundOn)
+  const toggleSound = useGraphStore((s) => s.toggleSound)
   const setNotice = useGraphStore((s) => s.setNotice)
   const loadDesign = useGraphStore((s) => s.loadDesign)
   const setShortcutHelp = useGraphStore((s) => s.setShortcutHelp)
@@ -125,6 +129,16 @@ export function Toolbar() {
       >
         {running ? <Square size={14} /> : <Play size={14} />}
         {running ? '중지' : '시작'}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => toggleSound()}
+        className={iconBtn}
+        title={soundOn ? '재생 사운드 끄기' : '재생 사운드 켜기'}
+        aria-pressed={soundOn}
+      >
+        {soundOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
       </button>
 
       <button type="button" onClick={() => reset()} className={iconBtn}>

@@ -7,6 +7,7 @@ import { Palette, PaletteBody } from './Palette'
 import { Canvas } from './Canvas'
 import { Inspector, InspectorBody } from './Inspector'
 import { MissionList } from './MissionPanel'
+import { SimAudio } from './SimAudio'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useGraphStore } from '@/store/useGraphStore'
 
@@ -29,6 +30,7 @@ export function Layout() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface text-slate-200">
+      <SimAudio />
       <header className="flex items-center justify-between border-b border-surface-border bg-surface-raised px-4 py-2.5">
         <div className="flex items-center gap-2">
           <Waves size={20} className="text-accent" />
