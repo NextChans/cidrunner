@@ -24,6 +24,37 @@ describe('share', () => {
     expect(design!.nodes.find((n) => n.id === 'rds-10')?.data.config.engine).toBe('mysql')
   })
 
+  it('restores a resized container to its resized size, not its created size', () => {
+    // A NodeResizer resize writes the new size to top-level width/height (and
+    // `measured`), leaving the original `style` stale. sanitizeSnapshot must
+    // keep the resized size so children are not clamped into a shrunken box.
+    const vpc = {
+      id: 'vpc-1',
+      type: 'resource',
+      position: { x: 0, y: 0 },
+      style: { width: 480, height: 340 }, // original created size (stale)
+      width: 900, // resized (top-level, what RF writes)
+      height: 700,
+      measured: { width: 900, height: 700 },
+      data: { type: 'vpc', label: 'VPC', config: { cidr_block: '10.0.0.0/16' } },
+    }
+    const clean = sanitizeSnapshot({ v: 1, nodes: [vpc], edges: [] })
+    expect(clean).not.toBeNull()
+    expect(clean!.nodes[0]!.style).toEqual({ width: 900, height: 700 })
+  })
+
+  it('falls back to the style size for a container that was never resized', () => {
+    const vpc = {
+      id: 'vpc-1',
+      type: 'resource',
+      position: { x: 0, y: 0 },
+      style: { width: 480, height: 340 },
+      data: { type: 'vpc', label: 'VPC', config: { cidr_block: '10.0.0.0/16' } },
+    }
+    const clean = sanitizeSnapshot({ v: 1, nodes: [vpc], edges: [] })
+    expect(clean!.nodes[0]!.style).toEqual({ width: 480, height: 340 })
+  })
+
   it('carries mission context and drops unknown mission ids', () => {
     const { nodes, edges } = bestPracticeTopology()
     const withMission = designFromHash(packHash(toSnapshot(nodes, edges, 'three-tier')))

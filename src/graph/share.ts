@@ -66,6 +66,10 @@ export function encodeShareUrl(
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 
+/** First finite number among the candidates, or undefined. */
+const firstNum = (...vals: unknown[]): number | undefined =>
+  vals.find((v): v is number => typeof v === 'number' && Number.isFinite(v))
+
 /**
  * Validates and rebuilds a snapshot from untrusted JSON. Returns null when the
  * shape is unusable; unknown fields are dropped.
@@ -104,8 +108,21 @@ export function sanitizeSnapshot(raw: unknown): LoadedDesign | null {
       node.parentId = n.parentId
       node.extent = 'parent'
     }
+    // Restore a container's size. A NodeResizer resize writes the new dimensions
+    // to the node's top-level `width`/`height` (and `measured`) — NOT to `style`
+    // — so reading only `style` reverted a resized container to its original
+    // created size on reload, clamping its `extent: 'parent'` children into the
+    // smaller box (the "sizes reset + resources jumbled after refresh" bug).
+    // Prefer the resized top-level/measured size, falling back to the created
+    // `style` size. Only containers carry an authored size; leaf cards size to
+    // their content, so never pin their dimensions.
     const style = (n.style ?? {}) as Record<string, unknown>
-    if (isNum(style.width) && isNum(style.height)) {
+    if (resources[type].container) {
+      const measured = (n.measured ?? {}) as Record<string, unknown>
+      const w = firstNum(n.width, style.width, measured.width)
+      const h = firstNum(n.height, style.height, measured.height)
+      if (w !== undefined && h !== undefined) node.style = { width: w, height: h }
+    } else if (isNum(style.width) && isNum(style.height)) {
       node.style = { width: style.width, height: style.height }
     }
     nodes.push(node)
