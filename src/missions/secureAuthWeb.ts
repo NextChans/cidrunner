@@ -1,5 +1,5 @@
 import type { Mission } from './types'
-import { scopedSecurityOk } from './scope'
+import { liveChain, scopedSecurityOk } from './scope'
 
 export const secureAuthWeb: Mission = {
   id: 'secure-auth-web',
@@ -12,24 +12,14 @@ export const secureAuthWeb: Mission = {
   // ★1 CF→ALB→EC2→RDS 도달 + 보안 스택(Cognito/Secrets/ACM/WAF) 존재
   // ★2 설정 오류 없음 · ★3 보안 경고 0
   check: (ctx) => {
-    const { nodes, sim, allValid } = ctx
-    const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
+    const { nodes, allValid } = ctx
     const has = (t: string) => nodes.some((n) => n.data.type === t)
-    const flow = sim.flows.find((f) => {
-      const path = f.pathNodeIds.map(typeOf)
-      return (
-        f.ok &&
-        path[0] === 'cloudfront' &&
-        path.includes('alb') &&
-        path.includes('ec2') &&
-        path[path.length - 1] === 'rds'
-      )
-    })
-    if (!flow) return 0
+    const chain = liveChain(ctx, ['cloudfront', 'alb', 'ec2', 'rds'])
+    if (!chain) return 0
     if (!has('cognito') || !has('secretsmanager') || !has('acm') || !has('waf')) return 0
     let stars = 1
     if (allValid) stars += 1
-    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
+    if (scopedSecurityOk(ctx, chain)) stars += 1
     return stars
   },
 }

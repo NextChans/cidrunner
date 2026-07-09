@@ -1,5 +1,5 @@
 import type { Mission } from './types'
-import { scopedSecurityOk } from './scope'
+import { liveChain, scopedSecurityOk } from './scope'
 
 export const dataPipeline: Mission = {
   id: 'data-pipeline',
@@ -11,21 +11,11 @@ export const dataPipeline: Mission = {
   requiredResources: ['kinesis', 'lambda', 's3'],
   // ★1 Kinesis→Lambda→S3 도달 · ★2 설정 오류 없음 · ★3 보안 경고 0
   check: (ctx) => {
-    const { nodes, sim, allValid } = ctx
-    const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
-    const flow = sim.flows.find((f) => {
-      const path = f.pathNodeIds.map(typeOf)
-      return (
-        f.ok &&
-        path[0] === 'kinesis' &&
-        path.includes('lambda') &&
-        path[path.length - 1] === 's3'
-      )
-    })
-    if (!flow) return 0
+    const chain = liveChain(ctx, ['kinesis', 'lambda', 's3'])
+    if (!chain) return 0
     let stars = 1
-    if (allValid) stars += 1
-    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
+    if (ctx.allValid) stars += 1
+    if (scopedSecurityOk(ctx, chain)) stars += 1
     return stars
   },
 }
