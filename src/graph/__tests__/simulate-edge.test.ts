@@ -61,6 +61,19 @@ describe('simulate — backtracking traversal (QA-002)', () => {
     )
   })
 
+  it('enumerates one route per reachable sink when an entry forks', () => {
+    // CloudFront → S3, and CloudFront → ALB → EC2 → RDS: the banner must list
+    // BOTH destinations, not just the first sink the DFS reaches.
+    const sim = simulate(
+      [N('cf', 'cloudfront'), N('s31', 's3'), N('alb1', 'alb'), N('ec21', 'ec2'), N('rds1', 'rds')],
+      [E('o1', 'cf', 's31'), E('o2', 'cf', 'alb1'), E('t1', 'alb1', 'ec21'), E('t2', 'ec21', 'rds1')],
+    )
+    expect(sim.ok).toBe(true)
+    expect(sim.flows).toHaveLength(2)
+    const sinks = sim.flows.map((f) => f.pathNodeIds[f.pathNodeIds.length - 1]).sort()
+    expect(sinks).toEqual(['rds1', 's31'])
+  })
+
   it('an SG-only inbound does not disqualify an ALB from being an entry', () => {
     // sg → alb is an attachment; the ALB is still the traffic entry (and here,
     // blocked because it has no traffic target).
