@@ -22,6 +22,7 @@
 - **읽기 복제본 승격** — 죽은 **단일-AZ** 마스터가 살아있는 다른 AZ에 읽기 복제본(rds → rds 엣지)을 가지면, 복제본을 **승격**(`promotedIds`)하고 **마스터를 향하던 요청 트래픽 엣지를 복제본으로 재라우팅**(`edges` 재작성). UI는 **⬆ 승격** 배지 + 승격된 복제본이 경로에 초록으로 활성.
 - 시뮬은 `simulate(nodes, faultEdges, { deadNodeIds, failoverIds, promotedIds })`로 재라우팅된 엣지 + 죽은 집합을 받아 기존 백트래킹 도달성으로 생존/차단 판정. `SimResult`에 `failoverNodeIds`·`promotedNodeIds` 에코(렌더용).
 - 스토어의 `runWithChaos`가 `chaosAz` 활성 시 `applyAzFault`를 적용.
+- **캔버스도 재라우팅된 엣지를 렌더**(ADR 0053 후속) — [Canvas.tsx](../../src/components/Canvas.tsx)의 `renderedEdges`가 chaos 중엔 `applyAzFault().edges`를 사용해, 트래픽 엣지 지오메트리가 죽은 마스터가 아니라 승격된 복제본으로 향한다(초록 하이라이트와 시각이 일치). 정상 시엔 기존 사용자 엣지 렌더.
 
 ## Consequences
 
