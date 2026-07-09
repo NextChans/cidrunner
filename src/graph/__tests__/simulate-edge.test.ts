@@ -145,6 +145,30 @@ describe('simulate — traffic viz metadata', () => {
     expect(sim.blockedNodeIds).toContain('ec2b')
   })
 
+  it('streams a replication arrival to a reached primary’s read replica', () => {
+    // alb → ec2 → rds(primary), rds → rds(replica). Once traffic lands on the
+    // primary, the replica gets an arrival one hop later.
+    const sim = simulate(
+      [N('alb1', 'alb'), N('ec21', 'ec2'), N('rds1', 'rds'), N('rds2', 'rds')],
+      [E('e1', 'alb1', 'ec21'), E('e2', 'ec21', 'rds1'), E('r1', 'rds1', 'rds2')],
+    )
+    expect(sim.ok).toBe(true)
+    // Primary reached at hop 2 (0.9s); replica one hop later.
+    expect(sim.arrivals['rds1']).toBeCloseTo(0.9)
+    expect(sim.replicaArrivals['rds2']).toBeCloseTo(0.9 + 0.45)
+    // The replica is not a request-traffic node.
+    expect(sim.pathNodeIds).not.toContain('rds2')
+  })
+
+  it('does not stream replication when the primary is never reached', () => {
+    // No entry reaches the primary → no replication flow.
+    const sim = simulate(
+      [N('rds1', 'rds'), N('rds2', 'rds')],
+      [E('r1', 'rds1', 'rds2')],
+    )
+    expect(sim.replicaArrivals['rds2']).toBeUndefined()
+  })
+
   it('marks edges ok on a successful flow and blocked on a failed one', () => {
     const ok = simulate(
       [N('alb1', 'alb'), N('ec21', 'ec2'), N('rds1', 'rds')],

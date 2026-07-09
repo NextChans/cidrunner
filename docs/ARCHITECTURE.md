@@ -260,7 +260,10 @@ carries a continuous violet `lb-pulse`
 **directional in/out effects** — an expanding ring where traffic leaves the
 source, a converging ring where it arrives at the target — tinted green on a
 reachable path and red on a blocked one via `edgeStatus`
-([ADR 0049](decisions/0049-edge-inout-visual-effects.md)).
+([ADR 0049](decisions/0049-edge-inout-visual-effects.md)). When request data
+lands on a primary RDS, `replicaArrivals` streams an **indigo** replication flow
+along each `rds → rds` edge to its read replica (particle + arrival pulse),
+distinct from the green request traffic (ADR 0019 + 0049).
 
 **Internet ingress gate** — when a trace reaches an internet-facing ALB
 (`internal !== true`) that sits inside a VPC, the flow only continues if that
