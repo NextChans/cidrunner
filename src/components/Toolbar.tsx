@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { redoDesign, undoDesign, useGraphStore, type Mode } from '@/store/useGraphStore'
 import { downloadTerraformZip } from '@/graph/terraform'
+import { getGraphIssues } from '@/graph/checks'
 import { encodeShareUrl, sanitizeSnapshot, toSnapshot } from '@/graph/share'
 
 const MODES: Mode[] = ['free', 'challenge']
@@ -186,6 +187,19 @@ export function Toolbar() {
         type="button"
         onClick={() => {
           const { nodes, edges } = useGraphStore.getState()
+          // Apply-ready contract (QA-001 / ADR 0045): a graph error means the
+          // export would emit REPLACE_ME markers (e.g. an orphaned resource with
+          // no parent reference), so block export until the design validates.
+          const errorCount = [...getGraphIssues(nodes, edges).errors.values()].reduce(
+            (sum, msgs) => sum + msgs.length,
+            0,
+          )
+          if (errorCount > 0) {
+            setNotice(
+              `설계에 오류 ${errorCount}건이 있어 Terraform으로 내보낼 수 없습니다. 빨간 오류를 먼저 해결하세요.`,
+            )
+            return
+          }
           void downloadTerraformZip(nodes, edges)
         }}
         className={iconBtn}

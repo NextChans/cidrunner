@@ -69,3 +69,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0042](0042-sg-attach-rules.md) | Security Group 부착 규칙 — sgAttachable 정정 · 경고 정합 (extends 0017) | Accepted | 2026-07-09 |
 | [0043](0043-derived-visual-edges.md) | 파생 시각 엣지 — 엔진 소유 IGW → 퍼블릭 Subnet 점선 (extends 0039) | Accepted | 2026-07-09 |
 | [0044](0044-alb-fallback-cleanup.md) | ALB 서브넷 fallback 정리 — dead-path 명시화 (extends 0016) | Accepted | 2026-07-09 |
+| [0045](0045-containment-legality-validation.md) | Containment-legality 상시 검증 — 부모 없는 불법 배치 감지 (QA-001 hotfix, extends 0017·0038·0040) | Accepted | 2026-07-09 |
