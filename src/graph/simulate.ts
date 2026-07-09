@@ -79,6 +79,18 @@ export interface SimResult {
    * normal run.
    */
   deadNodeIds: string[]
+  /**
+   * Chaos mode (ADR 0053): Multi-AZ RDS instances that rode out the AZ failure
+   * via automatic failover to their standby — same endpoint, no promotion. Shown
+   * with a ⚡ failover badge so a surviving DB inside a downed AZ reads clearly.
+   */
+  failoverNodeIds: string[]
+  /**
+   * Chaos mode (ADR 0053): read replicas promoted to primary because their
+   * single-AZ master died with the AZ; request traffic that targeted the dead
+   * master is rerouted here. Shown with a promotion badge.
+   */
+  promotedNodeIds: string[]
 }
 
 /** Types that terminate a successful request (the "DB / storage" tier). */
@@ -357,6 +369,10 @@ export interface SimOptions {
    * while redundant designs survive.
    */
   deadNodeIds?: ReadonlySet<string>
+  /** Multi-AZ RDS that survived via failover — echoed to the result (ADR 0053). */
+  failoverIds?: readonly string[]
+  /** Read replicas promoted to primary — echoed to the result (ADR 0053). */
+  promotedIds?: readonly string[]
 }
 
 /** Runs the simulation over the whole graph: one flow per entry point. */
@@ -367,6 +383,8 @@ export function simulate(
 ): SimResult {
   const dead = opts.deadNodeIds ?? new Set<string>()
   const deadNodeIds = [...dead]
+  const failoverNodeIds = [...(opts.failoverIds ?? [])]
+  const promotedNodeIds = [...(opts.promotedIds ?? [])]
   // Chaos mode: a downed node is treated as absent — it cannot be an entry, a
   // hop, or a sink, and edges touching it carry nothing.
   if (dead.size) {
@@ -408,6 +426,8 @@ export function simulate(
       edgeStatus: {},
       replicaArrivals: {},
       deadNodeIds,
+      failoverNodeIds,
+      promotedNodeIds,
     }
   }
 
@@ -581,5 +601,7 @@ export function simulate(
     edgeStatus,
     replicaArrivals,
     deadNodeIds,
+    failoverNodeIds,
+    promotedNodeIds,
   }
 }

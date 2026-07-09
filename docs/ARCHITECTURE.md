@@ -207,6 +207,11 @@ injected AZ failure (`deadNodesForAz`; a Multi-AZ RDS fails over and survives),
 which `simulate(nodes, edges, { deadNodeIds })` removes before tracing — so the
 existing reachability search reports survive/down. The counterweight to Budget:
 a single-AZ build is cheaper but goes dark, a redundant one costs more but holds.
+RDS models both real recovery patterns ([ADR 0053](decisions/0053-chaos-rds-failover-and-promotion.md)):
+a **Multi-AZ** instance rides out the failure via failover (same endpoint — ⚡
+badge), while a dead **single-AZ** master is replaced by **promoting** a read
+replica in a surviving AZ and rerouting its traffic (⬆ badge) — `applyAzFault`
+computes the dead set, failovers, promotions, and rewired edges.
 
 ## Graph rules
 
