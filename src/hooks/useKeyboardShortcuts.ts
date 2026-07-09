@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { downloadTerraformZip } from '@/graph/terraform'
+import { PALETTE_SEARCH_ID } from '@/components/Palette'
 import { redoDesign, undoDesign, useGraphStore } from '@/store/useGraphStore'
 
 /** True when the user is typing in a form control (skip global shortcuts). */
@@ -31,6 +32,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
  * | R                         | fit view                       |
  * | S                         | start / stop traffic sim       |
  * | E                         | export Terraform (.tf zip)     |
+ * | /                         | focus palette search           |
  * | ?                         | toggle shortcut help           |
  */
 export function useKeyboardShortcuts() {
@@ -78,6 +80,16 @@ export function useKeyboardShortcuts() {
       if (key === '?') {
         e.preventDefault()
         store.setShortcutHelp(!store.showShortcutHelp)
+        return
+      }
+      // `/` jumps focus to the palette search (ADR 0037). Only the desktop
+      // aside claims the id; on mobile the palette lives in a drawer instead.
+      if (key === '/') {
+        const input = document.getElementById(PALETTE_SEARCH_ID)
+        if (input) {
+          e.preventDefault()
+          input.focus()
+        }
         return
       }
       switch (lower) {

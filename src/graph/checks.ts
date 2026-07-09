@@ -221,6 +221,16 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
         push(warnings, node.id, '모니터링할 대상이 연결되어 있지 않습니다 (엣지로 연결).')
       }
     }
+
+    // A Kinesis stream needs a Lambda consumer to do anything with the data.
+    if (t === 'kinesis') {
+      const hasConsumer = edges.some(
+        (e) => e.source === node.id && byId.get(e.target)?.data.type === 'lambda',
+      )
+      if (!hasConsumer) {
+        push(warnings, node.id, '스트림을 소비할 Lambda가 연결되어 있지 않습니다.')
+      }
+    }
   }
 
   // VPC-to-VPC CIDR overlap: AWS allows it, so it is not an error (ADR 0015),

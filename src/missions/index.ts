@@ -9,6 +9,8 @@ import { containerWorkload } from './containerWorkload'
 import { globalWeb } from './globalWeb'
 import { eventDriven } from './eventDriven'
 import { disasterRecovery } from './disasterRecovery'
+import { dataPipeline } from './dataPipeline'
+import { secureAuthWeb } from './secureAuthWeb'
 
 /** Ordered list of missions shown in the MissionPanel. */
 export const missions: Mission[] = [
@@ -22,6 +24,8 @@ export const missions: Mission[] = [
   eventDriven,
   securityHardening,
   disasterRecovery,
+  dataPipeline,
+  secureAuthWeb,
 ]
 
 export function getMission(id: string): Mission | undefined {

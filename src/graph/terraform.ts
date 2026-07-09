@@ -24,9 +24,9 @@ function awsName(id: string): string {
 
 /** Emit order so the file reads network-outward. */
 const ORDER: ResourceType[] = [
-  'vpc', 'subnet', 'igw', 'nat', 'sg', 'efs', 'alb', 'ec2', 'ecs', 'eks',
-  'rds', 'elasticache', 's3', 'dynamodb', 'sqs', 'sns', 'lambda', 'cloudwatch',
-  'cloudfront', 'route53',
+  'vpc', 'subnet', 'igw', 'nat', 'sg', 'kms', 'acm', 'cognito', 'secretsmanager',
+  'efs', 'alb', 'ec2', 'ecs', 'eks', 'rds', 'elasticache', 's3', 'dynamodb',
+  'kinesis', 'sqs', 'sns', 'lambda', 'cloudwatch', 'waf', 'cloudfront', 'route53',
 ]
 
 function ancestorOfType(
@@ -74,9 +74,10 @@ export function generateTerraform(
     )
     return e ? { kind: typeOf(e.target) as ResourceType, name: tfName(e.target) } : undefined
   }
-  const sqsConsumers = (sqsId: string) =>
+  // Lambda consumers of a queue or stream (sqs → lambda, kinesis → lambda).
+  const lambdaConsumers = (sourceId: string) =>
     edges
-      .filter((e) => e.source === sqsId && typeOf(e.target) === 'lambda')
+      .filter((e) => e.source === sourceId && typeOf(e.target) === 'lambda')
       .map((e) => tfName(e.target))
   const lambdaSqsSources = (lambdaId: string) =>
     edges
@@ -141,8 +142,15 @@ export function generateTerraform(
             node.data.type === 'route53'
               ? firstTargetOf(node.id, ['cloudfront', 'alb'])
               : undefined,
-          consumers: node.data.type === 'sqs' ? sqsConsumers(node.id) : undefined,
+          consumers:
+            node.data.type === 'sqs' || node.data.type === 'kinesis'
+              ? lambdaConsumers(node.id)
+              : undefined,
           sqsSources: node.data.type === 'lambda' ? lambdaSqsSources(node.id) : undefined,
+          kmsKey:
+            node.data.type === 'secretsmanager'
+              ? firstTargetOf(node.id, ['kms'])?.name
+              : undefined,
           subscribers:
             node.data.type === 'sns' ? targetsOf(node.id, ['sqs', 'lambda']) : undefined,
           monitorTargets:
@@ -383,6 +391,42 @@ ${dataBlocks}${blocks.join('\n\n')}${derived.length ? '\n\n# --- Derived network
       outputs.push(`output "${name}_log_group" {
   description = "${n.data.label} log group name"
   value       = aws_cloudwatch_log_group.${name}.name
+}`)
+    }
+    if (n.data.type === 'kinesis') {
+      outputs.push(`output "${name}_stream_arn" {
+  description = "${n.data.label} stream ARN"
+  value       = aws_kinesis_stream.${name}.arn
+}`)
+    }
+    if (n.data.type === 'cognito') {
+      outputs.push(`output "${name}_user_pool_id" {
+  description = "${n.data.label} user pool id"
+  value       = aws_cognito_user_pool.${name}.id
+}`)
+    }
+    if (n.data.type === 'kms') {
+      outputs.push(`output "${name}_key_arn" {
+  description = "${n.data.label} key ARN"
+  value       = aws_kms_key.${name}.arn
+}`)
+    }
+    if (n.data.type === 'secretsmanager') {
+      outputs.push(`output "${name}_secret_arn" {
+  description = "${n.data.label} secret ARN"
+  value       = aws_secretsmanager_secret.${name}.arn
+}`)
+    }
+    if (n.data.type === 'acm') {
+      outputs.push(`output "${name}_certificate_arn" {
+  description = "${n.data.label} certificate ARN"
+  value       = aws_acm_certificate.${name}.arn
+}`)
+    }
+    if (n.data.type === 'waf') {
+      outputs.push(`output "${name}_web_acl_arn" {
+  description = "${n.data.label} web ACL ARN"
+  value       = aws_wafv2_web_acl.${name}.arn
 }`)
     }
   }

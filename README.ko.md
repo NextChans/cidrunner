@@ -42,18 +42,18 @@
 
 ## 컨셉
 
-- **블록형 에디터** — 카테고리(네트워킹/컴퓨팅/데이터베이스/스토리지/보안)로 정리된 팔레트와 실제 AWS 규칙을 따르는 중첩·연결.
+- **블록형 에디터** — 카테고리(네트워킹/컴퓨팅/데이터베이스/스토리지/앱 통합/관리·모니터링/보안·아이덴티티)로 정리된 팔레트와 실제 AWS 규칙을 따르는 중첩·연결. 상단 검색으로 실시간 필터(debounce), `/` 키로 포커스. [ADR 0037](docs/decisions/0037-palette-search.md) 참고.
 - **보안이 곧 게임** — Security Group을 엣지로 그려서 연결하고, 암호화·퍼블릭 차단 토글을 다룹니다. 위험한 구성은 주황 경고로 표시됩니다.
 - **트래픽 재생** — Start를 누르면 모든 플로우(ALB → EC2 → RDS, Lambda → S3 …)가 파티클과 도착 펄스로 재생되고, 막힌 경로는 병목 노드가 하이라이트됩니다.
-- **미션 & 자유 모드** — 베스트 프랙티스 챌린지 10종(튜토리얼 / 고가용성 3-tier / 서버리스 / 글로벌 정적 웹 / 비동기 파이프라인 / 컨테이너 워크로드 / 글로벌 동적 웹 / 이벤트 드리븐 팬아웃 / 시큐리티 하드닝 / 재난 복구)과 별점(0–3), 또는 자유 샌드박스.
+- **미션 & 자유 모드** — 베스트 프랙티스 챌린지 12종(튜토리얼 / 고가용성 3-tier / 서버리스 / 글로벌 정적 웹 / 비동기 파이프라인 / 컨테이너 워크로드 / 글로벌 동적 웹 / 이벤트 드리븐 팬아웃 / 시큐리티 하드닝 / 재난 복구 / 데이터 파이프라인 / 보안·인증 웹)과 별점(0–3), 또는 자유 샌드박스.
 - **저장 & 공유** — 설계가 브라우저에 자동 저장되어 새로고침에도 유지되고, URL 하나 또는 JSON 파일로 공유됩니다(미션 컨텍스트 포함, 불러오기 전 기존 작업 확인). 계정·백엔드 불필요. 공유 링크는 Open Graph·Twitter Card 미리보기 이미지를 함께 노출합니다. [ADR 0031](docs/decisions/0031-og-image-and-share-metadata.md) 참고.
 - **갤러리** — 여러 설계를 이름 붙여 로컬 슬롯에 저장하고, 실시간 SVG 썸네일 카드 그리드에서 다시 엽니다. 이름 변경·삭제도 인라인으로. [ADR 0033](docs/decisions/0033-gallery-multi-slot.md) 참고.
 - **배지** — 플레이 진행도에서 순수하게 파생되는 배지 5종(첫 클리어·첫 3-star·첫 저장·미션 5개·전 미션 3-star)이 열립니다. [ADR 0032](docs/decisions/0032-achievements-and-badges.md) 참고.
 - **에디터 기본기** — undo/redo(Ctrl+Z, 제스처당 1스텝), 첫 방문 튜토리얼 안내, 미션별 별점 최고기록.
-- **키보드 단축키 & 컨텍스트 메뉴** — undo/redo(⌘Z / ⌘⇧Z)·복제(⌘D)·삭제·화면 맞춤(R)·시뮬(S)·내보내기(E)·도움말(?) 전역 단축키, 노드 우클릭으로 속성 편집 / 복제 / 엣지 지우기 / 부모 분리 / 삭제. [ADR 0028](docs/decisions/0028-keyboard-shortcuts-and-context-menu.md) 참고.
+- **키보드 단축키 & 컨텍스트 메뉴** — undo/redo(⌘Z / ⌘⇧Z)·복제(⌘D)·삭제·화면 맞춤(R)·시뮬(S)·내보내기(E)·리소스 검색 포커스(/)·도움말(?) 전역 단축키, 노드 우클릭으로 속성 편집 / 복제 / 엣지 지우기 / 부모 분리 / 삭제. [ADR 0028](docs/decisions/0028-keyboard-shortcuts-and-context-menu.md) 참고.
 - **인터랙티브 튜토리얼** — 첫 미션이 실시간 자가 점검 단계 목록을 보여주며, 설계를 진행하면 완료 단계가 꺼지고 다음 할 일이 강조됩니다. [ADR 0030](docs/decisions/0030-interactive-tutorial-steps.md) 참고.
 - **apply 가능한 Terraform 내보내기** — 라우트 테이블·DB Subnet Group·IAM·API Gateway까지 유도 생성된 `main.tf`/`variables.tf`/`outputs.tf`. `terraform apply` 하면 실제 리소스가 생성됩니다.
-- **리소스 20종** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda+API GW · RDS(+읽기 복제본) · ElastiCache · DynamoDB · S3 · EFS · SQS · SNS · CloudWatch · Security Group.
+- **리소스 26종** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda+API GW · RDS(+읽기 복제본) · ElastiCache · DynamoDB · S3 · EFS · Kinesis · SQS · SNS · CloudWatch · Security Group · Cognito · Secrets Manager · KMS · ACM · WAF. [ADR 0035](docs/decisions/0035-resource-expansion-3-security-and-streaming.md) 참고.
 - **모바일** — 인프라 편집은 데스크톱 우선 경험이지만, 좁은 화면(<768px)에서는 캔버스가 전체 화면을 차지하고 팔레트 / 인스펙터 / 미션이 오버레이 drawer로 이동해 폰에서도 프로젝트를 보고 데모할 수 있습니다. [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md) 참고.
 
 ## 로드맵
@@ -137,8 +137,8 @@ src/
 ├─ store/useGraphStore.ts   # Zustand — nodes / edges / mode
 ├─ components/              # Layout, Canvas, Palette, Inspector, MissionPanel, Toolbar
 │  └─ nodes/ResourceNode.tsx
-├─ resources/              # 리소스 20종 meta + 레지스트리 (apply-ready terraform 생성기)
-└─ missions/               # 미션 10종: 튜토리얼 / 3-tier / 서버리스 / 정적CDN / 비동기파이프라인 / 컨테이너 / 글로벌동적웹 / 이벤트드리븐 / 보안 / 재난복구
+├─ resources/              # 리소스 26종 meta + 레지스트리 (apply-ready terraform 생성기)
+└─ missions/               # 미션 12종: 튜토리얼 / 3-tier / 서버리스 / 정적CDN / 비동기파이프라인 / 컨테이너 / 글로벌동적웹 / 이벤트드리븐 / 보안 / 재난복구 / 데이터파이프라인 / 보안인증웹
 ```
 
 ## 라이선스
