@@ -9,6 +9,7 @@ export const dataPipeline: Mission = {
   goal: 'Kinesis → Lambda → S3 로 스트림 데이터가 저장되게 하세요.',
   hint: 'Kinesis Data Stream이 파이프라인의 진입점입니다. 스트림에서 Lambda로 엣지를 잇고, Lambda에서 S3로 이으세요. S3 암호화·퍼블릭 차단이 켜져 있으면 별 3개!',
   requiredResources: ['kinesis', 'lambda', 's3'],
+  budget: 20,
   // ★1 Kinesis→Lambda→S3 도달 · ★2 설정 오류 없음 · ★3 보안 경고 0
   check: (ctx) => {
     const chain = liveChain(ctx, ['kinesis', 'lambda', 's3'])

@@ -9,6 +9,7 @@ export const threeTier: Mission = {
   goal: '클라이언트 → ALB → EC2 → RDS 로 트래픽이 DB까지 도달하게 하세요 (AZ 2개).',
   hint: 'Subnet의 AZ를 서로 다르게 설정하세요. ALB·RDS는 2개 AZ가 필요합니다. Security Group을 각 계층에 연결하면 별 3개!',
   requiredResources: ['vpc', 'subnet', 'igw', 'alb', 'ec2', 'rds', 'sg'],
+  budget: 60,
   // ★1 ALB→EC2→RDS 트래픽 도달 · ★2 오류 없음(멀티 AZ 포함) · ★3 3계층 모두 SG 연결
   check: (ctx) => {
     const { nodes, edges, allValid } = ctx

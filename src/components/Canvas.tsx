@@ -25,6 +25,8 @@ import { DerivedEdge } from './edges/DerivedEdge'
 import { getResource, resources, type ResourceType } from '@/resources'
 import { canConnect, canContain, canBeTopLevel, isContainer, requiredParentLabel } from '@/graph/rules'
 import { derivedEdges } from '@/graph/derived'
+import { estimateMonthlyCost } from '@/graph/cost'
+import { getMission } from '@/missions'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
 const DND_MIME = 'application/cidrunner'
@@ -143,6 +145,13 @@ export function Canvas() {
   const setContextMenu = useGraphStore((s) => s.setContextMenu)
   const attachToParent = useGraphStore((s) => s.attachToParent)
   const setDropTarget = useGraphStore((s) => s.setDropTarget)
+  const activeMissionId = useGraphStore((s) => s.activeMissionId)
+
+  // Budget mode (ADR 0051): a live monthly-cost estimate for the whole graph,
+  // gauged against the active mission's optional budget target.
+  const monthlyCost = useMemo(() => estimateMonthlyCost(nodes), [nodes])
+  const budget = activeMissionId ? getMission(activeMissionId)?.budget : undefined
+  const overBudget = budget !== undefined && monthlyCost > budget
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ resource: ResourceNode }), [])
   const edgeTypes = useMemo<EdgeTypes>(
@@ -296,6 +305,29 @@ export function Canvas() {
             maskColor="rgba(15, 23, 42, 0.6)"
           />
         )}
+        <Panel position="top-left">
+          <div
+            title="예상 월 비용 (대략치)"
+            className={
+              'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium shadow-lg ' +
+              (budget === undefined
+                ? 'border-surface-border bg-surface-raised text-slate-300'
+                : overBudget
+                  ? 'border-rose-700/70 bg-rose-950/90 text-rose-200'
+                  : 'border-accent/60 bg-emerald-950/90 text-emerald-200')
+            }
+          >
+            <span>💸</span>
+            <span className="tabular-nums">${monthlyCost}/월</span>
+            {budget !== undefined && (
+              <span className="tabular-nums opacity-80">
+                {' '}
+                / 예산 ${budget}
+                {overBudget ? ' ⚠️' : ' ✓'}
+              </span>
+            )}
+          </div>
+        </Panel>
         <Panel position="top-right">
           <button
             type="button"

@@ -53,6 +53,12 @@ export interface Mission {
   steps?: TutorialStep[]
   /** Resources expected to appear in a correct solution. */
   requiredResources?: ResourceType[]
+  /**
+   * Optional monthly cost target (USD) for the Budget game mode (ADR 0051). When
+   * set, the mission surfaces a "💸 예산 $X / 현재 $Y" readout — a self-imposed
+   * optimization goal that does not change the star gate.
+   */
+  budget?: number
   /** Clear detection + star rating (0–3). Omit for descriptive-only missions. */
   check?: (ctx: MissionCheckContext) => number
 }
