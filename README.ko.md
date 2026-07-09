@@ -50,7 +50,7 @@
 - **갤러리** — 여러 설계를 이름 붙여 로컬 슬롯에 저장하고, 실시간 SVG 썸네일 카드 그리드에서 다시 엽니다. 이름 변경·삭제도 인라인으로. [ADR 0033](docs/decisions/0033-gallery-multi-slot.md) 참고.
 - **배지** — 플레이 진행도에서 순수하게 파생되는 배지 5종(첫 클리어·첫 3-star·첫 저장·미션 5개·전 미션 3-star)이 열립니다. [ADR 0032](docs/decisions/0032-achievements-and-badges.md) 참고.
 - **에디터 기본기** — undo/redo(Ctrl+Z, 제스처당 1스텝), 첫 방문 튜토리얼 안내, 미션별 별점 최고기록.
-- **키보드 단축키 & 컨텍스트 메뉴** — undo/redo(⌘Z / ⌘⇧Z)·복제(⌘D)·삭제·화면 맞춤(R)·시뮬(S)·내보내기(E)·리소스 검색 포커스(/)·도움말(?) 전역 단축키, 노드 우클릭으로 속성 편집 / 복제 / 엣지 지우기 / 부모 분리 / 삭제. [ADR 0028](docs/decisions/0028-keyboard-shortcuts-and-context-menu.md) 참고.
+- **키보드 단축키 & 컨텍스트 메뉴** — undo/redo(⌘Z / ⌘⇧Z)·복제(⌘D)·삭제·화면 맞춤(R)·시뮬(S)·내보내기(E)·리소스 검색 포커스(/)·도움말(?) 전역 단축키, 노드 우클릭으로 속성 편집 / 복제 / 엣지 지우기 / 부모 분리 / 부모에 넣기 / 삭제. 노드를 컨테이너 위로 드래그하면 자동으로 중첩된다. [ADR 0028](docs/decisions/0028-keyboard-shortcuts-and-context-menu.md) · [ADR 0038](docs/decisions/0038-containment-attach-actions.md) 참고.
 - **인터랙티브 튜토리얼** — 첫 미션이 실시간 자가 점검 단계 목록을 보여주며, 설계를 진행하면 완료 단계가 꺼지고 다음 할 일이 강조됩니다. [ADR 0030](docs/decisions/0030-interactive-tutorial-steps.md) 참고.
 - **apply 가능한 Terraform 내보내기** — 라우트 테이블·DB Subnet Group·IAM·API Gateway까지 유도 생성된 `main.tf`/`variables.tf`/`outputs.tf`. `terraform apply` 하면 실제 리소스가 생성됩니다.
 - **리소스 26종** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda+API GW · RDS(+읽기 복제본) · ElastiCache · DynamoDB · S3 · EFS · Kinesis · SQS · SNS · CloudWatch · Security Group · Cognito · Secrets Manager · KMS · ACM · WAF. [ADR 0035](docs/decisions/0035-resource-expansion-3-security-and-streaming.md) 참고.

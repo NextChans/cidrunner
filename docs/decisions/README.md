@@ -62,3 +62,5 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0035](0035-resource-expansion-3-security-and-streaming.md) | Resource expansion batch 3 — Cognito · Secrets Manager · KMS · ACM · WAF · Kinesis (extends 0026) | Accepted | 2026-07-09 |
 | [0036](0036-mission-expansion-3-pipelines-and-auth.md) | Mission expansion batch 3 — 데이터 파이프라인 · 보안·인증 웹 | Accepted | 2026-07-09 |
 | [0037](0037-palette-search.md) | Palette 검색 — debounced 실시간 필터 + `/` 단축키 | Accepted | 2026-07-09 |
+| [0038](0038-containment-attach-actions.md) | Containment attach 액션 대칭화 — drop-onto-parent + 우클릭 "부모에 넣기" | Accepted | 2026-07-09 |
+| [0039](0039-igw-internet-ingress-simulation.md) | IGW 인터넷 인그레스 시뮬레이션 — external entry 도달성 검사 | Accepted | 2026-07-09 |

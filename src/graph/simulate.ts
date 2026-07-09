@@ -68,6 +68,55 @@ const ENTRY_CAPABLE: ReadonlySet<ResourceType> = new Set<ResourceType>([
   'kinesis',
 ])
 
+/** Walks the parent chain to the enclosing VPC, if any. */
+function vpcOf(
+  node: ResourceNodeType,
+  byId: Map<string, ResourceNodeType>,
+): ResourceNodeType | undefined {
+  let cur = node.parentId ? byId.get(node.parentId) : undefined
+  while (cur) {
+    if (cur.data.type === 'vpc') return cur
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined
+  }
+  return undefined
+}
+
+/**
+ * Internet ingress gate (ADR 0039). An internet-facing ALB (`internal !== true`)
+ * placed inside a VPC can only receive traffic if that VPC has an Internet
+ * Gateway attached and at least one public subnet for the ALB to live in —
+ * modeling `인터넷 → IGW → public subnet → ALB`. Returns a player-facing block
+ * message, or `null` when ingress is satisfied (or not applicable).
+ *
+ * A loose ALB with no enclosing VPC is exempt: there is no VPC topology to
+ * evaluate, so the tracer stays as lenient as before (no regression).
+ */
+function internetIngressBlock(
+  node: ResourceNodeType,
+  byId: Map<string, ResourceNodeType>,
+  nodes: ResourceNodeType[],
+): string | null {
+  if (node.data.type !== 'alb' || node.data.config.internal === true) return null
+  const vpc = vpcOf(node, byId)
+  if (!vpc) return null
+  const hasIgw = nodes.some(
+    (n) => n.data.type === 'igw' && vpcOf(n, byId)?.id === vpc.id,
+  )
+  if (!hasIgw) {
+    return '인터넷 페이싱 ALB인데 VPC에 Internet Gateway가 없습니다. IGW를 VPC에 추가하세요.'
+  }
+  const hasPublicSubnet = nodes.some(
+    (n) =>
+      n.data.type === 'subnet' &&
+      vpcOf(n, byId)?.id === vpc.id &&
+      n.data.config.public === true,
+  )
+  if (!hasPublicSubnet) {
+    return '인터넷 페이싱 ALB가 위치할 퍼블릭 Subnet이 없습니다.'
+  }
+  return null
+}
+
 function blockedMessage(type: ResourceType): string {
   switch (type) {
     case 'route53':
@@ -99,6 +148,7 @@ function traceFlow(
   entry: ResourceNodeType,
   byId: Map<string, ResourceNodeType>,
   trafficEdges: Edge[],
+  ingressBlock: (node: ResourceNodeType) => string | null,
 ): SimFlow {
   const pathNodeIds: string[] = []
   const pathEdgeIds: string[] = []
@@ -108,6 +158,21 @@ function traceFlow(
   while (current) {
     pathNodeIds.push(current.id)
     visited.add(current.id)
+
+    // Internet ingress gate: an internet-facing ALB without IGW + public
+    // subnet cannot be reached from the internet, so the request stops here.
+    const ingressMsg = ingressBlock(current)
+    if (ingressMsg) {
+      return {
+        entryId: entry.id,
+        ok: false,
+        pathNodeIds,
+        pathEdgeIds,
+        blockedNodeId: current.id,
+        label: pathNodeIds.map((id) => byId.get(id)?.data.label ?? id).join(' → '),
+        message: ingressMsg,
+      }
+    }
 
     if (SINKS.has(current.data.type)) {
       return {
@@ -194,7 +259,9 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
     }
   }
 
-  const flows = entries.map((entry) => traceFlow(entry, byId, trafficEdges))
+  const ingressBlock = (node: ResourceNodeType) =>
+    internetIngressBlock(node, byId, nodes)
+  const flows = entries.map((entry) => traceFlow(entry, byId, trafficEdges, ingressBlock))
 
   const pathNodeIds = [...new Set(flows.flatMap((f) => f.pathNodeIds))]
   const pathEdgeIds = [...new Set(flows.flatMap((f) => f.pathEdgeIds))]

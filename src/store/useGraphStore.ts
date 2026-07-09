@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import { temporal } from 'zundo'
 import type { Edge, Node, XYPosition } from '@xyflow/react'
 import { getResource, type ResourceType } from '@/resources'
-import { canBeTopLevel, canContain, requiredParentLabel } from '@/graph/rules'
+import { canBeTopLevel, canContain, isContainer, requiredParentLabel } from '@/graph/rules'
 import { simulate, type SimResult } from '@/graph/simulate'
 import { sanitizeSnapshot, toSnapshot, type DesignSnapshot } from '@/graph/share'
 
@@ -102,6 +102,13 @@ interface GraphState {
   clearNodeEdges: (id: string) => void
   /** Detaches a node from its parent, converting to an absolute position. */
   detachNode: (id: string) => void
+  /**
+   * Nests a node under `parentId` (drag drop or context-menu "부모에 넣기"),
+   * converting its absolute position to parent-relative and re-sorting so the
+   * parent precedes the child. No-op if the rules forbid the nesting or it
+   * would create a cycle.
+   */
+  attachToParent: (nodeId: string, parentId: string) => void
   /** Updates a single key in a node's `data.config` (Inspector edits). */
   updateNodeConfig: (id: string, key: string, value: unknown) => void
   /** Renames a node (player-facing label, used for Terraform tags). */
@@ -211,6 +218,45 @@ function makeNode(
     node.extent = 'parent'
   }
   return node
+}
+
+/**
+ * Absolute canvas position of a node, folding in every ancestor's offset (React
+ * Flow stores child positions relative to their parent).
+ */
+function absolutePosition(
+  byId: Map<string, ResourceNodeType>,
+  id: string,
+): XYPosition {
+  let cur = byId.get(id)
+  let x = 0
+  let y = 0
+  while (cur) {
+    x += cur.position.x
+    y += cur.position.y
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined
+  }
+  return { x, y }
+}
+
+/**
+ * Stable topological order where every node follows its parent — React Flow
+ * requires a parent to appear before its children in the `nodes` array, so
+ * reparenting has to re-sort. Preserves the incoming order otherwise.
+ */
+function orderByParent(nodes: ResourceNodeType[]): ResourceNodeType[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const emitted = new Set<string>()
+  const result: ResourceNodeType[] = []
+  const emit = (n: ResourceNodeType) => {
+    if (emitted.has(n.id)) return
+    const parent = n.parentId ? byId.get(n.parentId) : undefined
+    if (parent) emit(parent)
+    emitted.add(n.id)
+    result.push(n)
+  }
+  for (const n of nodes) emit(n)
+  return result
 }
 
 /** Collects a node id plus all of its (transitive) descendants. */
@@ -443,6 +489,32 @@ export const useGraphStore = create<GraphState>()(
         simulation: null,
         contextMenu: null,
       }
+    }),
+
+  attachToParent: (nodeId, parentId) =>
+    set((state) => {
+      if (nodeId === parentId) return state
+      const byId = new Map(state.nodes.map((n) => [n.id, n]))
+      const node = byId.get(nodeId)
+      const parent = byId.get(parentId)
+      if (!node || !parent) return state
+      // Only containers that the rules allow may become the new parent…
+      if (!isContainer(parent.data.type) || !canContain(parent.data.type, node.data.type)) {
+        return state
+      }
+      // …and the target must not be the node's own descendant (no cycles).
+      if (withDescendants(state.nodes, nodeId).has(parentId)) return state
+      if (node.parentId === parentId) return state
+
+      // Preserve the node's on-canvas position: absolute → new-parent-relative.
+      const abs = absolutePosition(byId, nodeId)
+      const parentAbs = absolutePosition(byId, parentId)
+      const position = { x: abs.x - parentAbs.x, y: abs.y - parentAbs.y }
+
+      const nodes = state.nodes.map((n) =>
+        n.id === nodeId ? { ...n, parentId, extent: 'parent' as const, position } : n,
+      )
+      return { nodes: orderByParent(nodes), simulation: null, contextMenu: null }
     }),
 
   updateNodeConfig: (id, key, value) =>

@@ -192,6 +192,13 @@ predicates — `canContain`, `canBeTopLevel`, `canConnect`, `canBeSource`,
   type is in the dropped resource's `allowedParents`; if none matches it falls
   back to top level (when `'canvas'` is allowed) or is rejected. React Flow's
   native `parentId` + `extent: 'parent'` then keep children within their parent.
+- **Re-parenting (attach)** — dragging an existing node onto a container
+  (`onNodeDragStop`) or picking "부모에 넣기 / 부모 변경" from the right-click menu
+  both funnel into the store's `attachToParent`, which validates the rules,
+  blocks cycles, converts the node's absolute position to parent-relative, sets
+  `extent: 'parent'`, and re-sorts so the parent precedes the child. This is the
+  symmetric partner of "부모에서 분리" (detach). See
+  [ADR 0038](decisions/0038-containment-attach-actions.md).
 - **Edges** — a connection `source → target` is allowed only when the source's
   `connectsTo` lists the target's type; connection handles are rendered only
   where a node may be an edge source and/or target.
@@ -216,6 +223,14 @@ The `SimResult` carries `flows[]` plus derived aggregates (`edgeHops`,
 lands), red pulses on blocking nodes, and a banner listing every flow with its
 outcome. See [ADR 0012](decisions/0012-traffic-simulation-model.md) and
 [ADR 0018](decisions/0018-multi-flow-playback-and-palette-categories.md).
+
+**Internet ingress gate** — when a trace reaches an internet-facing ALB
+(`internal !== true`) that sits inside a VPC, the flow only continues if that
+VPC has an Internet Gateway attached **and** at least one public subnet
+(modeling `인터넷 → IGW → public subnet → ALB`); otherwise it blocks at the ALB
+with guidance. Internal ALBs and loose ALBs with no enclosing VPC are exempt, so
+abstract test topologies stay valid. See
+[ADR 0039](decisions/0039-igw-internet-ingress-simulation.md).
 
 ## Terraform export
 
