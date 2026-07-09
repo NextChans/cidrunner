@@ -11,6 +11,8 @@ import { eventDriven } from './eventDriven'
 import { disasterRecovery } from './disasterRecovery'
 import { dataPipeline } from './dataPipeline'
 import { secureAuthWeb } from './secureAuthWeb'
+import { haSurvival } from './haSurvival'
+import { leanServerless } from './leanServerless'
 
 /** Ordered list of missions shown in the MissionPanel. */
 export const missions: Mission[] = [
@@ -26,6 +28,9 @@ export const missions: Mission[] = [
   disasterRecovery,
   dataPipeline,
   secureAuthWeb,
+  // 운영 챌린지 티어 (ADR 0057) — 비용·카오스가 별점 게이트가 되는 미션들.
+  haSurvival,
+  leanServerless,
 ]
 
 export function getMission(id: string): Mission | undefined {
