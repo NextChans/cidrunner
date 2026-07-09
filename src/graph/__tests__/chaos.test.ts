@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { graphAzs, deadNodesForAz } from '@/graph/chaos'
+import { graphAzs, deadNodesForAz, applyAzFault } from '@/graph/chaos'
 import { simulate } from '@/graph/simulate'
 import { E, N } from './helpers'
 
@@ -50,6 +50,53 @@ describe('chaos — AZ fault injection', () => {
     const down = simulate(nodes, edges, { deadNodeIds: deadNodesForAz(nodes, 'a') })
     expect(down.ok).toBe(false) // EC2 + RDS gone → no path
     expect(down.deadNodeIds).toContain('ec2')
+  })
+
+  it('flags a Multi-AZ RDS as failed-over (survives, same endpoint), no promotion', () => {
+    const nodes = [
+      N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+      N('s-a', 'subnet', 'vpc-1', { cidr_block: '10.0.1.0/24', az: 'a' }),
+      N('s-c', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'c' }),
+      N('master', 'rds', 's-a', { instance_class: 'db.t3.micro', multi_az: true }),
+      N('replica', 'rds', 's-c', { instance_class: 'db.t3.micro' }),
+    ]
+    const edges = [E('r', 'master', 'replica')]
+    const fault = applyAzFault(nodes, edges, 'a')
+    expect(fault.failoverIds).toContain('master')
+    expect(fault.deadNodeIds.has('master')).toBe(false) // survives
+    expect(fault.promotedIds).toEqual([]) // Multi-AZ needs no promotion
+  })
+
+  it('promotes a read replica and reroutes traffic when a single-AZ master dies', () => {
+    const nodes = [
+      N('alb', 'alb'),
+      N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+      N('s-a', 'subnet', 'vpc-1', { cidr_block: '10.0.1.0/24', az: 'a' }),
+      N('s-c', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'c' }),
+      N('ec2c', 'ec2', 's-c', {}),
+      N('master', 'rds', 's-a', { instance_class: 'db.t3.micro' }), // single-AZ, in AZ-a
+      N('replica', 'rds', 's-c', { instance_class: 'db.t3.micro' }), // read replica in AZ-c
+    ]
+    const edges = [
+      E('t1', 'alb', 'ec2c'),
+      E('t2', 'ec2c', 'master'), // app writes to the master
+      E('rep', 'master', 'replica'), // replication edge
+    ]
+    const fault = applyAzFault(nodes, edges, 'a')
+    expect(fault.deadNodeIds.has('master')).toBe(true) // single-AZ master dies with AZ-a
+    expect(fault.promotedIds).toContain('replica')
+    // The app→master traffic edge is redirected to the promoted replica.
+    const t2 = fault.edges.find((e) => e.id === 't2')
+    expect(t2?.target).toBe('replica')
+
+    // End to end: the flow now reaches the promoted replica.
+    const sim = simulate(nodes, fault.edges, {
+      deadNodeIds: fault.deadNodeIds,
+      promotedIds: fault.promotedIds,
+    })
+    expect(sim.ok).toBe(true)
+    expect(sim.pathNodeIds).toContain('replica')
+    expect(sim.promotedNodeIds).toContain('replica')
   })
 
   it('a redundant (2-AZ + Multi-AZ RDS) design survives an AZ failure', () => {

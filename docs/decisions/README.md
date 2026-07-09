@@ -77,3 +77,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0050](0050-account-az-containers-and-inheritance.md) | AWS Account · AZ 조직 컨테이너 + 컨테이너 상속 (리소스 27→29, extends 0010·0015·0040) | Accepted | 2026-07-09 |
 | [0051](0051-cost-budget-mode.md) | 비용 예산 모드 — 실시간 월 비용 추정 + 미션 예산 목표 (extends 0014·0016) | Accepted | 2026-07-09 |
 | [0052](0052-chaos-mode-fault-injection.md) | 카오스 모드 — AZ 장애 주입 (비용↔복원력 딜레마, extends 0047·0050·0051) | Accepted | 2026-07-09 |
+| [0053](0053-chaos-rds-failover-and-promotion.md) | 카오스 RDS 복원 — Multi-AZ 페일오버 & 읽기 복제본 승격 (extends 0019·0052) | Accepted | 2026-07-09 |

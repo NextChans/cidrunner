@@ -62,6 +62,9 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
   const dropValid = useGraphStore((s) => (s.dropTarget?.id === id ? s.dropTarget.valid : null))
   // Chaos mode (ADR 0052): a node knocked out by an injected AZ failure.
   const isDead = sim?.deadNodeIds.includes(id) ?? false
+  // ADR 0053: a Multi-AZ RDS that failed over (survives) / a promoted replica.
+  const isFailover = sim?.failoverNodeIds.includes(id) ?? false
+  const isPromoted = sim?.promotedNodeIds.includes(id) ?? false
   const blocked = !isDead && (sim?.blockedNodeIds.includes(id) ?? false)
   const onPath = !isDead && !blocked && (sim?.pathNodeIds.includes(id) ?? false)
   const arrival = sim?.arrivals[id]
@@ -180,9 +183,25 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
         <span className="text-sm font-medium text-slate-100">{data.label}</span>
         <span className="text-[10px] uppercase tracking-wide text-slate-500">
           {data.type}
-          {isReplica && (
+          {isReplica && !isPromoted && (
             <span className="ml-1 rounded bg-indigo-900/70 px-1 py-px font-semibold text-indigo-300">
               REPLICA
+            </span>
+          )}
+          {isFailover && (
+            <span
+              className="ml-1 rounded bg-amber-900/70 px-1 py-px font-semibold text-amber-300"
+              title="Multi-AZ 자동 페일오버로 생존 (동일 엔드포인트)"
+            >
+              ⚡ 페일오버
+            </span>
+          )}
+          {isPromoted && (
+            <span
+              className="ml-1 rounded bg-emerald-900/70 px-1 py-px font-semibold text-emerald-300"
+              title="마스터 장애로 복제본이 승격됨"
+            >
+              ⬆ 승격
             </span>
           )}
         </span>

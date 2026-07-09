@@ -10,7 +10,7 @@ import {
   orderByParent,
 } from '@/graph/containment'
 import { simulate, type SimResult } from '@/graph/simulate'
-import { deadNodesForAz } from '@/graph/chaos'
+import { applyAzFault } from '@/graph/chaos'
 import { applyInheritedDefaults } from '@/graph/inherit'
 import { sanitizeSnapshot, toSnapshot, type DesignSnapshot } from '@/graph/share'
 
@@ -237,6 +237,21 @@ function makeNode(
     node.extent = 'parent'
   }
   return node
+}
+
+/** Runs the sim, applying an AZ fault (ADR 0052/0053) when chaos is active. */
+function runWithChaos(
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  chaosAz: string | null,
+): SimResult {
+  if (!chaosAz) return simulate(nodes, edges)
+  const fault = applyAzFault(nodes, edges, chaosAz)
+  return simulate(nodes, fault.edges, {
+    deadNodeIds: fault.deadNodeIds,
+    failoverIds: fault.failoverIds,
+    promotedIds: fault.promotedIds,
+  })
 }
 
 /** Collects a node id plus all of its (transitive) descendants. */
@@ -562,28 +577,16 @@ export const useGraphStore = create<GraphState>()(
     ),
 
   runSimulation: () =>
-    set((state) => ({
-      simulation: simulate(
-        state.nodes,
-        state.edges,
-        state.chaosAz
-          ? { deadNodeIds: deadNodesForAz(state.nodes, state.chaosAz) }
-          : undefined,
-      ),
-    })),
+    set((state) => ({ simulation: runWithChaos(state.nodes, state.edges, state.chaosAz) })),
 
   stopSimulation: () => set({ simulation: null, chaosAz: null }),
 
-  // Chaos mode (ADR 0052): down an AZ (or clear with null) and immediately
+  // Chaos mode (ADR 0052/0053): down an AZ (or clear with null) and immediately
   // re-run the sim on the survivors so the impact is visible.
   setChaos: (az) =>
     set((state) => ({
       chaosAz: az,
-      simulation: simulate(
-        state.nodes,
-        state.edges,
-        az ? { deadNodeIds: deadNodesForAz(state.nodes, az) } : undefined,
-      ),
+      simulation: runWithChaos(state.nodes, state.edges, az),
     })),
 
   toggleMiniMap: () => set((state) => ({ showMiniMap: !state.showMiniMap })),
