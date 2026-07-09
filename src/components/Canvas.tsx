@@ -32,14 +32,22 @@ type RfInstance = ReactFlowInstance<ResourceNodeType>
 /**
  * Finds the innermost container node under `point` that is allowed to hold a
  * `childType` node. Returns the container id and its absolute position so the
- * caller can compute a parent-relative drop position.
+ * caller can compute a parent-relative drop position. `excludeIds` skips the
+ * dragged node and its own descendants (a node can't be nested into itself).
  */
-function findDropParent(rf: RfInstance, point: XYPosition, childType: ResourceType) {
+function findDropParent(
+  rf: RfInstance,
+  point: XYPosition,
+  childType: ResourceType,
+  excludeIds?: ReadonlySet<string>,
+) {
   const candidates = rf
     .getNodes()
     .filter(
       (n) =>
-        isContainer(n.data.type) && canContain(n.data.type, childType),
+        isContainer(n.data.type) &&
+        canContain(n.data.type, childType) &&
+        !excludeIds?.has(n.id),
     )
     .map((n) => {
       const internal = rf.getInternalNode(n.id)
@@ -75,6 +83,7 @@ export function Canvas() {
   const showMiniMap = useGraphStore((s) => s.showMiniMap)
   const toggleMiniMap = useGraphStore((s) => s.toggleMiniMap)
   const setContextMenu = useGraphStore((s) => s.setContextMenu)
+  const attachToParent = useGraphStore((s) => s.attachToParent)
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ resource: ResourceNode }), [])
   const edgeTypes = useMemo<EdgeTypes>(() => ({ traffic: TrafficEdge }), [])
@@ -129,6 +138,38 @@ export function Canvas() {
     [nodes, edges, setEdges, setNotice, stopSimulation],
   )
 
+  // Drop-onto-parent for existing nodes (ADR 0038): after a drag, nest the
+  // node into the innermost container under its center if the rules allow it.
+  const onNodeDragStop = useCallback(
+    (_: MouseEvent | TouchEvent, node: ResourceNodeType) => {
+      const internal = rf.getInternalNode(node.id)
+      const abs = internal?.internals.positionAbsolute ?? node.position
+      const width = internal?.measured?.width ?? 0
+      const height = internal?.measured?.height ?? 0
+      const center = { x: abs.x + width / 2, y: abs.y + height / 2 }
+
+      // Exclude the node itself and its descendants as drop targets.
+      const all = rf.getNodes()
+      const exclude = new Set<string>([node.id])
+      let grew = true
+      while (grew) {
+        grew = false
+        for (const n of all) {
+          if (n.parentId && exclude.has(n.parentId) && !exclude.has(n.id)) {
+            exclude.add(n.id)
+            grew = true
+          }
+        }
+      }
+
+      const parent = findDropParent(rf, center, node.data.type, exclude)
+      if (parent && parent.id !== node.parentId) {
+        attachToParent(node.id, parent.id)
+      }
+    },
+    [rf, attachToParent],
+  )
+
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
@@ -169,6 +210,7 @@ export function Canvas() {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}
         onNodeClick={(_, node) => setSelected(node.id)}
         onPaneClick={() => setSelected(null)}

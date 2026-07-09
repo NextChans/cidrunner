@@ -179,3 +179,27 @@ Sprint E 완료. `tsc -b` clean · Vitest 109/109 통과 · `oxlint` clean · `v
 - **다음 관심사**: (1) WAF→ALB·ACM→ALB·Cognito 인증 액션 결합은 진입점 "비-트래픽 엣지"
   일반화 리팩터 후 4차 배치. (2) Kinesis Firehose→S3(데이터 레이크)·Lambda producer 스트림.
   (3) 검색에 최근/자주 쓰는 정렬·동의어 사전 여지.
+
+## Sprint F1 결과 (완료: 2026-07-09 — 도메인 모델 정확도 P0 3건)
+
+차니 리포트 3건(P0) 반영. `tsc -b` strict clean · Vitest 120/120 통과 · `oxlint` clean ·
+`vite build` 성공(최대 청크 199 kB, 500 kB 경고 없음) · 로컬 dev에서 우클릭 분리↔재부착
+루프(부모에서 분리 → 부모에 넣기 flyout → Public Subnet 재부착) end-to-end 확인.
+feature branch → PR → merge.
+
+- **Drop-onto-parent (P0.1)** — 기존 노드를 컨테이너 위로 드래그하면 `onNodeDragStop`이
+  노드 중앙 절대좌표로 가장 안쪽 컨테이너를 판정, 스토어 `attachToParent` 호출.
+  `findDropParent`에 `excludeIds`(자기+자손)를 추가해 팔레트 드롭과 공용. `extent: 'parent'`
+  잠금 특성상 이미 nested된 노드의 드래그 이동은 겹칠 때만 — 그 경우 우클릭으로. ADR 0038.
+- **우클릭 "부모에 넣기 / 부모 변경" (P0.2)** — 규칙 허용 후보 컨테이너를 flyout 서브메뉴로.
+  `attachToParent`가 절대→상대 좌표 변환·사이클 방지·위상 재정렬 담당. "부모에서 분리"와
+  완전 대칭 — 한 번 분리해도 복구 가능(리포트 갭 해소). ADR 0038.
+- **IGW 인터넷 인그레스 sim (P0.3)** — `traceFlow`가 인터넷 페이싱 ALB(`internal!==true`,
+  enclosing VPC 있음) 방문 시 IGW attach + public subnet 존재를 검사, 미충족이면 그 ALB에서
+  차단하고 명확한 메시지. internal ALB·VPC 없는 loose ALB는 면제(기존 성공 케이스 회귀 방지).
+  Option C(플레이어-드로잉 라우팅 엣지)는 진실 이중화·"plumbing은 파생" 철학 충돌로 기각. ADR 0039.
+- **테스트 109→120** — `simulate-ingress` 6케이스(IGW 없음/public subnet 없음/성공/internal 면제/
+  loose 면제/CF-fed 차단), `containment` 5케이스(좌표 변환·렌더 순서·규칙 거부·no-op).
+- **남은 관심사(Sprint F2)**: (1) `인터넷 → IGW → public subnet → ALB` 인그레스 leg를 시각
+  파생 점선으로. (2) public subnet 없을 때 ALB fallback 정리. (3) drop 거부 hover 시각 피드백
+  (빨간 테두리)은 미구현 여지.
