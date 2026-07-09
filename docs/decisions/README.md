@@ -70,3 +70,7 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0043](0043-derived-visual-edges.md) | 파생 시각 엣지 — 엔진 소유 IGW → 퍼블릭 Subnet 점선 (extends 0039) | Accepted | 2026-07-09 |
 | [0044](0044-alb-fallback-cleanup.md) | ALB 서브넷 fallback 정리 — dead-path 명시화 (extends 0016) | Accepted | 2026-07-09 |
 | [0045](0045-containment-legality-validation.md) | Containment-legality 상시 검증 — 부모 없는 불법 배치 감지 (QA-001 hotfix, extends 0017·0038·0040) | Accepted | 2026-07-09 |
+| [0046](0046-lambda-apigw-split.md) | Lambda + API GW 콤보 분리 — 독립 API Gateway 리소스 (extends 0001·0016·0022) | Accepted | 2026-07-09 |
+| [0047](0047-simulate-backtracking.md) | 시뮬레이션 백트래킹 — greedy → DFS 다중 경로 탐색 (QA-002, extends 0012·0018·0039) | Accepted | 2026-07-09 |
+| [0048](0048-load-balancing-animation.md) | 로드 밸런싱 애니메이션 — ALB fan-out 시각화 규격 (extends 0012·0018·0047) | Accepted | 2026-07-09 |
+| [0049](0049-edge-inout-visual-effects.md) | 엣지 in/out 트래픽 시각 효과 — 방향 인지도 강화 (extends 0012·0043·0047) | Accepted | 2026-07-09 |

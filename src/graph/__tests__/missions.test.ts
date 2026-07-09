@@ -74,10 +74,11 @@ function serverlessBuild() {
   return {
     id: 'serverless',
     nodes: [
+      N('apigw-0', 'apigw', undefined, { stage_name: 'prod', endpoint_type: 'regional' }),
       N('lambda-1', 'lambda', undefined, { runtime: 'nodejs20.x', handler: 'index.handler', memory_mb: 128 }),
       N('s3-2', 's3', undefined, { versioning: true, encryption: true, block_public_access: true }),
     ],
-    edges: [E('t1', 'lambda-1', 's3-2')],
+    edges: [E('t0', 'apigw-0', 'lambda-1'), E('t1', 'lambda-1', 's3-2')],
   }
 }
 

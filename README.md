@@ -54,8 +54,9 @@ Design and decisions live in [`docs/`](docs/):
 - **Editor fundamentals** — undo/redo (Ctrl+Z, one step per gesture), a first-visit tutorial hand-off, and per-mission best-star records.
 - **Keyboard & context menu** — global shortcuts for undo/redo (⌘Z / ⌘⇧Z), duplicate (⌘D), delete, fit view (R), simulate (S), export (E), and a `?` cheat-sheet; right-click a node to edit / duplicate / clear edges / detach / re-nest into a parent / delete. Drag a node onto a container to nest it automatically. See [ADR 0028](docs/decisions/0028-keyboard-shortcuts-and-context-menu.md) and [ADR 0038](docs/decisions/0038-containment-attach-actions.md).
 - **Interactive tutorial** — the first mission shows a live, self-checking step list that ticks off and highlights the next action as you build. See [ADR 0030](docs/decisions/0030-interactive-tutorial-steps.md).
-- **Apply-ready Terraform export** — `main.tf`, `variables.tf`, `outputs.tf` with derived route tables, DB subnet groups, IAM, and a working API Gateway; `terraform apply` creates real resources.
-- **Resource set (26)** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda+API GW · RDS (+read replica) · ElastiCache · DynamoDB · S3 · EFS · Kinesis · SQS · SNS · CloudWatch · Security Group · Cognito · Secrets Manager · KMS · ACM · WAF. See [ADR 0035](docs/decisions/0035-resource-expansion-3-security-and-streaming.md).
+- **Traffic playback** — Start traces every entry point with a backtracking search (a completed branch wins even when an incomplete sibling is drawn first — [ADR 0047](docs/decisions/0047-simulate-backtracking.md)); an active load balancer fans traffic out across all its targets (round-robin pulse — [ADR 0048](docs/decisions/0048-load-balancing-animation.md)), and each edge shows directional in/out effects tinted green (reachable) or red (blocked) — [ADR 0049](docs/decisions/0049-edge-inout-visual-effects.md).
+- **Apply-ready Terraform export** — `main.tf`, `variables.tf`, `outputs.tf` with derived route tables, DB subnet groups, IAM, and an API Gateway REST API wired to its Lambda; `terraform apply` creates real resources.
+- **Resource set (27)** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda · API Gateway · RDS (+read replica) · ElastiCache · DynamoDB · S3 · EFS · Kinesis · SQS · SNS · CloudWatch · Security Group · Cognito · Secrets Manager · KMS · ACM · WAF. See [ADR 0035](docs/decisions/0035-resource-expansion-3-security-and-streaming.md) and the Lambda/API GW split in [ADR 0046](docs/decisions/0046-lambda-apigw-split.md).
 - **Mobile** — building infra is a desktop-first experience, but narrow screens (<768px) get a full-viewport canvas with the palette / inspector / missions moved into overlay drawers, so a project stays viewable and demo-able on a phone. See [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md).
 
 ## Roadmap
@@ -139,7 +140,7 @@ src/
 ├─ store/useGraphStore.ts   # Zustand — nodes / edges / mode
 ├─ components/              # Layout, Canvas, Palette, Inspector, MissionPanel, Toolbar
 │  └─ nodes/ResourceNode.tsx
-├─ resources/              # 26 resource metas + registry (apply-ready terraform emitters)
+├─ resources/              # 27 resource metas + registry (apply-ready terraform emitters)
 └─ missions/               # 12 missions: tutorial / 3-tier / serverless / static-CDN / async-pipeline / container / global-web / event-driven / security / disaster-recovery / data-pipeline / secure-auth-web
 ```
 

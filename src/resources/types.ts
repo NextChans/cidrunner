@@ -4,8 +4,10 @@ import type { LucideIcon } from 'lucide-react'
  * The AWS resource primitives the game supports — one block per real-world
  * concept. The original 10-block MVP set (ADR 0001) was expanded to 14 in
  * batch 1 (ADR 0022: DynamoDB, CloudFront, Route 53, SQS), to 20 in batch 2
- * (ADR 0026: ECS, EKS, SNS, EFS, ElastiCache, CloudWatch), and to 26 in batch 3
- * (ADR 0035: Cognito, Secrets Manager, KMS, ACM, WAF, Kinesis).
+ * (ADR 0026: ECS, EKS, SNS, EFS, ElastiCache, CloudWatch), to 26 in batch 3
+ * (ADR 0035: Cognito, Secrets Manager, KMS, ACM, WAF, Kinesis), and to 27 when
+ * the Lambda + API GW combo was split into standalone Lambda and API Gateway
+ * blocks (ADR 0046).
  */
 export type ResourceType =
   | 'vpc'
@@ -22,6 +24,7 @@ export type ResourceType =
   | 's3'
   | 'efs'
   | 'lambda'
+  | 'apigw'
   | 'dynamodb'
   | 'cloudfront'
   | 'route53'
@@ -147,6 +150,8 @@ export interface TfContext {
     monitorTargets?: { kind: ResourceType; name: string }[]
     /** Local name of the customer-managed KMS key (secretsmanager → kms edge). */
     kmsKey?: string
+    /** Lambda proxy target of an API Gateway (apigw → lambda edge). */
+    integrationTarget?: string
   }
 }
 

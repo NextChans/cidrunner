@@ -150,10 +150,10 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
       const origin = edges.find(
         (e) =>
           e.source === node.id &&
-          ['alb', 's3', 'lambda'].includes(byId.get(e.target)?.data.type ?? ''),
+          ['alb', 's3', 'apigw'].includes(byId.get(e.target)?.data.type ?? ''),
       )
       if (!origin) {
-        push(errors, node.id, 'CloudFront에 오리진(ALB/S3/Lambda)이 연결되어 있지 않습니다.')
+        push(errors, node.id, 'CloudFront에 오리진(ALB/S3/API GW)이 연결되어 있지 않습니다.')
       } else if (byId.get(origin.target)?.data.config.internal === true) {
         push(warnings, node.id, '내부(Internal) ALB는 CloudFront 오리진으로 동작하지 않습니다.')
       }
