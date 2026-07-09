@@ -231,3 +231,32 @@ extent·상대좌표·렌더순서 + 시각 편입). feature branch → PR → m
   fixture 마이그레이션+sim entry로 광범위·독립적이라 별도 PR이 리뷰·회귀 관리에 유리.
 - **남은 관심사(F2)**: P0.7 + 드래그 중 자동 detach(현 `extent:'parent'` 잠금상 실효 낮음) +
   Lambda VPC 연결 모델(allowedParents vs 파생) 결정.
+
+---
+
+## Sprint F2 결과 (미션·SG 감사 + IGW 파생 점선 + ALB 정리)
+
+차니 리포트 4건 후속. F1.5 완료 후 별도 브랜치 `sprint-f2/mission-sg-audit-igw-visual`.
+`tsc -b` strict clean · Vitest **126→139** 통과 · `oxlint` clean · `vite build` 성공(최대
+청크 199 kB) · 로컬 dev에서 IGW 점선·미션 ★3 end-to-end 확인. feature branch → PR → merge.
+
+- **미션 체커 감사(P0)** — 12개 미션 **해피패스는 전부 정상**(전수 재현). 리포트의 "정적 웹·
+  비동기가 ★3 안 뜸"의 근본원인은 체크 로직이 아니라 **평가 범위**였다: ★3 `securityOk`가
+  **그래프 전체**를 보므로, 첫 로드 시드(VPC▸Subnet▸EC2, SG 없음)를 안 건드리는 VPC-밖 미션
+  (정적 웹·비동기·서버리스·이벤트·데이터 파이프라인)이 시드 EC2의 "SG 없음" **경고**로 ★2에
+  갇혔다. 힌트도 정적 문자열이라 무관한 블로커에도 계속 떴다. → `scopedSecurityOk(ctx, anchors)`
+  (만족 flow에서 엣지 **양방향**+부모 체인 closure)로 8개 미션 전환. 무관 노드는 무시, SSH 개방
+  SG·public S3 등 **빌드 내부 경고는 유지**. `allValid`(★2)는 전체 유지(에러는 시드에 오염 안 됨).
+  그리디 tracer 막다른-엣지는 [simulate-edge.test.ts]가 **의도적으로 락인한** 동작이라 미변경. ADR 0041.
+- **SG 부착 룰(P0)** — **ECS↔SG 모순** 확정: `canConnect('sg','ecs')=false`인데 checks.ts는 경고.
+  `sg.connectsTo`에 `ecs·eks·elasticache·efs` 추가 + checks.ts에 EKS 경고 추가로 **"부착 가능
+  집합 == 경고 집합"** 불변식 확립. Lambda는 VPC-밖 모델이라 제외. ADR 0042.
+- **IGW 파생 점선(P1)** — 엔진 소유 파생 엣지 프레임워크(`derived.ts`): 저장·편집·선택·삭제 불가,
+  렌더 전용 병합. IGW→같은 VPC 퍼블릭 subnet slate(#94a3b8) 점선 + hover 툴팁 "라우팅
+  (0.0.0.0/0 → IGW)". 범용이라 RDS→subnet group 등 재사용 가능. ADR 0043.
+- **ALB fallback 정리(P2)** — 외부 ALB의 퍼블릭 subnet 부재 시 프라이빗으로 조용히 fallback하던
+  dead-path 제거(checks.ts가 이미 에러로 잡음), `REPLACE_ME` 명시(ECS/EKS와 일관). ADR 0044.
+- **테스트 126→139** — `missions` 9(캐노니컬 ★3·시드 잔존 ★3·public S3 ★2 캡·SSH SG 3★ 미만·
+  무관 리소스 무시·SG 부착 불변식), `derived` 4.
+- **남은 관심사(F3)**: Lambda+API GW 분리(별도 PR 규모) + 그리디 tracer 백트래킹 재검토(현재
+  의도 동작으로 락인) + Lambda VPC 연결 모델 결정.

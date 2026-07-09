@@ -1,4 +1,5 @@
 import type { Mission } from './types'
+import { scopedSecurityOk } from './scope'
 
 export const securityHardening: Mission = {
   id: 'security-hardening',
@@ -9,14 +10,15 @@ export const securityHardening: Mission = {
   hint: 'RDS를 프라이빗 Subnet(퍼블릭 해제)으로 옮기고 스토리지 암호화를 켜세요. SG의 SSH를 끄고, ⚠️ 표시가 남은 리소스에 SG를 연결하세요.',
   requiredResources: ['vpc', 'subnet', 'igw', 'alb', 'ec2', 'rds', 'sg'],
   // ★1 3-tier 도달 + DB가 프라이빗 · ★2 + SSH 미개방·DB 암호화 · ★3 + 보안 경고 0
-  check: ({ nodes, sim, securityOk }) => {
+  check: (ctx) => {
+    const { nodes, sim } = ctx
     const byId = new Map(nodes.map((n) => [n.id, n]))
     const typeOf = (id: string) => byId.get(id)?.data.type
-    const reachesDb = sim.flows.some((f) => {
+    const dbFlow = sim.flows.find((f) => {
       const path = f.pathNodeIds.map(typeOf)
       return f.ok && path.includes('alb') && path.includes('ec2') && path.includes('rds')
     })
-    if (!reachesDb) return 0
+    if (!dbFlow) return 0
 
     const rdsNodes = nodes.filter((n) => n.data.type === 'rds')
     const dbPrivate =
@@ -33,7 +35,7 @@ export const securityHardening: Mission = {
       .every((n) => n.data.config.allow_ssh !== true)
     const dbEncrypted = rdsNodes.every((n) => n.data.config.storage_encrypted !== false)
     if (noSsh && dbEncrypted) stars += 1
-    if (securityOk) stars += 1
+    if (scopedSecurityOk(ctx, dbFlow.pathNodeIds)) stars += 1
     return stars
   },
 }

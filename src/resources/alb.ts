@@ -36,11 +36,15 @@ export const alb: ResourceMeta = {
   validate: (c) => collect(validateRange(c.listener_port, 1, 65535, '리스너 포트')),
   terraform: ({ name, awsName, config, refs, displayName }) => {
     const port = Number(config.listener_port ?? 80)
-    // External ALBs live in public subnets (best practice); internal in any.
-    const subnetPool = config.internal
-      ? (refs.subnets ?? [])
-      : (refs.publicSubnets?.length ? refs.publicSubnets : (refs.subnets ?? []))
-    const subnets = subnetPool.map((s) => `aws_subnet.${s}.id`).join(', ')
+    // An internet-facing ALB MUST sit in public subnets; an internal one in any
+    // subnet. There is no valid fallback for an external ALB with no public
+    // subnet — checks.ts already flags that as an error, so silently placing it
+    // in private subnets only emits wrong-but-plausible HCL that can never
+    // apply. Mark the gap with REPLACE_ME instead (ADR 0044), matching ECS/EKS.
+    const subnetPool = config.internal ? (refs.subnets ?? []) : (refs.publicSubnets ?? [])
+    const subnets = (subnetPool.length ? subnetPool : ['REPLACE_ME'])
+      .map((s) => `aws_subnet.${s}.id`)
+      .join(', ')
     const sgs = (refs.securityGroups ?? []).map((s) => `aws_security_group.${s}.id`).join(', ')
     const attachments = (refs.targets ?? [])
       .map(

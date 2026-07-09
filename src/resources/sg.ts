@@ -18,9 +18,11 @@ export const sg: ResourceMeta = {
     allow_https: true,
     allow_ssh: false,
   },
-  // A VPC-scoped firewall; attach to ALB/EC2/RDS by drawing an edge.
+  // A VPC-scoped firewall; attach to any VPC-bound resource that owns ENIs by
+  // drawing an edge (ADR 0042). Lambda is intentionally absent: this game models
+  // Lambda as a non-VPC, canvas-level function, and an SG is VPC-scoped.
   allowedParents: ['vpc'],
-  connectsTo: ['alb', 'ec2', 'rds'],
+  connectsTo: ['alb', 'ec2', 'rds', 'ecs', 'eks', 'elasticache', 'efs'],
   fields: [
     { key: 'allow_http', label: 'HTTP (80) 허용', type: 'boolean' },
     { key: 'allow_https', label: 'HTTPS (443) 허용', type: 'boolean' },

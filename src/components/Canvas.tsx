@@ -21,8 +21,10 @@ import {
 import { Map as MapIcon } from 'lucide-react'
 import { ResourceNode } from './nodes/ResourceNode'
 import { TrafficEdge } from './edges/TrafficEdge'
+import { DerivedEdge } from './edges/DerivedEdge'
 import { getResource, resources, type ResourceType } from '@/resources'
 import { canConnect, canContain, canBeTopLevel, isContainer, requiredParentLabel } from '@/graph/rules'
+import { derivedEdges } from '@/graph/derived'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
 const DND_MIME = 'application/cidrunner'
@@ -143,7 +145,14 @@ export function Canvas() {
   const setDropTarget = useGraphStore((s) => s.setDropTarget)
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ resource: ResourceNode }), [])
-  const edgeTypes = useMemo<EdgeTypes>(() => ({ traffic: TrafficEdge }), [])
+  const edgeTypes = useMemo<EdgeTypes>(
+    () => ({ traffic: TrafficEdge, derived: DerivedEdge }),
+    [],
+  )
+
+  // Engine-owned derived edges (ADR 0043) are rendered but never stored: merge
+  // them in for display only, so onEdgesChange keeps operating on user edges.
+  const renderedEdges = useMemo(() => [...edges, ...derivedEdges(nodes)], [edges, nodes])
 
   // Auto-dismiss the transient notice.
   useEffect(() => {
@@ -254,7 +263,7 @@ export function Canvas() {
     <div className="relative h-full w-full" onDrop={onDrop} onDragOver={onDragOver}>
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={renderedEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}

@@ -194,7 +194,8 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
       push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
     }
 
-    // EKS control plane + node group span ≥2 AZ subnets.
+    // EKS control plane + node group span ≥2 AZ subnets and need an SG for the
+    // cluster/node ENIs (ADR 0042 — same attach rule as the other VPC compute).
     if (t === 'eks') {
       const vpc = vpcOf(node)
       if (vpc) {
@@ -202,6 +203,9 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
         if (subnets.length < 2 || distinctAzs(subnets) < 2) {
           push(errors, node.id, 'EKS는 서로 다른 AZ의 Subnet 2개 이상이 필요합니다.')
         }
+      }
+      if (attachedSGs(node.id).length === 0) {
+        push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
       }
     }
 

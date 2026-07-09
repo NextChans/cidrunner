@@ -65,3 +65,7 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0038](0038-containment-attach-actions.md) | Containment attach 액션 대칭화 — drop-onto-parent + 우클릭 "부모에 넣기" | Accepted | 2026-07-09 |
 | [0039](0039-igw-internet-ingress-simulation.md) | IGW 인터넷 인그레스 시뮬레이션 — external entry 도달성 검사 | Accepted | 2026-07-09 |
 | [0040](0040-containment-audit-normalize-feedback.md) | Containment 정확도 — allowedParents 감사 · auto-normalize · 드래그 피드백 (extends 0038) | Accepted | 2026-07-09 |
+| [0041](0041-mission-checker-audit.md) | 미션 체커 감사 — 별점 스코핑 · 힌트/체크 정합 (extends 0036) | Accepted | 2026-07-09 |
+| [0042](0042-sg-attach-rules.md) | Security Group 부착 규칙 — sgAttachable 정정 · 경고 정합 (extends 0017) | Accepted | 2026-07-09 |
+| [0043](0043-derived-visual-edges.md) | 파생 시각 엣지 — 엔진 소유 IGW → 퍼블릭 Subnet 점선 (extends 0039) | Accepted | 2026-07-09 |
+| [0044](0044-alb-fallback-cleanup.md) | ALB 서브넷 fallback 정리 — dead-path 명시화 (extends 0016) | Accepted | 2026-07-09 |

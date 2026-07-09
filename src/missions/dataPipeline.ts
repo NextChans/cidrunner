@@ -1,4 +1,5 @@
 import type { Mission } from './types'
+import { scopedSecurityOk } from './scope'
 
 export const dataPipeline: Mission = {
   id: 'data-pipeline',
@@ -9,7 +10,8 @@ export const dataPipeline: Mission = {
   hint: 'Kinesis Data Stream이 파이프라인의 진입점입니다. 스트림에서 Lambda로 엣지를 잇고, Lambda에서 S3로 이으세요. S3 암호화·퍼블릭 차단이 켜져 있으면 별 3개!',
   requiredResources: ['kinesis', 'lambda', 's3'],
   // ★1 Kinesis→Lambda→S3 도달 · ★2 설정 오류 없음 · ★3 보안 경고 0
-  check: ({ nodes, sim, allValid, securityOk }) => {
+  check: (ctx) => {
+    const { nodes, sim, allValid } = ctx
     const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
     const flow = sim.flows.find((f) => {
       const path = f.pathNodeIds.map(typeOf)
@@ -23,7 +25,7 @@ export const dataPipeline: Mission = {
     if (!flow) return 0
     let stars = 1
     if (allValid) stars += 1
-    if (securityOk) stars += 1
+    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
     return stars
   },
 }

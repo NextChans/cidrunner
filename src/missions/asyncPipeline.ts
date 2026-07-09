@@ -1,4 +1,5 @@
 import type { Mission } from './types'
+import { scopedSecurityOk } from './scope'
 
 export const asyncPipeline: Mission = {
   id: 'async-pipeline',
@@ -9,7 +10,8 @@ export const asyncPipeline: Mission = {
   hint: 'Lambda 블록이 2개 필요합니다 — 하나는 생산자(API), 하나는 큐를 소비하는 워커입니다.',
   requiredResources: ['lambda', 'sqs', 'dynamodb'],
   // ★1 Lambda→SQS→Lambda→DynamoDB 도달 · ★2 설정 오류 없음 · ★3 보안 경고 0
-  check: ({ nodes, sim, allValid, securityOk }) => {
+  check: (ctx) => {
+    const { nodes, sim, allValid } = ctx
     const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
     const flow = sim.flows.find((f) => {
       const path = f.pathNodeIds.map(typeOf)
@@ -24,7 +26,7 @@ export const asyncPipeline: Mission = {
     if (!flow) return 0
     let stars = 1
     if (allValid) stars += 1
-    if (securityOk) stars += 1
+    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
     return stars
   },
 }

@@ -1,4 +1,5 @@
 import type { Mission } from './types'
+import { scopedSecurityOk } from './scope'
 
 export const eventDriven: Mission = {
   id: 'event-driven',
@@ -9,7 +10,8 @@ export const eventDriven: Mission = {
   hint: 'Lambda 블록이 2개 필요합니다 — 생산자는 SNS에 발행하고, 컨슈머는 SQS를 소비합니다. SNS → SQS 엣지로 팬아웃을 구성하세요.',
   requiredResources: ['lambda', 'sns', 'sqs', 'dynamodb'],
   // ★1 Lambda→SNS→SQS→Lambda→DynamoDB 도달 · ★2 설정 오류 없음 · ★3 보안 경고 0
-  check: ({ nodes, sim, allValid, securityOk }) => {
+  check: (ctx) => {
+    const { nodes, sim, allValid } = ctx
     const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
     const flow = sim.flows.find((f) => {
       const path = f.pathNodeIds.map(typeOf)
@@ -25,7 +27,7 @@ export const eventDriven: Mission = {
     if (!flow) return 0
     let stars = 1
     if (allValid) stars += 1
-    if (securityOk) stars += 1
+    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
     return stars
   },
 }
