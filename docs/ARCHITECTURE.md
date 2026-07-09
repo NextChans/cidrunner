@@ -213,6 +213,14 @@ badge), while a dead **single-AZ** master is replaced by **promoting** a read
 replica in a surviving AZ and rerouting its traffic (⬆ badge) — `applyAzFault`
 computes the dead set, failovers, promotions, and rewired edges.
 
+**Well-Architected grade** ([ADR 0054](decisions/0054-well-architected-grade.md)) —
+`wellArchitectedGrade` in [`src/graph/grade.ts`](../src/graph/grade.ts) synthesizes
+a live A–S letter grade across four pillars: 🔒 security (validation warnings),
+🛡 reliability (multi-AZ + DB resilience + surviving every single-AZ chaos
+failure), 💰 cost (idle expensive resources), ⚡ performance (accelerator
+presence). Shown next to the cost meter; display-only, it does not affect the
+star gate.
+
 ## Graph rules
 
 Nesting and edge constraints (Phase 1) are **data-driven**, derived entirely
