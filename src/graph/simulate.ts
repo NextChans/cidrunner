@@ -298,6 +298,57 @@ function traceFlow(
   }
 }
 
+/**
+ * Every distinct sink reachable from `entry`, with a shortest representative
+ * path to each (BFS + parent pointers). This is what lets the banner enumerate
+ * ALL destinations — an entry that fans out to several sinks (CloudFront → S3
+ * *and* → ALB → … → RDS; a producer Lambda → S3 *and* → SQS → … → DynamoDB)
+ * yields one route per sink, not just the first one the DFS happened to pick.
+ * Ingress-blocked ALBs are reached but not expanded (traffic can't pass).
+ */
+function tracePathsToSinks(
+  entry: ResourceNodeType,
+  byId: Map<string, ResourceNodeType>,
+  trafficEdges: Edge[],
+  ingressBlock: (node: ResourceNodeType) => string | null,
+): { nodePath: string[]; edgePath: string[] }[] {
+  const parentOf = new Map<string, { node: string; edge: string }>()
+  const reached = new Set<string>([entry.id])
+  const queue: string[] = [entry.id]
+  const sinkIds: string[] = []
+  while (queue.length) {
+    const uid = queue.shift()!
+    const u = byId.get(uid)
+    if (!u) continue
+    if (ingressBlock(u)) continue // reached, but a wall — do not expand
+    if (SINKS.has(u.data.type)) {
+      sinkIds.push(uid)
+      continue // sinks terminate the path
+    }
+    for (const edge of trafficEdges) {
+      if (edge.source !== uid) continue
+      const v = edge.target
+      if (!byId.has(v) || reached.has(v)) continue
+      reached.add(v)
+      parentOf.set(v, { node: uid, edge: edge.id })
+      queue.push(v)
+    }
+  }
+  return sinkIds.map((sid) => {
+    const nodePath: string[] = []
+    const edgePath: string[] = []
+    let cur: string | undefined = sid
+    while (cur !== undefined) {
+      nodePath.unshift(cur)
+      const p = parentOf.get(cur)
+      if (!p) break
+      edgePath.unshift(p.edge)
+      cur = p.node
+    }
+    return { nodePath, edgePath }
+  })
+}
+
 /** Options for {@link simulate}. */
 export interface SimOptions {
   /**
@@ -362,7 +413,28 @@ export function simulate(
 
   const ingressBlock = (node: ResourceNodeType) =>
     internetIngressBlock(node, byId, nodes)
-  const flows = entries.map((entry) => traceFlow(entry, byId, trafficEdges, ingressBlock))
+  // One flow per (entry, reachable sink) so the banner enumerates every
+  // destination; an entry that reaches no sink yields a single failed flow with
+  // a block reason (via the DFS tracer).
+  const flows: SimFlow[] = []
+  for (const entry of entries) {
+    const routes = tracePathsToSinks(entry, byId, trafficEdges, ingressBlock)
+    if (routes.length === 0) {
+      flows.push(traceFlow(entry, byId, trafficEdges, ingressBlock))
+      continue
+    }
+    for (const r of routes) {
+      flows.push({
+        entryId: entry.id,
+        ok: true,
+        pathNodeIds: r.nodePath,
+        pathEdgeIds: r.edgePath,
+        blockedNodeId: null,
+        label: r.nodePath.map((id) => byId.get(id)?.data.label ?? id).join(' → '),
+        message: '도달',
+      })
+    }
+  }
 
   // ── Highlight subgraph ──────────────────────────────────────────────────
   // The per-flow trace above yields ONE representative route per entry (used by

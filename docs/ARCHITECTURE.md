@@ -267,8 +267,10 @@ Two edge kinds carry no traffic and are skipped: Security-Group *attachments*
 and RDS → RDS *replication links* (dashed indigo, target shows a `REPLICA` badge
 and emits `replicate_source_db` —
 [ADR 0019](decisions/0019-rds-read-replica-as-edge.md)).
-The `SimResult` carries `flows[]` (one representative route per entry, for the
-banner + mission checks) plus a **highlight subgraph** computed separately:
+The `SimResult` carries `flows[]` — one route per **(entry, reachable sink)**
+pair (BFS + parent pointers), so the banner enumerates *every* destination (an
+entry that forks to S3 and to RDS lists both) rather than one path per entry —
+plus a **highlight subgraph** computed separately:
 `pathNodeIds` / `edgeHops` / `edgeStatus` / `arrivals` cover *every* live
 entry→sink path (forward-reachable from an entry ∩ backward-reachable to a sink),
 so a load balancer fanning out to two app servers lights **both** of their paths
