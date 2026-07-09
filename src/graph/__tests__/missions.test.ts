@@ -272,6 +272,29 @@ describe('mission checker audit (ADR 0041)', () => {
     expect(stars('security-hardening', sshOpen, b.edges)).toBeLessThan(3)
   })
 
+  it('async pipeline clears with an API Gateway in front of the producer + an S3 fork', () => {
+    // The reported topology: API GW → Lambda(producer) → SQS → Lambda(consumer)
+    // → DynamoDB, where the producer ALSO writes S3. The producer is no longer
+    // the entry (apigw is) and forks to a sink, yet the pipeline must clear —
+    // grading matches the live chain structurally, not the single traced path.
+    const nodes = [
+      N('apigw-0', 'apigw', undefined, { stage_name: 'prod', endpoint_type: 'regional' }),
+      N('lambda-1', 'lambda', undefined, { runtime: 'nodejs20.x', handler: 'index.handler', memory_mb: 128 }),
+      N('sqs-2', 'sqs', undefined, { fifo: false, visibility_timeout: 30 }),
+      N('lambda-3', 'lambda', undefined, { runtime: 'nodejs20.x', handler: 'index.handler', memory_mb: 128 }),
+      N('dynamodb-4', 'dynamodb', undefined, { billing_mode: 'PAY_PER_REQUEST', hash_key: 'id' }),
+      N('s3-5', 's3', undefined, { versioning: true, encryption: true, block_public_access: true }),
+    ]
+    const edges = [
+      E('a0', 'apigw-0', 'lambda-1'),
+      E('e1', 'lambda-1', 'sqs-2'),
+      E('e2', 'sqs-2', 'lambda-3'),
+      E('e3', 'lambda-3', 'dynamodb-4'),
+      E('f1', 'lambda-1', 's3-5'),
+    ]
+    expect(stars('async-pipeline', nodes, edges)).toBe(3)
+  })
+
   it('mission-scoped security ignores a disconnected insecure resource', () => {
     // A dangling public-block-off S3 unrelated to the async pipeline is ignored.
     const b = asyncBuild()
