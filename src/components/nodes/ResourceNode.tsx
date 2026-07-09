@@ -30,6 +30,9 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
   )
   const invalid = hasError || (meta.validate?.(data.config) ?? []).length > 0
   const sim = useGraphStore((s) => s.simulation)
+  // Drop-target highlight during a drag (ADR 0040): null = not the target,
+  // true = a valid drop, false = the rules reject this container.
+  const dropValid = useGraphStore((s) => (s.dropTarget?.id === id ? s.dropTarget.valid : null))
   const blocked = sim?.blockedNodeIds.includes(id) ?? false
   const onPath = !blocked && (sim?.pathNodeIds.includes(id) ?? false)
   const arrival = sim?.arrivals[id]
@@ -49,17 +52,21 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
       <div
         className={clsx(
           'h-full w-full rounded-lg border-2 border-dashed bg-slate-800/20 p-2 transition-colors',
-          blocked
-            ? 'border-rose-500'
-            : onPath
-              ? 'border-accent-soft'
-              : invalid
+          dropValid === true
+            ? 'border-accent bg-emerald-500/10 ring-2 ring-accent'
+            : dropValid === false
+              ? 'border-rose-500 bg-rose-500/10 ring-2 ring-rose-500'
+              : blocked
                 ? 'border-rose-500'
-                : hasWarning
-                  ? 'border-amber-400'
-                  : selected
-                    ? 'border-accent'
-                    : 'border-slate-600',
+                : onPath
+                  ? 'border-accent-soft'
+                  : invalid
+                    ? 'border-rose-500'
+                    : hasWarning
+                      ? 'border-amber-400'
+                      : selected
+                        ? 'border-accent'
+                        : 'border-slate-600',
         )}
       >
         <NodeResizer

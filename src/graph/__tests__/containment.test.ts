@@ -75,3 +75,23 @@ describe('attachToParent (ADR 0038)', () => {
     expect(useGraphStore.getState().nodes).toBe(before)
   })
 })
+
+describe('setDropTarget (ADR 0040 — drag highlight)', () => {
+  it('sets, dedups equal values, and clears', () => {
+    const s = useGraphStore.getState()
+    s.setDropTarget({ id: 'subnet-1', valid: true })
+    const first = useGraphStore.getState().dropTarget
+    expect(first).toEqual({ id: 'subnet-1', valid: true })
+
+    // An equal-by-value set must not churn state (prevents redundant re-renders).
+    s.setDropTarget({ id: 'subnet-1', valid: true })
+    expect(useGraphStore.getState().dropTarget).toBe(first)
+
+    // A changed validity updates.
+    s.setDropTarget({ id: 'subnet-1', valid: false })
+    expect(useGraphStore.getState().dropTarget).toEqual({ id: 'subnet-1', valid: false })
+
+    s.setDropTarget(null)
+    expect(useGraphStore.getState().dropTarget).toBeNull()
+  })
+})

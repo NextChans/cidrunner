@@ -203,3 +203,31 @@ feature branch → PR → merge.
 - **남은 관심사(Sprint F2)**: (1) `인터넷 → IGW → public subnet → ALB` 인그레스 leg를 시각
   파생 점선으로. (2) public subnet 없을 때 ALB fallback 정리. (3) drop 거부 hover 시각 피드백
   (빨간 테두리)은 미구현 여지.
+
+## Sprint F1.5 결과 (완료: 2026-07-09 — 차니 후속 P0.4~0.6)
+
+차니 추가 리포트("NAT Gateway도 부모와 분리됨") 후속. F1 완료 후 별도 브랜치로 진행.
+`tsc -b` strict clean · Vitest **120→126** 통과 · `oxlint` clean · `vite build` 성공 ·
+공유 URL(detached EC2 inside subnet) 로드 → auto-normalize end-to-end 확인(store parentId·
+extent·상대좌표·렌더순서 + 시각 편입). feature branch → PR → merge.
+
+- **P0.4 allowedParents 전수 감사(26종)** — AWS 배치 모델과 대조, **전부 정합(코드 변경 0)**.
+  핵심 발견: **NAT "분리"는 `allowedParents` 버그가 아니다**(`['subnet']` 올바름) — 로드 시
+  정규화 부재 + 재부착 수단 부재(F1 P0.2에서 해소)가 원인. 리포트 초안의 Cognito/Secrets/
+  KMS/ACM/WAF/Kinesis "→VPC" 분류는 **부정확**(리전/글로벌 서비스라 VPC 밖, `canvas` 유지).
+  전체 대조표는 ADR 0040에 첨부.
+- **P0.5 auto-normalize** — `normalizeContainment`가 로드 경계(공유 URL·슬롯·localStorage
+  리하이드레이트)에서 parent 미설정이지만 공간적으로 컨테이너 안인 노드를 가장 안쪽 허용
+  컨테이너로 편입. **"없는 것만 채움"**(기존 parent 유지), 절대→상대 좌표 변환·`extent`·위상
+  정렬, 한 패스로 중첩 깊이까지(자유 subnet→VPC, 그 안 ec2→subnet). 규칙 거부 시 미편입. ADR 0040.
+- **P0.6 드래그 드롭-타깃 피드백** — transient `dropTarget: {id, valid}`(미persist·미undo).
+  `onNodeDrag`가 `containerUnder`로 컨테이너+유효성 계산, `onNodeDragStop` 클리어, 동일값 dedup.
+  유효=accent 링+틴트, 규칙 거부=rose 링+틴트. ADR 0040.
+- **리팩터** — `absolutePosition`·`orderByParent`를 스토어에서 `graph/containment.ts`로 추출해
+  스토어(`attachToParent`)·normalize·테스트가 공유(타입 전용 import로 순환 참조 없음).
+- **테스트 120→126** — `normalize` 5(편입·중첩깊이·기존parent 유지·규칙거부·밖은 무시),
+  `setDropTarget` 1(dedup·클리어).
+- **범위 판단** — **P0.7(Lambda/API GW 분리)은 F2로 이월**. 신규 리소스+Terraform 6블록+미션
+  fixture 마이그레이션+sim entry로 광범위·독립적이라 별도 PR이 리뷰·회귀 관리에 유리.
+- **남은 관심사(F2)**: P0.7 + 드래그 중 자동 detach(현 `extent:'parent'` 잠금상 실효 낮음) +
+  Lambda VPC 연결 모델(allowedParents vs 파생) 결정.

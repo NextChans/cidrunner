@@ -64,3 +64,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0037](0037-palette-search.md) | Palette 검색 — debounced 실시간 필터 + `/` 단축키 | Accepted | 2026-07-09 |
 | [0038](0038-containment-attach-actions.md) | Containment attach 액션 대칭화 — drop-onto-parent + 우클릭 "부모에 넣기" | Accepted | 2026-07-09 |
 | [0039](0039-igw-internet-ingress-simulation.md) | IGW 인터넷 인그레스 시뮬레이션 — external entry 도달성 검사 | Accepted | 2026-07-09 |
+| [0040](0040-containment-audit-normalize-feedback.md) | Containment 정확도 — allowedParents 감사 · auto-normalize · 드래그 피드백 (extends 0038) | Accepted | 2026-07-09 |
