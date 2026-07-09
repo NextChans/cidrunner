@@ -4,11 +4,17 @@ import type { ResourceNodeType } from '@/store/useGraphStore'
 import type { ResourceType } from '@/resources'
 
 /**
- * Traffic simulation (Phase 3, extended to multi-flow — ADR 0018). Pressing
- * Start traces a request from EVERY entry point (each ALB, each Lambda with no
- * inbound traffic) along the traffic edges to a data sink (RDS or S3). Edges
- * whose source is a Security Group are *attachments*, not traffic, and are
- * ignored here (ADR 0017).
+ * Traffic simulation (Phase 3, extended to multi-flow — ADR 0018 — and to a
+ * backtracking path search — ADR 0047 / QA-002). Pressing Start traces a request
+ * from EVERY entry point (each ALB, API Gateway, Lambda, … with no inbound
+ * traffic) along the traffic edges to a data sink (RDS/S3/…). Instead of greedily
+ * committing to the first outgoing edge, the tracer performs a depth-first search
+ * with backtracking: a flow succeeds if *any* path from the entry reaches a sink,
+ * so a completed branch is no longer masked by an incomplete sibling drawn first.
+ *
+ * Edges whose source is a Security Group are *attachments*, not traffic, and are
+ * ignored here (ADR 0017), as are CloudWatch monitoring links and RDS → RDS
+ * replication links (ADR 0019).
  */
 
 /** Seconds per hop — drives particle stagger and arrival pulses. */
@@ -18,7 +24,7 @@ export const HOP_SECONDS = 0.45
 export interface SimFlow {
   entryId: string
   ok: boolean
-  /** Node ids on the traced path, in visit order. */
+  /** Node ids on the traced path, in visit order (a successful path when ok). */
   pathNodeIds: string[]
   /** Edge ids on the traced path, in visit order. */
   pathEdgeIds: string[]
@@ -44,6 +50,19 @@ export interface SimResult {
   edgeHops: Record<string, number>
   /** node id → seconds until the request reaches it (arrival pulse). */
   arrivals: Record<string, number>
+  /**
+   * Load-balancer fan-out (ADR 0048): for every reachable, unblocked ALB, each of
+   * its outgoing traffic edges gets a round-robin slot so the renderer can animate
+   * the balancer distributing across all registered targets — not just the one on
+   * the traced success path.
+   */
+  fanout: Record<string, { index: number; total: number }>
+  /**
+   * Per-highlighted-edge outcome (ADR 0049): `'ok'` when the edge lies on a
+   * successful flow, `'blocked'` when it only lies on a failed one. Drives the
+   * green vs. red in/out direction effect on traffic edges.
+   */
+  edgeStatus: Record<string, 'ok' | 'blocked'>
 }
 
 /** Types that terminate a successful request (the "DB / storage" tier). */
@@ -59,6 +78,7 @@ const SINKS: ReadonlySet<ResourceType> = new Set<ResourceType>([
 const ENTRY_CAPABLE: ReadonlySet<ResourceType> = new Set<ResourceType>([
   'route53',
   'cloudfront',
+  'apigw',
   'alb',
   'lambda',
   'ecs',
@@ -67,6 +87,9 @@ const ENTRY_CAPABLE: ReadonlySet<ResourceType> = new Set<ResourceType>([
   // (ingestion → Lambda consumer → sink) — ADR 0035.
   'kinesis',
 ])
+
+/** Node types that distribute inbound traffic across many targets (fan-out). */
+const BALANCERS: ReadonlySet<ResourceType> = new Set<ResourceType>(['alb'])
 
 /** Walks the parent chain to the enclosing VPC, if any. */
 function vpcOf(
@@ -122,7 +145,9 @@ function blockedMessage(type: ResourceType): string {
     case 'route53':
       return 'Route 53 레코드가 가리킬 대상(CloudFront/ALB)이 없습니다.'
     case 'cloudfront':
-      return 'CloudFront에 오리진(ALB/S3)이 연결되어 있지 않습니다.'
+      return 'CloudFront에 오리진(ALB/S3/API GW)이 연결되어 있지 않습니다.'
+    case 'apigw':
+      return 'API Gateway가 Lambda에 연결되어 있지 않습니다.'
     case 'alb':
       return '로드 밸런서에서 대상(EC2/Lambda)으로 가는 연결이 없습니다.'
     case 'ec2':
@@ -143,84 +168,117 @@ function blockedMessage(type: ResourceType): string {
   }
 }
 
-/** Traces one request greedily from `entry` along traffic edges. */
+/**
+ * Traces one request from `entry` with a depth-first, backtracking search. The
+ * first path that reaches a sink wins (edges are tried in graph order, so the
+ * result is deterministic). If no path reaches a sink, the deepest attempted
+ * path is reported so the block message still points at a meaningful dead end.
+ */
 function traceFlow(
   entry: ResourceNodeType,
   byId: Map<string, ResourceNodeType>,
   trafficEdges: Edge[],
   ingressBlock: (node: ResourceNodeType) => string | null,
 ): SimFlow {
-  const pathNodeIds: string[] = []
-  const pathEdgeIds: string[] = []
+  // Reachability search: a node is only expanded once (its "can I reach a sink"
+  // answer does not depend on how we arrived), which keeps the walk O(V+E) and
+  // naturally terminates on cycles. nodePath/edgePath follow the call stack, so a
+  // sink hit yields a valid simple path.
   const visited = new Set<string>()
+  const nodePath: string[] = []
+  const edgePath: string[] = []
 
-  let current: ResourceNodeType | undefined = entry
-  while (current) {
-    pathNodeIds.push(current.id)
-    visited.add(current.id)
+  let success: { nodePath: string[]; edgePath: string[] } | null = null
+  let bestFail:
+    | { nodePath: string[]; edgePath: string[]; blockedNodeId: string; message: string }
+    | null = null
 
-    // Internet ingress gate: an internet-facing ALB without IGW + public
-    // subnet cannot be reached from the internet, so the request stops here.
-    const ingressMsg = ingressBlock(current)
-    if (ingressMsg) {
-      return {
-        entryId: entry.id,
-        ok: false,
-        pathNodeIds,
-        pathEdgeIds,
-        blockedNodeId: current.id,
-        label: pathNodeIds.map((id) => byId.get(id)?.data.label ?? id).join(' → '),
-        message: ingressMsg,
-      }
+  const recordFail = (blockedNodeId: string, message: string) => {
+    if (!bestFail || nodePath.length > bestFail.nodePath.length) {
+      bestFail = { nodePath: [...nodePath], edgePath: [...edgePath], blockedNodeId, message }
     }
-
-    if (SINKS.has(current.data.type)) {
-      return {
-        entryId: entry.id,
-        ok: true,
-        pathNodeIds,
-        pathEdgeIds,
-        blockedNodeId: null,
-        label: pathNodeIds.map((id) => byId.get(id)?.data.label ?? id).join(' → '),
-        message: '도달',
-      }
-    }
-
-    let chosen: { edge: Edge; node: ResourceNodeType } | undefined
-    for (const edge of trafficEdges) {
-      if (edge.source !== current.id) continue
-      const node = byId.get(edge.target)
-      if (node && !visited.has(node.id)) {
-        chosen = { edge, node }
-        break
-      }
-    }
-
-    if (!chosen) {
-      return {
-        entryId: entry.id,
-        ok: false,
-        pathNodeIds,
-        pathEdgeIds,
-        blockedNodeId: current.id,
-        label: pathNodeIds.map((id) => byId.get(id)?.data.label ?? id).join(' → '),
-        message: blockedMessage(current.data.type),
-      }
-    }
-
-    pathEdgeIds.push(chosen.edge.id)
-    current = chosen.node
   }
 
-  // Unreachable, but keeps the types honest.
+  const dfs = (node: ResourceNodeType): boolean => {
+    nodePath.push(node.id)
+    visited.add(node.id)
+
+    // Internet ingress gate: an internet-facing ALB without IGW + public subnet
+    // cannot be reached from the internet, so no path through it can succeed.
+    const ingressMsg = ingressBlock(node)
+    if (ingressMsg) {
+      recordFail(node.id, ingressMsg)
+      nodePath.pop()
+      return false
+    }
+
+    if (SINKS.has(node.data.type)) {
+      success = { nodePath: [...nodePath], edgePath: [...edgePath] }
+      nodePath.pop()
+      return true
+    }
+
+    let advanced = false
+    for (const edge of trafficEdges) {
+      if (edge.source !== node.id) continue
+      const next = byId.get(edge.target)
+      if (!next || visited.has(next.id)) continue
+      advanced = true
+      edgePath.push(edge.id)
+      const found = dfs(next)
+      edgePath.pop()
+      if (found) {
+        nodePath.pop()
+        return true
+      }
+    }
+
+    // A dead end: no unvisited outgoing edge led to a sink from here.
+    if (!advanced) recordFail(node.id, blockedMessage(node.data.type))
+    nodePath.pop()
+    return false
+  }
+
+  dfs(entry)
+
+  const labelOf = (ids: string[]) =>
+    ids.map((id) => byId.get(id)?.data.label ?? id).join(' → ')
+
+  if (success) {
+    const s: { nodePath: string[]; edgePath: string[] } = success
+    return {
+      entryId: entry.id,
+      ok: true,
+      pathNodeIds: s.nodePath,
+      pathEdgeIds: s.edgePath,
+      blockedNodeId: null,
+      label: labelOf(s.nodePath),
+      message: '도달',
+    }
+  }
+
+  // No path reached a sink. Surface the deepest attempt (falls back to the entry
+  // itself when it had nowhere to go).
+  const fail: {
+    nodePath: string[]
+    edgePath: string[]
+    blockedNodeId: string
+    message: string
+  } =
+    bestFail ?? {
+      nodePath: [entry.id],
+      edgePath: [],
+      blockedNodeId: entry.id,
+      message: blockedMessage(entry.data.type),
+    }
   return {
     entryId: entry.id,
     ok: false,
-    pathNodeIds,
-    pathEdgeIds,
-    blockedNodeId: entry.id,
-    label: entry.data.label,
-    message: '경로를 완성할 수 없습니다.',
+    pathNodeIds: fail.nodePath,
+    pathEdgeIds: fail.edgePath,
+    blockedNodeId: fail.blockedNodeId,
+    label: labelOf(fail.nodePath),
+    message: fail.message,
   }
 }
 
@@ -250,12 +308,15 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
     return {
       ok: false,
       flows: [],
-      message: '트래픽 진입점이 없습니다. Route 53 / CloudFront / ALB / Lambda를 추가하세요.',
+      message:
+        '트래픽 진입점이 없습니다. Route 53 / CloudFront / API Gateway / ALB / Lambda를 추가하세요.',
       pathNodeIds: [],
       pathEdgeIds: [],
       blockedNodeIds: [],
       edgeHops: {},
       arrivals: {},
+      fanout: {},
+      edgeStatus: {},
     }
   }
 
@@ -271,14 +332,34 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
 
   const edgeHops: Record<string, number> = {}
   const arrivals: Record<string, number> = {}
+  const edgeStatus: Record<string, 'ok' | 'blocked'> = {}
   for (const flow of flows) {
     flow.pathEdgeIds.forEach((edgeId, i) => {
       if (!(edgeId in edgeHops)) edgeHops[edgeId] = i
+      // 'ok' always wins over 'blocked' for an edge shared across flows.
+      if (flow.ok) edgeStatus[edgeId] = 'ok'
+      else if (!(edgeId in edgeStatus)) edgeStatus[edgeId] = 'blocked'
     })
     flow.pathNodeIds.forEach((nodeId, i) => {
       const t = i * HOP_SECONDS
       const prev = arrivals[nodeId]
       if (prev === undefined || prev > t) arrivals[nodeId] = t
+    })
+  }
+
+  // Load-balancer fan-out: for each reachable, unblocked balancer, slot ALL of
+  // its outgoing traffic edges (even ones off the traced success path) so the
+  // renderer can animate a round-robin distribution across every target.
+  const reached = new Set(pathNodeIds)
+  const blocked = new Set(blockedNodeIds)
+  const fanout: Record<string, { index: number; total: number }> = {}
+  for (const node of nodes) {
+    if (!BALANCERS.has(node.data.type)) continue
+    if (!reached.has(node.id) || blocked.has(node.id)) continue
+    const outs = trafficEdges.filter((e) => e.source === node.id && byId.has(e.target))
+    if (outs.length < 2) continue // a single target is not a visible fan-out
+    outs.forEach((e, index) => {
+      fanout[e.id] = { index, total: outs.length }
     })
   }
 
@@ -290,5 +371,16 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
       : `모든 요청(${flows.length}개 경로)이 목적지에 도달했습니다! 🎉`
     : `${flows.length}개 경로 중 ${flows.length - okCount}개가 차단되었습니다.`
 
-  return { ok, flows, message, pathNodeIds, pathEdgeIds, blockedNodeIds, edgeHops, arrivals }
+  return {
+    ok,
+    flows,
+    message,
+    pathNodeIds,
+    pathEdgeIds,
+    blockedNodeIds,
+    edgeHops,
+    arrivals,
+    fanout,
+    edgeStatus,
+  }
 }

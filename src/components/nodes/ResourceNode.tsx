@@ -143,6 +143,11 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
           style={{ animationDelay: `${arrival}s` }}
         />
       )}
+      {/* Load-balancer distribution pulse (ADR 0048): a continuous violet ring on
+          an active ALB while it fans traffic out to its targets. */}
+      {data.type === 'alb' && onPath && (
+        <span className="lb-pulse pointer-events-none absolute inset-0 rounded-lg" />
+      )}
       {showTarget && <Handle type="target" position={Position.Left} className="!bg-accent" />}
       <Icon size={18} className={meta.color} />
       <div className="flex flex-col leading-tight">

@@ -25,15 +25,16 @@ const INLINE_SOURCE: Record<string, InlineSource> = {
 }
 
 /**
- * Lambda — a serverless function fronted by an HTTP API Gateway. The emitter
- * generates a real execution role, an inline hello-world package (archive
- * provider), and a working API GW v2 integration so `terraform apply` yields a
- * callable endpoint.
+ * Lambda — a standalone serverless function. The emitter generates a real
+ * execution role and an inline hello-world package (archive provider) so
+ * `terraform apply` yields a deployable function. HTTP fronting is now a
+ * separate API Gateway resource (ADR 0046) that integrates via an `apigw →
+ * lambda` edge, so a Lambda block no longer bundles its own endpoint.
  */
 export const lambda: ResourceMeta = {
   type: 'lambda',
-  label: 'Lambda + API GW',
-  description: '서버리스 함수 + HTTP API',
+  label: 'Lambda',
+  description: '서버리스 함수',
   category: 'compute',
   icon: Zap,
   color: 'text-yellow-400',
@@ -117,38 +118,6 @@ resource "aws_lambda_function" "${name}" {
   filename         = data.archive_file.${name}_zip.output_path
   source_code_hash = data.archive_file.${name}_zip.output_base64sha256
   tags = { Name = "${displayName}" }
-}
-
-resource "aws_apigatewayv2_api" "${name}_api" {
-  name          = "${awsName}-api"
-  protocol_type = "HTTP"
-}
-
-resource "aws_apigatewayv2_integration" "${name}_int" {
-  api_id                 = aws_apigatewayv2_api.${name}_api.id
-  integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.${name}.invoke_arn
-  payload_format_version = "2.0"
-}
-
-resource "aws_apigatewayv2_route" "${name}_route" {
-  api_id    = aws_apigatewayv2_api.${name}_api.id
-  route_key = "$default"
-  target    = "integrations/\${aws_apigatewayv2_integration.${name}_int.id}"
-}
-
-resource "aws_apigatewayv2_stage" "${name}_stage" {
-  api_id      = aws_apigatewayv2_api.${name}_api.id
-  name        = "$default"
-  auto_deploy = true
-}
-
-resource "aws_lambda_permission" "${name}_perm" {
-  statement_id  = "AllowAPIGWInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.${name}.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "\${aws_apigatewayv2_api.${name}_api.execution_arn}/*"
 }`
   },
 }

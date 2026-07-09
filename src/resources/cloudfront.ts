@@ -2,14 +2,16 @@ import { Cloud } from 'lucide-react'
 import type { ResourceMeta } from './types'
 
 /**
- * CloudFront — a CDN in front of an origin (ALB, S3, or Lambda's API). A
+ * CloudFront — a CDN in front of an origin (ALB, S3, or an API Gateway). A
  * cloudfront → origin edge selects the origin; without one the emitter falls
- * back to a placeholder domain (and validation raises an error).
+ * back to a placeholder domain (and validation raises an error). Since the
+ * Lambda + API GW split (ADR 0046), a serverless origin is the API Gateway
+ * block rather than a bare Lambda.
  */
 export const cloudfront: ResourceMeta = {
   type: 'cloudfront',
   label: 'CloudFront',
-  description: 'CDN — 오리진(ALB/S3) 앞단',
+  description: 'CDN — 오리진(ALB/S3/API GW) 앞단',
   category: 'network',
   icon: Cloud,
   color: 'text-cyan-400',
@@ -18,7 +20,7 @@ export const cloudfront: ResourceMeta = {
   },
   // Global service — not inside a VPC.
   allowedParents: ['canvas'],
-  connectsTo: ['alb', 's3', 'lambda'],
+  connectsTo: ['alb', 's3', 'apigw'],
   fields: [
     {
       key: 'price_class',
@@ -49,19 +51,24 @@ export const cloudfront: ResourceMeta = {
     }
   }`
     } else {
-      const domain =
-        origin?.kind === 'alb'
+      const isApi = origin?.kind === 'apigw'
+      const domain = isApi
+        ? `"\${aws_api_gateway_rest_api.${origin.name}.id}.execute-api.\${var.aws_region}.amazonaws.com"`
+        : origin?.kind === 'alb'
           ? `aws_lb.${origin.name}.dns_name`
-          : origin?.kind === 'lambda'
-            ? `replace(aws_apigatewayv2_api.${origin.name}_api.api_endpoint, "https://", "")`
-            : `"origin-not-connected.example.com"`
+          : `"origin-not-connected.example.com"`
+      // A REST API is reached under its stage path, so a CloudFront API origin
+      // needs an origin_path of "/<stage>".
+      const originPath = isApi
+        ? `\n    origin_path = "/\${aws_api_gateway_stage.${origin.name}.stage_name}"`
+        : ''
       originBlock = `  origin {
     domain_name = ${domain}
-    origin_id   = "origin-${origin?.name ?? 'missing'}"
+    origin_id   = "origin-${origin?.name ?? 'missing'}"${originPath}
     custom_origin_config {
       http_port              = 80
       https_port             = 443
-      origin_protocol_policy = "${origin?.kind === 'lambda' ? 'https-only' : 'http-only'}"
+      origin_protocol_policy = "${isApi ? 'https-only' : 'http-only'}"
       origin_ssl_protocols   = ["TLSv1.2"]
     }
   }`

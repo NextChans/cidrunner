@@ -26,7 +26,7 @@ function awsName(id: string): string {
 const ORDER: ResourceType[] = [
   'vpc', 'subnet', 'igw', 'nat', 'sg', 'kms', 'acm', 'cognito', 'secretsmanager',
   'efs', 'alb', 'ec2', 'ecs', 'eks', 'rds', 'elasticache', 's3', 'dynamodb',
-  'kinesis', 'sqs', 'sns', 'lambda', 'cloudwatch', 'waf', 'cloudfront', 'route53',
+  'kinesis', 'sqs', 'sns', 'lambda', 'apigw', 'cloudwatch', 'waf', 'cloudfront', 'route53',
 ]
 
 function ancestorOfType(
@@ -136,7 +136,7 @@ export function generateTerraform(
           replicaSource: node.data.type === 'rds' ? replicaSourceOf(node.id) : undefined,
           originTarget:
             node.data.type === 'cloudfront'
-              ? firstTargetOf(node.id, ['alb', 's3', 'lambda'])
+              ? firstTargetOf(node.id, ['alb', 's3', 'apigw'])
               : undefined,
           aliasTarget:
             node.data.type === 'route53'
@@ -150,6 +150,10 @@ export function generateTerraform(
           kmsKey:
             node.data.type === 'secretsmanager'
               ? firstTargetOf(node.id, ['kms'])?.name
+              : undefined,
+          integrationTarget:
+            node.data.type === 'apigw'
+              ? firstTargetOf(node.id, ['lambda'])?.name
               : undefined,
           subscribers:
             node.data.type === 'sns' ? targetsOf(node.id, ['sqs', 'lambda']) : undefined,
@@ -316,9 +320,15 @@ ${dataBlocks}${blocks.join('\n\n')}${derived.length ? '\n\n# --- Derived network
 }`)
     }
     if (n.data.type === 'lambda') {
-      outputs.push(`output "${name}_api_endpoint" {
-  description = "${n.data.label} HTTP API endpoint"
-  value       = aws_apigatewayv2_api.${name}_api.api_endpoint
+      outputs.push(`output "${name}_function_arn" {
+  description = "${n.data.label} function ARN"
+  value       = aws_lambda_function.${name}.arn
+}`)
+    }
+    if (n.data.type === 'apigw') {
+      outputs.push(`output "${name}_invoke_url" {
+  description = "${n.data.label} invoke URL"
+  value       = aws_api_gateway_stage.${name}.invoke_url
 }`)
     }
     if (n.data.type === 's3') {
@@ -445,7 +455,7 @@ Notes:
 - EC2 AMIs set to \`auto\` resolve to the latest Amazon Linux 2023 via a data source.
 - Route tables and associations are derived from your topology (IGW → public,
   NAT → private).
-${hasType('rds') ? '- RDS requires `db_password` (no default; it is marked sensitive).\n- The DB subnet group spans the subnets of the VPC that contains the RDS.\n' : ''}${hasType('lambda') ? '- Lambda ships an inline hello-world package (archive provider) and a working\n  API Gateway HTTP API — the endpoint is in the outputs.\n' : ''}- **Cost warning**: NAT Gateway, ALB, and RDS bill hourly. \`terraform destroy\`
+${hasType('rds') ? '- RDS requires `db_password` (no default; it is marked sensitive).\n- The DB subnet group spans the subnets of the VPC that contains the RDS.\n' : ''}${hasType('lambda') ? '- Lambda ships an inline hello-world package (archive provider) and an IAM\n  execution role.\n' : ''}${hasType('apigw') ? '- API Gateway proxies to the Lambda it is connected to (apigw → lambda edge)\n  via an AWS_PROXY `{proxy+}` integration — the invoke URL is in the outputs.\n' : ''}- **Cost warning**: NAT Gateway, ALB, and RDS bill hourly. \`terraform destroy\`
   when you are done.
 `
 

@@ -24,7 +24,7 @@ console and docs. See [ADR 0008](decisions/0008-korean-first-ui-no-i18n.md).
 ```
 App
 └─ Layout                     responsive shell (3-pane ≥md / drawers <md)
-   ├─ Palette         (left)    searchable, draggable list of the 26 resource types
+   ├─ Palette         (left)    searchable, draggable list of the 27 resource types
    ├─ Canvas          (center)  React Flow editor — nodes, edges, nesting
    │  └─ ResourceNode           one node renderer, driven by ResourceMeta
    ├─ Inspector       (right)   per-resource property form (Phase 2)
@@ -144,12 +144,14 @@ interface ResourceMeta {
 }
 ```
 
-The resource set is **26** blocks — the 10-block MVP set (ADR 0001) plus expansion
+The resource set is **27** blocks — the 10-block MVP set (ADR 0001) plus expansion
 batch 1 ([ADR 0022](decisions/0022-resource-expansion-batch-1.md): DynamoDB,
 CloudFront, Route 53, SQS), batch 2 ([ADR 0026](decisions/0026-resource-expansion-2.md):
-ECS, EKS, ElastiCache, EFS, SNS, CloudWatch), and batch 3
+ECS, EKS, ElastiCache, EFS, SNS, CloudWatch), batch 3
 ([ADR 0035](decisions/0035-resource-expansion-3-security-and-streaming.md): Cognito,
-Secrets Manager, KMS, ACM, WAF, Kinesis). They group into seven palette categories —
+Secrets Manager, KMS, ACM, WAF, Kinesis), and the Lambda + API GW split
+([ADR 0046](decisions/0046-lambda-apigw-split.md): standalone Lambda and a new
+API Gateway REST API block). They group into seven palette categories —
 networking / compute / database / storage / integration / management / 보안·아이덴티티 —
 filtered live by a debounced search input
 ([ADR 0037](decisions/0037-palette-search.md)).
@@ -226,19 +228,35 @@ See [ADR 0010](decisions/0010-graph-nesting-and-edge-rule-model.md).
 ## Traffic simulation (playback)
 
 Pressing **Start** runs [`src/graph/simulate.ts`](../src/graph/simulate.ts): one
-greedy trace per **entry point** (every ALB, every Lambda with no inbound
-traffic) along the traffic edges to a sink (RDS or S3). Two edge kinds carry no
-traffic and are skipped: Security-Group *attachments* (dashed rose,
-[ADR 0017](decisions/0017-security-model-and-severity-validation.md)) and
-RDS → RDS *replication links* (dashed indigo, target shows a `REPLICA` badge and
-emits `replicate_source_db` —
+trace per **entry point** (every Route 53 / CloudFront / API Gateway / ALB /
+Lambda / container with no inbound traffic) along the traffic edges to a sink
+(RDS/S3/DynamoDB/ElastiCache/EFS). The tracer is a **depth-first search with
+backtracking** ([ADR 0047](decisions/0047-simulate-backtracking.md), fixing
+QA-002): a flow succeeds if *any* path from the entry reaches a sink, so a
+completed branch is no longer masked by an incomplete sibling drawn first. A
+non-reverting `visited` set keeps it O(V+E) and terminates on cycles; a failed
+flow reports its deepest attempt so the block hint points at a real dead end.
+Two edge kinds carry no traffic and are skipped: Security-Group *attachments*
+(dashed rose, [ADR 0017](decisions/0017-security-model-and-severity-validation.md))
+and RDS → RDS *replication links* (dashed indigo, target shows a `REPLICA` badge
+and emits `replicate_source_db` —
 [ADR 0019](decisions/0019-rds-read-replica-as-edge.md)).
 The `SimResult` carries `flows[]` plus derived aggregates (`edgeHops`,
-`arrivals`, `blockedNodeIds`). Playback: SVG particles staggered per hop
-(0.45s), a green **arrival pulse** when the request reaches each node (data
-lands), red pulses on blocking nodes, and a banner listing every flow with its
-outcome. See [ADR 0012](decisions/0012-traffic-simulation-model.md) and
-[ADR 0018](decisions/0018-multi-flow-playback-and-palette-categories.md).
+`arrivals`, `blockedNodeIds`, `fanout`, `edgeStatus`). Playback: SVG particles
+staggered per hop (0.45s), a green **arrival pulse** when the request reaches
+each node (data lands), red pulses on blocking nodes, and a banner listing every
+flow with its outcome. See [ADR 0012](decisions/0012-traffic-simulation-model.md)
+and [ADR 0018](decisions/0018-multi-flow-playback-and-palette-categories.md).
+
+**Traffic visualization** — an active ALB fans traffic out across **all** of its
+registered targets: `fanout` slots each of its outgoing edges into a round-robin
+schedule so siblings pulse in rotation (even off the winning path), and the node
+carries a continuous violet `lb-pulse`
+([ADR 0048](decisions/0048-load-balancing-animation.md)). Each active edge shows
+**directional in/out effects** — an expanding ring where traffic leaves the
+source, a converging ring where it arrives at the target — tinted green on a
+reachable path and red on a blocked one via `edgeStatus`
+([ADR 0049](decisions/0049-edge-inout-visual-effects.md)).
 
 **Internet ingress gate** — when a trace reaches an internet-facing ALB
 (`internal !== true`) that sits inside a VPC, the flow only continues if that
@@ -266,8 +284,10 @@ owns its HCL via `ResourceMeta.terraform(ctx)`; the generator resolves `refs`
 (enclosing VPC/subnet, public subnets, SG attachments and ALB targets from
 edges) and **derives the plumbing the canvas doesn't draw**: route tables +
 associations (IGW → public, NAT → private), DB subnet groups, the Amazon Linux
-2023 AMI lookup, and Lambda's IAM role + inline package + full API Gateway
-chain. Output: `main.tf` / `variables.tf` / `outputs.tf` / `README.md` zipped
+2023 AMI lookup, Lambda's IAM role + inline package, and the API Gateway REST
+API chain (`{proxy+}` AWS_PROXY integration to its connected Lambda + invoke
+permission — [ADR 0046](decisions/0046-lambda-apigw-split.md)). Output:
+`main.tf` / `variables.tf` / `outputs.tf` / `README.md` zipped
 via JSZip. Verified with a real `terraform init` + `validate` (v1.9.8, AWS
 provider 5.x + archive provider).
 
