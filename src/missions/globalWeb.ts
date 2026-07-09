@@ -1,4 +1,5 @@
 import type { Mission } from './types'
+import { scopedSecurityOk } from './scope'
 
 export const globalWeb: Mission = {
   id: 'global-web',
@@ -9,7 +10,8 @@ export const globalWeb: Mission = {
   hint: 'CloudFront의 오리진을 S3가 아니라 ALB로 두세요(외부 ALB여야 합니다). ALB 뒤에 EC2, 그 뒤에 RDS를 연결합니다. 보안 경고가 0이면 별 3개!',
   requiredResources: ['route53', 'cloudfront', 'alb', 'ec2', 'rds'],
   // ★1 R53→CF→ALB→EC2→RDS 도달 · ★2 설정 오류 없음 · ★3 보안 경고 0
-  check: ({ nodes, sim, allValid, securityOk }) => {
+  check: (ctx) => {
+    const { nodes, sim, allValid } = ctx
     const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
     const flow = sim.flows.find((f) => {
       const path = f.pathNodeIds.map(typeOf)
@@ -25,7 +27,7 @@ export const globalWeb: Mission = {
     if (!flow) return 0
     let stars = 1
     if (allValid) stars += 1
-    if (securityOk) stars += 1
+    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
     return stars
   },
 }

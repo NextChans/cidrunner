@@ -212,6 +212,12 @@ predicates — `canContain`, `canBeTopLevel`, `canConnect`, `canBeSource`,
 - **Edges** — a connection `source → target` is allowed only when the source's
   `connectsTo` lists the target's type; connection handles are rendered only
   where a node may be an edge source and/or target.
+- **SG attachment (ADR 0042)** — an SG attaches by drawing `SG → resource`. Its
+  `connectsTo` set is exactly the VPC-bound, ENI-owning resources
+  (`ec2`, `alb`, `rds`, `ecs`, `eks`, `elasticache`, `efs`) and matches, one-for-one,
+  the set for which `checks.ts` raises a "no SG attached" warning — so a warned
+  resource is always attachable (no "attach it" / "not allowed" contradiction).
+  Lambda is intentionally excluded (modeled as a non-VPC, canvas-level function).
 - **Feedback** — a rejected drop or edge sets a transient `notice` string in the
   store, surfaced as a toast over the canvas.
 
@@ -242,6 +248,15 @@ with guidance. Internal ALBs and loose ALBs with no enclosing VPC are exempt, so
 abstract test topologies stay valid. See
 [ADR 0039](decisions/0039-igw-internet-ingress-simulation.md).
 
+**Derived visual edges (ADR 0043)** — [`src/graph/derived.ts`](../src/graph/derived.ts)
+computes *engine-owned* edges from the graph's plumbing; they are rendered but
+never stored, editable, selectable, or deletable. Today an IGW nested in a VPC
+draws a subtle slate dashed arrow to every public subnet in that VPC (the
+`0.0.0.0/0 → IGW` default route), with a hover tooltip. The Canvas merges them in
+render-only (`[...userEdges, ...derivedEdges(nodes)]`) so `onEdgesChange` keeps
+operating on user edges. The framework is generic for future plumbing (e.g.
+RDS → its subnet group).
+
 ## Terraform export
 
 **Export** runs [`src/graph/terraform.ts`](../src/graph/terraform.ts) and is
@@ -258,17 +273,32 @@ provider 5.x + archive provider).
 
 ## Mission registry
 
-[`src/missions/`](../src/missions/) holds one module per mission (10 total:
+[`src/missions/`](../src/missions/) holds one module per mission (12 total:
 `tutorial`, `threeTier`, `serverless`, `staticCdn`, `asyncPipeline`,
 `containerWorkload`, `globalWeb`, `eventDriven`, `securityHardening`,
-`disasterRecovery` — see [ADR 0027](decisions/0027-mission-expansion-2.md)) plus
-an `index.ts`. A `Mission`
-describes its `goal`, optional `hint`, `requiredResources`, and a `check(ctx)`
-that returns a 0–3 star rating (0 = not cleared) for the current graph. The
-MissionPanel builds the check context live — the multi-flow simulation result,
-`allValid` (no errors) and `securityOk` (no security warnings) — so cards show
-clear state and stars as the graph changes. See
-[ADR 0014](decisions/0014-mission-clear-detection-and-stars.md).
+`disasterRecovery`, `dataPipeline`, `secureAuthWeb` — see
+[ADR 0027](decisions/0027-mission-expansion-2.md) and
+[ADR 0036](decisions/0036-mission-expansion-3-pipelines-and-auth.md)) plus an
+`index.ts`. A `Mission` describes its `goal`, optional `hint`,
+`requiredResources`, and a `check(ctx)` that returns a 0–3 star rating
+(0 = not cleared) for the current graph. The MissionPanel builds the check
+context live — the multi-flow simulation result, `allValid` (no errors) and
+`securityOk` (no security warnings) — so cards show clear state and stars as the
+graph changes. See [ADR 0014](decisions/0014-mission-clear-detection-and-stars.md).
+
+**Star-tier spec (ADR 0041).** The baseline grading is `★1` reachability /
+existence · `★2` no config errors **anywhere** on the canvas (errors are hard,
+apply-blocking) · `★3` no security warnings **within the mission's connected
+build**. That last scope matters: `securityOk` on `ctx` is a whole-graph flag, so
+a leftover starter seed (VPC▸Subnet▸EC2 with no SG) used to pin every VPC-less
+mission at ★2. Missions instead call `scopedSecurityOk(ctx, anchors)`
+([`src/missions/scope.ts`](../src/missions/scope.ts)), which closes the satisfying
+flow's nodes over edges (both directions — an SG attaches as the edge *source*)
+and the containment parent chain, then checks warnings only inside that closure.
+Unrelated leftover nodes are ignored; an SSH-open SG or a public S3 that is part
+of the build is still caught. Domain-specific tiers (three-tier's per-layer SG
+attach, disaster-recovery's Multi-AZ + cross-AZ replica) are documented in each
+mission's `check`.
 
 ## Data flow
 

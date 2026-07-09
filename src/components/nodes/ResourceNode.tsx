@@ -4,10 +4,37 @@ import clsx from 'clsx'
 import { getResource } from '@/resources'
 import { canBeSource, canBeTarget } from '@/graph/rules'
 import { getGraphIssues } from '@/graph/checks'
+import { DERIVED_SOURCE_HANDLE, DERIVED_TARGET_HANDLE } from '@/graph/derived'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
 /** Containers can't shrink below this, so their header and children stay visible. */
 const MIN_CONTAINER = { width: 160, height: 100 }
+
+/**
+ * Hidden, non-connectable handle pair for engine-owned derived edges (ADR 0043)
+ * to anchor to — every node carries them, including IGWs (no edge source) and
+ * containers (no interactive handle at all). Inert: opacity 0, no pointer events.
+ */
+function DerivedHandles() {
+  return (
+    <>
+      <Handle
+        id={DERIVED_TARGET_HANDLE}
+        type="target"
+        position={Position.Left}
+        isConnectable={false}
+        className="!pointer-events-none !h-px !w-px !min-w-0 !border-0 !bg-transparent !opacity-0"
+      />
+      <Handle
+        id={DERIVED_SOURCE_HANDLE}
+        type="source"
+        position={Position.Right}
+        isConnectable={false}
+        className="!pointer-events-none !h-px !w-px !min-w-0 !border-0 !bg-transparent !opacity-0"
+      />
+    </>
+  )
+}
 
 /**
  * Custom React Flow node rendering an AWS resource block. Containers (VPC,
@@ -87,6 +114,7 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
           <span className="text-slate-300">{data.label}</span>
           {hasWarning && !invalid && <span title="보안 경고">⚠️</span>}
         </div>
+        <DerivedHandles />
       </div>
     )
   }
@@ -134,6 +162,7 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
         </span>
       )}
       {showSource && <Handle type="source" position={Position.Right} className="!bg-accent" />}
+      <DerivedHandles />
     </div>
   )
 }

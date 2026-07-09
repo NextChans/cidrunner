@@ -1,4 +1,5 @@
 import type { Mission } from './types'
+import { scopedSecurityOk } from './scope'
 
 export const containerWorkload: Mission = {
   id: 'container-workload',
@@ -9,7 +10,8 @@ export const containerWorkload: Mission = {
   hint: 'ECS Fargate 또는 EKS를 VPC에 놓고, ALB에서 컨테이너로 엣지를 그으세요. ALB·컨테이너·RDS 모두에 Security Group을 연결하면 별 3개!',
   requiredResources: ['vpc', 'subnet', 'alb', 'ecs', 'rds'],
   // ★1 ALB→컨테이너→RDS 도달 · ★2 설정 오류 없음(멀티 AZ 포함) · ★3 보안 경고 0
-  check: ({ nodes, sim, allValid, securityOk }) => {
+  check: (ctx) => {
+    const { nodes, sim, allValid } = ctx
     const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
     const flow = sim.flows.find((f) => {
       const path = f.pathNodeIds.map(typeOf)
@@ -23,7 +25,7 @@ export const containerWorkload: Mission = {
     if (!flow) return 0
     let stars = 1
     if (allValid) stars += 1
-    if (securityOk) stars += 1
+    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
     return stars
   },
 }

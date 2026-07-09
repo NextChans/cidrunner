@@ -1,4 +1,5 @@
 import type { Mission } from './types'
+import { scopedSecurityOk } from './scope'
 
 export const secureAuthWeb: Mission = {
   id: 'secure-auth-web',
@@ -10,7 +11,8 @@ export const secureAuthWeb: Mission = {
   requiredResources: ['cloudfront', 'alb', 'ec2', 'rds', 'cognito', 'secretsmanager', 'acm', 'waf'],
   // ★1 CF→ALB→EC2→RDS 도달 + 보안 스택(Cognito/Secrets/ACM/WAF) 존재
   // ★2 설정 오류 없음 · ★3 보안 경고 0
-  check: ({ nodes, sim, allValid, securityOk }) => {
+  check: (ctx) => {
+    const { nodes, sim, allValid } = ctx
     const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
     const has = (t: string) => nodes.some((n) => n.data.type === t)
     const flow = sim.flows.find((f) => {
@@ -27,7 +29,7 @@ export const secureAuthWeb: Mission = {
     if (!has('cognito') || !has('secretsmanager') || !has('acm') || !has('waf')) return 0
     let stars = 1
     if (allValid) stars += 1
-    if (securityOk) stars += 1
+    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
     return stars
   },
 }
