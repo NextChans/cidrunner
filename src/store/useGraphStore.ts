@@ -62,6 +62,12 @@ interface GraphState {
   /** Transient, player-facing message (e.g. a rejected drop/edge). */
   notice: Notice | null
   mobileDrawers: MobileDrawers
+  /**
+   * Live palette search query (ADR 0037). Transient (never persisted) and
+   * independent of the mobile palette drawer's open/close state, so a `/`
+   * focus + type works regardless of how the palette is surfaced.
+   */
+  search: string
   /** Result of the last/current traffic simulation run (Phase 3), or null. */
   simulation: SimResult | null
   /** MiniMap visibility — defaults off on small screens where it hides the canvas. */
@@ -106,6 +112,8 @@ interface GraphState {
   setActiveMission: (id: string | null) => void
   setNotice: (text: string | null, kind?: Notice['kind']) => void
   setDrawer: (which: DrawerKey, open: boolean) => void
+  /** Sets the live palette search query (ADR 0037). */
+  setSearch: (query: string) => void
   /** Replaces the whole design (shared URL / JSON import). */
   loadDesign: (nodes: ResourceNodeType[], edges: Edge[], missionId?: string) => void
   /** Best star record per mission id — persisted (Editor Fundamentals sprint). */
@@ -253,6 +261,7 @@ export const useGraphStore = create<GraphState>()(
   activeMissionId: null,
   notice: null,
   mobileDrawers: { palette: false, inspector: false, missions: false },
+  search: '',
   simulation: null,
   showMiniMap: !isMobileViewport(),
   contextMenu: null,
@@ -472,6 +481,8 @@ export const useGraphStore = create<GraphState>()(
 
   setDrawer: (which, open) =>
     set((state) => ({ mobileDrawers: { ...state.mobileDrawers, [which]: open } })),
+
+  setSearch: (search) => set({ search }),
 
   loadDesign: (nodes, edges, missionId) => {
     bumpNodeSeq(nodes)

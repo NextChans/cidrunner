@@ -44,10 +44,10 @@ Design and decisions live in [`docs/`](docs/):
 
 ## Concept
 
-- **Block-style editor** — a React Flow canvas with a categorized palette (networking / compute / database / storage / integration / management / security); resources nest and connect under real AWS rules.
+- **Block-style editor** — a React Flow canvas with a categorized palette (networking / compute / database / storage / integration / management / security & identity), filtered live by a debounced search (press `/` to focus); resources nest and connect under real AWS rules. See [ADR 0037](docs/decisions/0037-palette-search.md).
 - **Security as gameplay** — attach Security Groups by drawing edges; encryption and public-access toggles; amber warnings for anything insecure.
 - **Traffic playback** — press Start and every flow (ALB → EC2 → RDS, Lambda → S3, …) animates with particles and arrival pulses; blocked paths highlight the blocking node.
-- **Missions & Free mode** — 10 best-practice challenges (tutorial / HA 3-tier / serverless / static CDN / async pipeline / container workload / global dynamic web / event-driven fan-out / security hardening / disaster recovery) with 0–3 star ratings, or an open sandbox.
+- **Missions & Free mode** — 12 best-practice challenges (tutorial / HA 3-tier / serverless / static CDN / async pipeline / container workload / global dynamic web / event-driven fan-out / security hardening / disaster recovery / data pipeline / secure auth web) with 0–3 star ratings, or an open sandbox.
 - **Save & Share** — designs autosave to the browser (survive refresh) and share as a single URL or a JSON file (mission context included, load asks before replacing your work); no account, no backend. Shared links carry an Open Graph / Twitter Card preview image. See [ADR 0031](docs/decisions/0031-og-image-and-share-metadata.md).
 - **Gallery** — save multiple named designs into local slots and reopen them from a card grid with live SVG thumbnails; rename and delete inline. See [ADR 0033](docs/decisions/0033-gallery-multi-slot.md).
 - **Achievements** — five badges (first clear, first 3-star, first saved design, five missions, all missions 3-star) unlock as you play, derived purely from your progress. See [ADR 0032](docs/decisions/0032-achievements-and-badges.md).
@@ -55,7 +55,7 @@ Design and decisions live in [`docs/`](docs/):
 - **Keyboard & context menu** — global shortcuts for undo/redo (⌘Z / ⌘⇧Z), duplicate (⌘D), delete, fit view (R), simulate (S), export (E), and a `?` cheat-sheet; right-click a node to edit / duplicate / clear edges / detach / delete. See [ADR 0028](docs/decisions/0028-keyboard-shortcuts-and-context-menu.md).
 - **Interactive tutorial** — the first mission shows a live, self-checking step list that ticks off and highlights the next action as you build. See [ADR 0030](docs/decisions/0030-interactive-tutorial-steps.md).
 - **Apply-ready Terraform export** — `main.tf`, `variables.tf`, `outputs.tf` with derived route tables, DB subnet groups, IAM, and a working API Gateway; `terraform apply` creates real resources.
-- **Resource set (20)** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda+API GW · RDS (+read replica) · ElastiCache · DynamoDB · S3 · EFS · SQS · SNS · CloudWatch · Security Group.
+- **Resource set (26)** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda+API GW · RDS (+read replica) · ElastiCache · DynamoDB · S3 · EFS · Kinesis · SQS · SNS · CloudWatch · Security Group · Cognito · Secrets Manager · KMS · ACM · WAF. See [ADR 0035](docs/decisions/0035-resource-expansion-3-security-and-streaming.md).
 - **Mobile** — building infra is a desktop-first experience, but narrow screens (<768px) get a full-viewport canvas with the palette / inspector / missions moved into overlay drawers, so a project stays viewable and demo-able on a phone. See [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md).
 
 ## Roadmap
@@ -139,8 +139,8 @@ src/
 ├─ store/useGraphStore.ts   # Zustand — nodes / edges / mode
 ├─ components/              # Layout, Canvas, Palette, Inspector, MissionPanel, Toolbar
 │  └─ nodes/ResourceNode.tsx
-├─ resources/              # 20 resource metas + registry (apply-ready terraform emitters)
-└─ missions/               # 10 missions: tutorial / 3-tier / serverless / static-CDN / async-pipeline / container / global-web / event-driven / security / disaster-recovery
+├─ resources/              # 26 resource metas + registry (apply-ready terraform emitters)
+└─ missions/               # 12 missions: tutorial / 3-tier / serverless / static-CDN / async-pipeline / container / global-web / event-driven / security / disaster-recovery / data-pipeline / secure-auth-web
 ```
 
 ## License

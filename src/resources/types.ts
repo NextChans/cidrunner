@@ -3,8 +3,9 @@ import type { LucideIcon } from 'lucide-react'
 /**
  * The AWS resource primitives the game supports — one block per real-world
  * concept. The original 10-block MVP set (ADR 0001) was expanded to 14 in
- * batch 1 (ADR 0022: DynamoDB, CloudFront, Route 53, SQS) and to 20 in batch 2
- * (ADR 0026: ECS, EKS, SNS, EFS, ElastiCache, CloudWatch).
+ * batch 1 (ADR 0022: DynamoDB, CloudFront, Route 53, SQS), to 20 in batch 2
+ * (ADR 0026: ECS, EKS, SNS, EFS, ElastiCache, CloudWatch), and to 26 in batch 3
+ * (ADR 0035: Cognito, Secrets Manager, KMS, ACM, WAF, Kinesis).
  */
 export type ResourceType =
   | 'vpc'
@@ -27,6 +28,12 @@ export type ResourceType =
   | 'sqs'
   | 'sns'
   | 'cloudwatch'
+  | 'cognito'
+  | 'secretsmanager'
+  | 'kms'
+  | 'acm'
+  | 'waf'
+  | 'kinesis'
 
 /** Palette groups, mirroring how the AWS console organizes services. */
 export type ResourceCategory =
@@ -45,7 +52,7 @@ export const CATEGORY_LABELS: Record<ResourceCategory, string> = {
   storage: '스토리지',
   integration: '앱 통합',
   management: '관리·모니터링',
-  security: '보안',
+  security: '보안·아이덴티티',
 }
 
 /** Palette display order for the categories. */
@@ -138,6 +145,8 @@ export interface TfContext {
     subscribers?: { kind: ResourceType; name: string }[]
     /** CloudWatch monitor targets (cloudwatch → ec2/rds/alb/lambda edges). */
     monitorTargets?: { kind: ResourceType; name: string }[]
+    /** Local name of the customer-managed KMS key (secretsmanager → kms edge). */
+    kmsKey?: string
   }
 }
 

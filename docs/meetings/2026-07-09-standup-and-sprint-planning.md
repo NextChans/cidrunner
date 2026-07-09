@@ -153,3 +153,29 @@ merge 워크플로로 진행.
 - **남은 관심사(Sprint E 시작 전)**: (1) OG 실 SNS 미리보기는 배포 후 각 플랫폼 크롤러로만
   검증 가능(로컬은 head 태그 확인까지). (2) 갤러리 슬롯은 localStorage 스코프라 기기 간 동기화
   없음 — 대량 슬롯 시 용량/정리 UX 필요. (3) 리소스 확장 3차·검색은 Sprint E로 이월.
+
+---
+
+## Sprint E 결과 (완료: 2026-07-09 — A–D 완주 후 후속)
+
+Sprint E 완료. `tsc -b` clean · Vitest 109/109 통과 · `oxlint` clean · `vite build` 성공(최대
+청크 198 kB, 500 kB 경고 없음) · 로컬 dev에서 새 리소스 6종·미션 2종·검색(필터/`/`/Escape/
+결과 없음) 확인. feature branch → PR → merge 워크플로로 진행.
+
+- **리소스 20→26종** — Cognito(앱 인증)·Secrets Manager(시크릿)·KMS(암호화 키)·ACM(TLS)·
+  WAF(L7 방어)·Kinesis(실시간 스트림). `security` 카테고리를 **보안·아이덴티티**로 재정의해
+  SG와 함께 5종을 모으고, Kinesis는 앱 통합 재사용. Kinesis는 entry-capable(파이프라인 머리),
+  `secretsmanager → kms`로 고객 관리 키 배선. Cognito/ACM/WAF는 진입점 판정 회귀를 피해
+  자기완결형 독립 노드로. Sprint B 보류(Kinesis)를 해소. ADR 0035.
+- **미션 10→12종** — 데이터 파이프라인(Kinesis→Lambda→S3), 보안·인증 웹(CF→ALB→EC2→RDS +
+  Cognito·Secrets·ACM·WAF 존재). "Lambda→Kinesis producer" 미션은 lambda 리소스 수정이 필요해
+  후속으로(회귀 금지). ADR 0036.
+- **Palette 검색** — Zustand `search`(transient) + `useResourceSearch`(100ms debounce,
+  label/description/category/type 부분·대소문자 무시 매칭). `/` 전역 포커스(데스크톱 aside id
+  단일), 입력창 Escape는 로컬 clear/blur(전역 선택해제로 안 샘). 매칭 0 카테고리 숨김·전체 0건
+  메시지·`×` clear·`aria-live` 결과 카운트. ShortcutHelp에 `/` 추가. ADR 0037.
+- **테스트 92→109** — 리소스/미션/터라폼 12케이스(엣지 규칙·Kinesis 진입·Secrets↔KMS·별점·
+  brace 균형), 검색 필터 순수함수 5케이스.
+- **다음 관심사**: (1) WAF→ALB·ACM→ALB·Cognito 인증 액션 결합은 진입점 "비-트래픽 엣지"
+  일반화 리팩터 후 4차 배치. (2) Kinesis Firehose→S3(데이터 레이크)·Lambda producer 스트림.
+  (3) 검색에 최근/자주 쓰는 정렬·동의어 사전 여지.

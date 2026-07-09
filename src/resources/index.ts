@@ -19,6 +19,12 @@ import { sns } from './sns'
 import { efs } from './efs'
 import { elasticache } from './elasticache'
 import { cloudwatch } from './cloudwatch'
+import { cognito } from './cognito'
+import { secretsmanager } from './secretsmanager'
+import { kms } from './kms'
+import { acm } from './acm'
+import { waf } from './waf'
+import { kinesis } from './kinesis'
 
 /** Registry mapping each resource type to its metadata. */
 export const resources: Record<ResourceType, ResourceMeta> = {
@@ -42,6 +48,12 @@ export const resources: Record<ResourceType, ResourceMeta> = {
   sqs,
   sns,
   cloudwatch,
+  cognito,
+  secretsmanager,
+  kms,
+  acm,
+  waf,
+  kinesis,
 }
 
 /** Palette-ordered list of resource metas (grouped by category in the UI). */
@@ -62,10 +74,16 @@ export const resourceList: ResourceMeta[] = [
   dynamodb,
   s3,
   efs,
+  kinesis,
   sqs,
   sns,
   cloudwatch,
   sg,
+  cognito,
+  secretsmanager,
+  kms,
+  acm,
+  waf,
 ]
 
 export function getResource(type: ResourceType): ResourceMeta {

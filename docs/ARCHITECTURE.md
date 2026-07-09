@@ -24,7 +24,7 @@ console and docs. See [ADR 0008](decisions/0008-korean-first-ui-no-i18n.md).
 ```
 App
 └─ Layout                     responsive shell (3-pane ≥md / drawers <md)
-   ├─ Palette         (left)    draggable list of the 20 resource types
+   ├─ Palette         (left)    searchable, draggable list of the 26 resource types
    ├─ Canvas          (center)  React Flow editor — nodes, edges, nesting
    │  └─ ResourceNode           one node renderer, driven by ResourceMeta
    ├─ Inspector       (right)   per-resource property form (Phase 2)
@@ -36,7 +36,7 @@ App
 
 | Component | Responsibility |
 | --------- | -------------- |
-| **Palette** | Lists `resourceList`; source of drag-and-drop node creation. |
+| **Palette** | Lists `resourceList` grouped by category, filtered live by a debounced search (`useResourceSearch`, ADR 0037); source of drag-and-drop node creation. |
 | **Canvas** | Wraps React Flow; owns node/edge interaction, nesting, and (later) edge-rule enforcement. |
 | **ResourceNode** | Generic node view; looks up its `ResourceMeta` by `data.type` to render icon, label, and accent. |
 | **Inspector** | Edits the selected node's `data.config`; runs `ResourceMeta.validate` (Phase 2). |
@@ -144,10 +144,15 @@ interface ResourceMeta {
 }
 ```
 
-The resource set is **20** blocks — the 10-block MVP set (ADR 0001) plus expansion
+The resource set is **26** blocks — the 10-block MVP set (ADR 0001) plus expansion
 batch 1 ([ADR 0022](decisions/0022-resource-expansion-batch-1.md): DynamoDB,
-CloudFront, Route 53, SQS) and batch 2 ([ADR 0026](decisions/0026-resource-expansion-2.md):
-ECS, EKS, ElastiCache, EFS, SNS, CloudWatch).
+CloudFront, Route 53, SQS), batch 2 ([ADR 0026](decisions/0026-resource-expansion-2.md):
+ECS, EKS, ElastiCache, EFS, SNS, CloudWatch), and batch 3
+([ADR 0035](decisions/0035-resource-expansion-3-security-and-streaming.md): Cognito,
+Secrets Manager, KMS, ACM, WAF, Kinesis). They group into seven palette categories —
+networking / compute / database / storage / integration / management / 보안·아이덴티티 —
+filtered live by a debounced search input
+([ADR 0037](decisions/0037-palette-search.md)).
 
 ## Property editing & validation
 

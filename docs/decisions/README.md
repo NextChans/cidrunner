@@ -59,3 +59,6 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0032](0032-achievements-and-badges.md) | Achievements — 배지 시스템 (5종, 파생 상태) | Accepted | 2026-07-09 |
 | [0033](0033-gallery-multi-slot.md) | 갤러리 — 다중 슬롯 저장 (extends 0020) | Accepted | 2026-07-09 |
 | [0034](0034-i18n-defer.md) | i18n 유보 재검토 — Korean-first 유지 (revisits 0008) | Accepted | 2026-07-09 |
+| [0035](0035-resource-expansion-3-security-and-streaming.md) | Resource expansion batch 3 — Cognito · Secrets Manager · KMS · ACM · WAF · Kinesis (extends 0026) | Accepted | 2026-07-09 |
+| [0036](0036-mission-expansion-3-pipelines-and-auth.md) | Mission expansion batch 3 — 데이터 파이프라인 · 보안·인증 웹 | Accepted | 2026-07-09 |
+| [0037](0037-palette-search.md) | Palette 검색 — debounced 실시간 필터 + `/` 단축키 | Accepted | 2026-07-09 |
