@@ -5,8 +5,8 @@ export const serverless: Mission = {
   title: '서버리스 API',
   description:
     '서버 없이 갑니다. API Gateway를 Lambda 함수에 연결하고 데이터를 S3에 저장하세요 — VPC 불필요.',
-  goal: '클라이언트 → API Gateway → Lambda → S3 로 연결하세요.',
-  hint: 'API Gateway 블록을 Lambda 앞에 두고 엣지로 이으세요. S3 버저닝까지 켜면 별 3개!',
+  goal: 'API Gateway → Lambda → S3 로 요청이 도달하게 하세요.',
+  hint: 'API Gateway가 진입점입니다(클라이언트는 별도 블록이 아닙니다). API Gateway → Lambda → S3 순으로 엣지를 이으세요. S3 버저닝까지 켜면 별 3개!',
   // API Gateway is now its own block (ADR 0046) rather than bundled into Lambda,
   // so a correct solution fronts the function with an explicit API Gateway.
   requiredResources: ['apigw', 'lambda', 's3'],
