@@ -193,6 +193,14 @@ Both feed the node outline, the Inspector badge + message lists (⚠ red / 🛡
 amber), and the mission context (`allValid`, `securityOk`) — see
 [ADR 0017](decisions/0017-security-model-and-severity-validation.md).
 
+**Budget mode** ([ADR 0051](decisions/0051-cost-budget-mode.md)) — a rough
+monthly-cost model in [`src/graph/cost.ts`](../src/graph/cost.ts) (a central,
+tunable table, not per-`ResourceMeta`) drives a live 💸 cost meter on the canvas
+and an optional per-mission `budget` target. It leans on the real AWS cost traps
+(NAT / ALB / EKS / RDS bill hourly; VPC/Subnet/IGW/SG and the Account/AZ boxes
+are free), turning a build into an optimization puzzle. Budget is a displayed
+goal — it does not change the star gate.
+
 ## Graph rules
 
 Nesting and edge constraints (Phase 1) are **data-driven**, derived entirely

@@ -6,6 +6,7 @@ import type { Mission, MissionCheckContext } from '@/missions/types'
 import { getResource } from '@/resources'
 import { simulate } from '@/graph/simulate'
 import { getGraphIssues } from '@/graph/checks'
+import { estimateMonthlyCost } from '@/graph/cost'
 import { useGraphStore } from '@/store/useGraphStore'
 
 /** Three star slots, filling `earned` of them. */
@@ -90,6 +91,10 @@ export function MissionList() {
     return { nodes, edges, sim: simulate(nodes, edges), allValid, securityOk, issues }
   }, [nodes, edges])
 
+  // Budget mode (ADR 0051): live monthly-cost estimate, shown against a
+  // mission's optional budget target.
+  const monthlyCost = useMemo(() => estimateMonthlyCost(nodes), [nodes])
+
   // Persist best star records (ADR 0023) as the live results change.
   useEffect(() => {
     for (const mission of missions) {
@@ -155,6 +160,17 @@ export function MissionList() {
             </div>
             <p className="mt-1 text-[11px] text-slate-400">{mission.description}</p>
             <p className="mt-2 text-[11px] text-accent-soft">🎯 {mission.goal}</p>
+            {mission.budget !== undefined && (
+              <p
+                className={clsx(
+                  'mt-1 text-[11px]',
+                  monthlyCost > mission.budget ? 'text-rose-300' : 'text-emerald-300',
+                )}
+              >
+                💸 예산 ${mission.budget} · 현재 ${monthlyCost}
+                {monthlyCost > mission.budget ? ' (초과)' : ' ✓'}
+              </p>
+            )}
             {active && mission.steps && <TutorialSteps steps={mission.steps} ctx={ctx} />}
             {cleared && stars < 3 && mission.hint && (
               <p className="mt-1 text-[11px] text-slate-500">💡 {mission.hint}</p>

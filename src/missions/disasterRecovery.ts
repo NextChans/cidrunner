@@ -8,6 +8,7 @@ export const disasterRecovery: Mission = {
   goal: '기본 RDS(Multi-AZ) + 다른 AZ의 읽기 복제본을 구성하세요.',
   hint: 'RDS 2개를 서로 다른 AZ의 Subnet에 놓고, 기본 → 복제본으로 엣지를 그으면 읽기 복제본이 됩니다(같은 엔진). 기본 RDS의 Multi-AZ를 켜세요.',
   requiredResources: ['vpc', 'subnet', 'rds'],
+  budget: 50,
   // ★1 기본+복제본 존재 · ★2 기본 Multi-AZ · ★3 복제본이 다른 AZ + 설정 오류 없음
   check: ({ nodes, edges, allValid }) => {
     const byId = new Map(nodes.map((n) => [n.id, n]))

@@ -75,3 +75,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0048](0048-load-balancing-animation.md) | 로드 밸런싱 애니메이션 — ALB fan-out 시각화 규격 (extends 0012·0018·0047) | Accepted | 2026-07-09 |
 | [0049](0049-edge-inout-visual-effects.md) | 엣지 in/out 트래픽 시각 효과 — 방향 인지도 강화 (extends 0012·0043·0047) | Accepted | 2026-07-09 |
 | [0050](0050-account-az-containers-and-inheritance.md) | AWS Account · AZ 조직 컨테이너 + 컨테이너 상속 (리소스 27→29, extends 0010·0015·0040) | Accepted | 2026-07-09 |
+| [0051](0051-cost-budget-mode.md) | 비용 예산 모드 — 실시간 월 비용 추정 + 미션 예산 목표 (extends 0014·0016) | Accepted | 2026-07-09 |
