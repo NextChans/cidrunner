@@ -197,8 +197,18 @@ predicates — `canContain`, `canBeTopLevel`, `canConnect`, `canBeSource`,
   both funnel into the store's `attachToParent`, which validates the rules,
   blocks cycles, converts the node's absolute position to parent-relative, sets
   `extent: 'parent'`, and re-sorts so the parent precedes the child. This is the
-  symmetric partner of "부모에서 분리" (detach). See
-  [ADR 0038](decisions/0038-containment-attach-actions.md).
+  symmetric partner of "부모에서 분리" (detach). During a drag, the innermost
+  container under the node is highlighted (accent = a valid drop, rose = the
+  rules reject it) via a transient `dropTarget`. See
+  [ADR 0038](decisions/0038-containment-attach-actions.md) and
+  [ADR 0040](decisions/0040-containment-audit-normalize-feedback.md).
+- **Auto-normalize** — at load boundaries (shared URL, gallery slot, localStorage
+  rehydrate), `normalizeContainment` ([`src/graph/containment.ts`](../src/graph/containment.ts))
+  adopts any node that sits spatially inside a container it may nest under but
+  carries no `parentId`, converting its position to the parent's frame. Nodes
+  that already have a parent are left untouched, so this only *fills in* the
+  spatial=logical containment invariant (the state that made IGW/NAT look
+  detached from their VPC). See [ADR 0040](decisions/0040-containment-audit-normalize-feedback.md).
 - **Edges** — a connection `source → target` is allowed only when the source's
   `connectsTo` lists the target's type; connection handles are rendered only
   where a node may be an edge source and/or target.

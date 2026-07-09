@@ -4,6 +4,11 @@ import { temporal } from 'zundo'
 import type { Edge, Node, XYPosition } from '@xyflow/react'
 import { getResource, type ResourceType } from '@/resources'
 import { canBeTopLevel, canContain, isContainer, requiredParentLabel } from '@/graph/rules'
+import {
+  absolutePosition,
+  normalizeContainment,
+  orderByParent,
+} from '@/graph/containment'
 import { simulate, type SimResult } from '@/graph/simulate'
 import { sanitizeSnapshot, toSnapshot, type DesignSnapshot } from '@/graph/share'
 
@@ -74,6 +79,12 @@ interface GraphState {
   showMiniMap: boolean
   /** Open node context menu (right-click), or null when closed (ADR 0028). */
   contextMenu: ContextMenuState | null
+  /**
+   * Container currently under a dragged node, for drop-target highlighting
+   * (ADR 0040). `valid` reflects whether the rules allow the nesting. Transient
+   * — never persisted, never in undo history.
+   */
+  dropTarget: { id: string; valid: boolean } | null
   /** Whether the keyboard-shortcut help modal is open (ADR 0028). */
   showShortcutHelp: boolean
   /** Whether the gallery modal is open (ADR 0033). */
@@ -133,6 +144,8 @@ interface GraphState {
   stopSimulation: () => void
   toggleMiniMap: () => void
   setContextMenu: (menu: ContextMenuState | null) => void
+  /** Sets (or clears) the drop-target highlight during a node drag (ADR 0040). */
+  setDropTarget: (target: { id: string; valid: boolean } | null) => void
   setShortcutHelp: (open: boolean) => void
   setShowGallery: (open: boolean) => void
   setShowAchievements: (open: boolean) => void
@@ -220,45 +233,6 @@ function makeNode(
   return node
 }
 
-/**
- * Absolute canvas position of a node, folding in every ancestor's offset (React
- * Flow stores child positions relative to their parent).
- */
-function absolutePosition(
-  byId: Map<string, ResourceNodeType>,
-  id: string,
-): XYPosition {
-  let cur = byId.get(id)
-  let x = 0
-  let y = 0
-  while (cur) {
-    x += cur.position.x
-    y += cur.position.y
-    cur = cur.parentId ? byId.get(cur.parentId) : undefined
-  }
-  return { x, y }
-}
-
-/**
- * Stable topological order where every node follows its parent — React Flow
- * requires a parent to appear before its children in the `nodes` array, so
- * reparenting has to re-sort. Preserves the incoming order otherwise.
- */
-function orderByParent(nodes: ResourceNodeType[]): ResourceNodeType[] {
-  const byId = new Map(nodes.map((n) => [n.id, n]))
-  const emitted = new Set<string>()
-  const result: ResourceNodeType[] = []
-  const emit = (n: ResourceNodeType) => {
-    if (emitted.has(n.id)) return
-    const parent = n.parentId ? byId.get(n.parentId) : undefined
-    if (parent) emit(parent)
-    emitted.add(n.id)
-    result.push(n)
-  }
-  for (const n of nodes) emit(n)
-  return result
-}
-
 /** Collects a node id plus all of its (transitive) descendants. */
 function withDescendants(nodes: ResourceNodeType[], rootId: string): Set<string> {
   const ids = new Set<string>([rootId])
@@ -311,6 +285,7 @@ export const useGraphStore = create<GraphState>()(
   simulation: null,
   showMiniMap: !isMobileViewport(),
   contextMenu: null,
+  dropTarget: null,
   showShortcutHelp: false,
   showGallery: false,
   showAchievements: false,
@@ -559,7 +534,7 @@ export const useGraphStore = create<GraphState>()(
   loadDesign: (nodes, edges, missionId) => {
     bumpNodeSeq(nodes)
     set({
-      nodes,
+      nodes: normalizeContainment(nodes),
       edges,
       selectedNodeId: null,
       activeMissionId: missionId ?? null,
@@ -585,6 +560,15 @@ export const useGraphStore = create<GraphState>()(
   toggleMiniMap: () => set((state) => ({ showMiniMap: !state.showMiniMap })),
 
   setContextMenu: (contextMenu) => set({ contextMenu }),
+  setDropTarget: (dropTarget) =>
+    set((state) => {
+      const cur = state.dropTarget
+      if (cur === dropTarget) return state
+      if (cur && dropTarget && cur.id === dropTarget.id && cur.valid === dropTarget.valid) {
+        return state
+      }
+      return { dropTarget }
+    }),
   setShortcutHelp: (showShortcutHelp) => set({ showShortcutHelp }),
   setShowGallery: (showGallery) => set({ showGallery }),
   setShowAchievements: (showAchievements) => set({ showAchievements }),
@@ -615,7 +599,7 @@ export const useGraphStore = create<GraphState>()(
     }
     bumpNodeSeq(clean.nodes)
     set({
-      nodes: clean.nodes,
+      nodes: normalizeContainment(clean.nodes),
       edges: clean.edges,
       selectedNodeId: null,
       activeMissionId: clean.missionId ?? null,
@@ -654,6 +638,7 @@ export const useGraphStore = create<GraphState>()(
       mobileDrawers: { palette: false, inspector: false, missions: false },
       simulation: null,
       contextMenu: null,
+      dropTarget: null,
     }),
       }),
       {
@@ -684,7 +669,7 @@ export const useGraphStore = create<GraphState>()(
           if (Array.isArray(p.nodes)) {
             const clean = sanitizeSnapshot({ v: 1, nodes: p.nodes, edges: p.edges ?? [] })
             if (clean) {
-              merged.nodes = clean.nodes
+              merged.nodes = normalizeContainment(clean.nodes)
               merged.edges = clean.edges
             }
           }

@@ -68,6 +68,62 @@ function findDropParent(
   return candidates[0] ?? null
 }
 
+/** The dragged node's center in flow coords plus its subtree (invalid targets). */
+function dragContext(rf: RfInstance, node: ResourceNodeType) {
+  const internal = rf.getInternalNode(node.id)
+  const abs = internal?.internals.positionAbsolute ?? node.position
+  const width = internal?.measured?.width ?? 0
+  const height = internal?.measured?.height ?? 0
+  const center = { x: abs.x + width / 2, y: abs.y + height / 2 }
+
+  const all = rf.getNodes()
+  const exclude = new Set<string>([node.id])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const n of all) {
+      if (n.parentId && exclude.has(n.parentId) && !exclude.has(n.id)) {
+        exclude.add(n.id)
+        grew = true
+      }
+    }
+  }
+  return { center, exclude }
+}
+
+/**
+ * Innermost container under `point`, regardless of whether the rules allow the
+ * nesting — so an invalid hover can still be highlighted red. `valid` is true
+ * only when `childType` may nest inside it. The dragged subtree is excluded.
+ */
+function containerUnder(
+  rf: RfInstance,
+  point: XYPosition,
+  childType: ResourceType,
+  excludeIds: ReadonlySet<string>,
+): { id: string; valid: boolean } | null {
+  const hit = rf
+    .getNodes()
+    .filter((n) => isContainer(n.data.type) && !excludeIds.has(n.id))
+    .map((n) => {
+      const internal = rf.getInternalNode(n.id)
+      const absPos = internal?.internals.positionAbsolute ?? n.position
+      const width = internal?.measured?.width ?? 0
+      const height = internal?.measured?.height ?? 0
+      return { id: n.id, type: n.data.type, absPos, width, height, area: width * height }
+    })
+    .filter(
+      (c) =>
+        point.x >= c.absPos.x &&
+        point.x <= c.absPos.x + c.width &&
+        point.y >= c.absPos.y &&
+        point.y <= c.absPos.y + c.height,
+    )
+    .sort((a, b) => a.area - b.area)[0]
+  if (!hit) return null
+  return { id: hit.id, valid: canContain(hit.type, childType) }
+}
+
 export function Canvas() {
   const rf = useReactFlow<ResourceNodeType>()
   const nodes = useGraphStore((s) => s.nodes)
@@ -84,6 +140,7 @@ export function Canvas() {
   const toggleMiniMap = useGraphStore((s) => s.toggleMiniMap)
   const setContextMenu = useGraphStore((s) => s.setContextMenu)
   const attachToParent = useGraphStore((s) => s.attachToParent)
+  const setDropTarget = useGraphStore((s) => s.setDropTarget)
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ resource: ResourceNode }), [])
   const edgeTypes = useMemo<EdgeTypes>(() => ({ traffic: TrafficEdge }), [])
@@ -138,36 +195,28 @@ export function Canvas() {
     [nodes, edges, setEdges, setNotice, stopSimulation],
   )
 
-  // Drop-onto-parent for existing nodes (ADR 0038): after a drag, nest the
-  // node into the innermost container under its center if the rules allow it.
+  // Live drop-target highlight while dragging (ADR 0040): mark the innermost
+  // container under the node, valid or not, so the node renderer can tint it.
+  const onNodeDrag = useCallback(
+    (_: MouseEvent | TouchEvent, node: ResourceNodeType) => {
+      const { center, exclude } = dragContext(rf, node)
+      setDropTarget(containerUnder(rf, center, node.data.type, exclude))
+    },
+    [rf, setDropTarget],
+  )
+
+  // Drop-onto-parent for existing nodes (ADR 0038): on release, nest the node
+  // into the innermost container under its center if the rules allow it.
   const onNodeDragStop = useCallback(
     (_: MouseEvent | TouchEvent, node: ResourceNodeType) => {
-      const internal = rf.getInternalNode(node.id)
-      const abs = internal?.internals.positionAbsolute ?? node.position
-      const width = internal?.measured?.width ?? 0
-      const height = internal?.measured?.height ?? 0
-      const center = { x: abs.x + width / 2, y: abs.y + height / 2 }
-
-      // Exclude the node itself and its descendants as drop targets.
-      const all = rf.getNodes()
-      const exclude = new Set<string>([node.id])
-      let grew = true
-      while (grew) {
-        grew = false
-        for (const n of all) {
-          if (n.parentId && exclude.has(n.parentId) && !exclude.has(n.id)) {
-            exclude.add(n.id)
-            grew = true
-          }
-        }
-      }
-
+      const { center, exclude } = dragContext(rf, node)
       const parent = findDropParent(rf, center, node.data.type, exclude)
       if (parent && parent.id !== node.parentId) {
         attachToParent(node.id, parent.id)
       }
+      setDropTarget(null)
     },
-    [rf, attachToParent],
+    [rf, attachToParent, setDropTarget],
   )
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -210,6 +259,7 @@ export function Canvas() {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}
         onNodeClick={(_, node) => setSelected(node.id)}
