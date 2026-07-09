@@ -7,9 +7,12 @@ import type { LucideIcon } from 'lucide-react'
  * (ADR 0026: ECS, EKS, SNS, EFS, ElastiCache, CloudWatch), to 26 in batch 3
  * (ADR 0035: Cognito, Secrets Manager, KMS, ACM, WAF, Kinesis), and to 27 when
  * the Lambda + API GW combo was split into standalone Lambda and API Gateway
- * blocks (ADR 0046).
+ * blocks (ADR 0046), and to 29 with the AWS Account and Availability Zone
+ * organizational containers (ADR 0050).
  */
 export type ResourceType =
+  | 'account'
+  | 'az'
   | 'vpc'
   | 'subnet'
   | 'igw'

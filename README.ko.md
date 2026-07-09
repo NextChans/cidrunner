@@ -54,7 +54,8 @@
 - **인터랙티브 튜토리얼** — 첫 미션이 실시간 자가 점검 단계 목록을 보여주며, 설계를 진행하면 완료 단계가 꺼지고 다음 할 일이 강조됩니다. [ADR 0030](docs/decisions/0030-interactive-tutorial-steps.md) 참고.
 - **트래픽 재생** — 시작 시 모든 진입점을 백트래킹 탐색으로 추적(미완결 분기를 먼저 그려도 완결 경로가 있으면 도달로 판정 — [ADR 0047](docs/decisions/0047-simulate-backtracking.md)), 활성 로드 밸런서는 모든 타깃으로 라운드로빈 분산 애니메이션([ADR 0048](docs/decisions/0048-load-balancing-animation.md)), 각 엣지는 나가는/들어오는 방향 효과를 성공=녹색·차단=빨강으로 표시합니다([ADR 0049](docs/decisions/0049-edge-inout-visual-effects.md)).
 - **apply 가능한 Terraform 내보내기** — 라우트 테이블·DB Subnet Group·IAM·Lambda에 연결된 API Gateway REST API까지 유도 생성된 `main.tf`/`variables.tf`/`outputs.tf`. `terraform apply` 하면 실제 리소스가 생성됩니다.
-- **리소스 27종** — VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda · API Gateway · RDS(+읽기 복제본) · ElastiCache · DynamoDB · S3 · EFS · Kinesis · SQS · SNS · CloudWatch · Security Group · Cognito · Secrets Manager · KMS · ACM · WAF. [ADR 0035](docs/decisions/0035-resource-expansion-3-security-and-streaming.md) · Lambda/API GW 분리는 [ADR 0046](docs/decisions/0046-lambda-apigw-split.md) 참고.
+- **조직 박스 & 상속 디폴트** — `AWS Account ▸ VPC ▸ Availability Zone ▸ Subnet` 으로 중첩. VPC 안에 만든 Subnet은 다음 빈 `/24`를 자동 배정받고, AZ 박스 안에 만든 Subnet은 그 `az`를 물려받습니다(둘 다 변경 가능). [ADR 0050](docs/decisions/0050-account-az-containers-and-inheritance.md) 참고.
+- **리소스 29종** — AWS Account · Availability Zone · VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda · API Gateway · RDS(+읽기 복제본) · ElastiCache · DynamoDB · S3 · EFS · Kinesis · SQS · SNS · CloudWatch · Security Group · Cognito · Secrets Manager · KMS · ACM · WAF. [ADR 0035](docs/decisions/0035-resource-expansion-3-security-and-streaming.md) · Lambda/API GW 분리 [ADR 0046](docs/decisions/0046-lambda-apigw-split.md) · Account/AZ 박스 [ADR 0050](docs/decisions/0050-account-az-containers-and-inheritance.md) 참고.
 - **모바일** — 인프라 편집은 데스크톱 우선 경험이지만, 좁은 화면(<768px)에서는 캔버스가 전체 화면을 차지하고 팔레트 / 인스펙터 / 미션이 오버레이 drawer로 이동해 폰에서도 프로젝트를 보고 데모할 수 있습니다. [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md) 참고.
 
 ## 로드맵
@@ -138,7 +139,7 @@ src/
 ├─ store/useGraphStore.ts   # Zustand — nodes / edges / mode
 ├─ components/              # Layout, Canvas, Palette, Inspector, MissionPanel, Toolbar
 │  └─ nodes/ResourceNode.tsx
-├─ resources/              # 리소스 27종 meta + 레지스트리 (apply-ready terraform 생성기)
+├─ resources/              # 리소스 29종 meta + 레지스트리 (apply-ready terraform 생성기)
 └─ missions/               # 미션 12종: 튜토리얼 / 3-tier / 서버리스 / 정적CDN / 비동기파이프라인 / 컨테이너 / 글로벌동적웹 / 이벤트드리븐 / 보안 / 재난복구 / 데이터파이프라인 / 보안인증웹
 ```
 

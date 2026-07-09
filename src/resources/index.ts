@@ -1,4 +1,6 @@
 import type { ResourceMeta, ResourceType } from './types'
+import { account } from './account'
+import { az } from './az'
 import { vpc } from './vpc'
 import { subnet } from './subnet'
 import { igw } from './igw'
@@ -29,6 +31,8 @@ import { kinesis } from './kinesis'
 
 /** Registry mapping each resource type to its metadata. */
 export const resources: Record<ResourceType, ResourceMeta> = {
+  account,
+  az,
   vpc,
   subnet,
   igw,
@@ -60,8 +64,10 @@ export const resources: Record<ResourceType, ResourceMeta> = {
 
 /** Palette-ordered list of resource metas (grouped by category in the UI). */
 export const resourceList: ResourceMeta[] = [
+  account,
   vpc,
   subnet,
+  az,
   igw,
   nat,
   route53,
