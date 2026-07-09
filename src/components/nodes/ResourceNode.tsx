@@ -60,8 +60,10 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
   // Drop-target highlight during a drag (ADR 0040): null = not the target,
   // true = a valid drop, false = the rules reject this container.
   const dropValid = useGraphStore((s) => (s.dropTarget?.id === id ? s.dropTarget.valid : null))
-  const blocked = sim?.blockedNodeIds.includes(id) ?? false
-  const onPath = !blocked && (sim?.pathNodeIds.includes(id) ?? false)
+  // Chaos mode (ADR 0052): a node knocked out by an injected AZ failure.
+  const isDead = sim?.deadNodeIds.includes(id) ?? false
+  const blocked = !isDead && (sim?.blockedNodeIds.includes(id) ?? false)
+  const onPath = !isDead && !blocked && (sim?.pathNodeIds.includes(id) ?? false)
   const arrival = sim?.arrivals[id]
   // A read replica receiving replicated data pulses indigo, one hop after its
   // primary (ADR 0019 + F3 replication-flow viz).
@@ -82,7 +84,9 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
       <div
         className={clsx(
           'h-full w-full rounded-lg border-2 border-dashed bg-slate-800/20 p-2 transition-colors',
-          dropValid === true
+          isDead
+            ? 'border-slate-700 opacity-40 grayscale'
+            : dropValid === true
             ? 'border-accent bg-emerald-500/10 ring-2 ring-accent'
             : dropValid === false
               ? 'border-rose-500 bg-rose-500/10 ring-2 ring-rose-500'
@@ -126,19 +130,30 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
     <div
       className={clsx(
         'relative flex min-w-[140px] items-center gap-2 rounded-lg border bg-surface-raised px-3 py-2 shadow-lg transition-colors',
-        blocked
-          ? 'border-rose-500 ring-2 ring-rose-500 animate-pulse'
-          : onPath
-            ? 'border-accent-soft ring-2 ring-accent-soft'
-            : invalid
-              ? 'border-rose-500 ring-1 ring-rose-500'
-              : hasWarning
-                ? 'border-amber-400 ring-1 ring-amber-400'
-                : selected
-                  ? 'border-accent ring-1 ring-accent'
-                  : 'border-surface-border',
+        isDead
+          ? 'border-slate-700 border-dashed opacity-40 grayscale'
+          : blocked
+            ? 'border-rose-500 ring-2 ring-rose-500 animate-pulse'
+            : onPath
+              ? 'border-accent-soft ring-2 ring-accent-soft'
+              : invalid
+                ? 'border-rose-500 ring-1 ring-rose-500'
+                : hasWarning
+                  ? 'border-amber-400 ring-1 ring-amber-400'
+                  : selected
+                    ? 'border-accent ring-1 ring-accent'
+                    : 'border-surface-border',
       )}
     >
+      {/* Chaos mode (ADR 0052): a downed node from an injected AZ failure. */}
+      {isDead && (
+        <span
+          className="pointer-events-none absolute -right-1.5 -top-1.5 text-xs"
+          title="장애 영향 (AZ 다운)"
+        >
+          ⚡
+        </span>
+      )}
       {/* Arrival pulse: fires when the simulated request reaches this node. */}
       {onPath && arrival !== undefined && (
         <span

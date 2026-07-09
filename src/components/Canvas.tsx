@@ -26,6 +26,7 @@ import { getResource, resources, type ResourceType } from '@/resources'
 import { canConnect, canContain, canBeTopLevel, isContainer, requiredParentLabel } from '@/graph/rules'
 import { derivedEdges } from '@/graph/derived'
 import { estimateMonthlyCost } from '@/graph/cost'
+import { graphAzs } from '@/graph/chaos'
 import { getMission } from '@/missions'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
@@ -146,12 +147,17 @@ export function Canvas() {
   const attachToParent = useGraphStore((s) => s.attachToParent)
   const setDropTarget = useGraphStore((s) => s.setDropTarget)
   const activeMissionId = useGraphStore((s) => s.activeMissionId)
+  const chaosAz = useGraphStore((s) => s.chaosAz)
+  const setChaos = useGraphStore((s) => s.setChaos)
 
   // Budget mode (ADR 0051): a live monthly-cost estimate for the whole graph,
   // gauged against the active mission's optional budget target.
   const monthlyCost = useMemo(() => estimateMonthlyCost(nodes), [nodes])
   const budget = activeMissionId ? getMission(activeMissionId)?.budget : undefined
   const overBudget = budget !== undefined && monthlyCost > budget
+
+  // Chaos mode (ADR 0052): the AZs present in the graph, offered as fault buttons.
+  const azs = useMemo(() => graphAzs(nodes), [nodes])
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ resource: ResourceNode }), [])
   const edgeTypes = useMemo<EdgeTypes>(
@@ -328,6 +334,39 @@ export function Canvas() {
             )}
           </div>
         </Panel>
+        {azs.length > 0 && (
+          <Panel position="bottom-center">
+            <div className="flex items-center gap-1.5 rounded-md border border-surface-border bg-surface-raised/95 px-2 py-1 text-xs shadow-lg">
+              <span className="text-slate-400" title="장애 주입 — AZ를 다운시켜 설계가 버티는지 확인">
+                ⚡ 장애
+              </span>
+              {azs.map((az) => (
+                <button
+                  key={az}
+                  type="button"
+                  onClick={() => setChaos(chaosAz === az ? null : az)}
+                  className={
+                    'rounded px-1.5 py-0.5 font-medium transition-colors ' +
+                    (chaosAz === az
+                      ? 'bg-rose-600 text-white'
+                      : 'bg-surface text-slate-300 hover:text-slate-100')
+                  }
+                >
+                  AZ-{az}
+                </button>
+              ))}
+              {chaosAz && (
+                <button
+                  type="button"
+                  onClick={() => setChaos(null)}
+                  className="rounded px-1.5 py-0.5 text-slate-400 hover:text-slate-100"
+                >
+                  복구
+                </button>
+              )}
+            </div>
+          </Panel>
+        )}
         <Panel position="top-right">
           <button
             type="button"

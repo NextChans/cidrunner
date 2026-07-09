@@ -10,6 +10,7 @@ import {
   orderByParent,
 } from '@/graph/containment'
 import { simulate, type SimResult } from '@/graph/simulate'
+import { deadNodesForAz } from '@/graph/chaos'
 import { applyInheritedDefaults } from '@/graph/inherit'
 import { sanitizeSnapshot, toSnapshot, type DesignSnapshot } from '@/graph/share'
 
@@ -141,8 +142,12 @@ interface GraphState {
   recordStars: (missionId: string, stars: number) => void
   /** Runs the traffic simulation over the current graph and stores the result. */
   runSimulation: () => void
-  /** Clears the current simulation highlight. */
+  /** Clears the current simulation highlight (and any injected fault). */
   stopSimulation: () => void
+  /** Chaos mode (ADR 0052): the AZ currently downed by fault injection, or null. */
+  chaosAz: string | null
+  /** Injects (or clears) an AZ failure and re-runs the sim on the survivors. */
+  setChaos: (az: string | null) => void
   toggleMiniMap: () => void
   setContextMenu: (menu: ContextMenuState | null) => void
   /** Sets (or clears) the drop-target highlight during a node drag (ADR 0040). */
@@ -284,6 +289,7 @@ export const useGraphStore = create<GraphState>()(
   mobileDrawers: { palette: false, inspector: false, missions: false },
   search: '',
   simulation: null,
+  chaosAz: null,
   showMiniMap: !isMobileViewport(),
   contextMenu: null,
   dropTarget: null,
@@ -556,9 +562,29 @@ export const useGraphStore = create<GraphState>()(
     ),
 
   runSimulation: () =>
-    set((state) => ({ simulation: simulate(state.nodes, state.edges) })),
+    set((state) => ({
+      simulation: simulate(
+        state.nodes,
+        state.edges,
+        state.chaosAz
+          ? { deadNodeIds: deadNodesForAz(state.nodes, state.chaosAz) }
+          : undefined,
+      ),
+    })),
 
-  stopSimulation: () => set({ simulation: null }),
+  stopSimulation: () => set({ simulation: null, chaosAz: null }),
+
+  // Chaos mode (ADR 0052): down an AZ (or clear with null) and immediately
+  // re-run the sim on the survivors so the impact is visible.
+  setChaos: (az) =>
+    set((state) => ({
+      chaosAz: az,
+      simulation: simulate(
+        state.nodes,
+        state.edges,
+        az ? { deadNodeIds: deadNodesForAz(state.nodes, az) } : undefined,
+      ),
+    })),
 
   toggleMiniMap: () => set((state) => ({ showMiniMap: !state.showMiniMap })),
 

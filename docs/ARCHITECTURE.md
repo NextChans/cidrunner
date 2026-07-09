@@ -201,6 +201,13 @@ and an optional per-mission `budget` target. It leans on the real AWS cost traps
 are free), turning a build into an optimization puzzle. Budget is a displayed
 goal — it does not change the star gate.
 
+**Chaos mode** ([ADR 0052](decisions/0052-chaos-mode-fault-injection.md)) —
+[`src/graph/chaos.ts`](../src/graph/chaos.ts) computes the node set killed by an
+injected AZ failure (`deadNodesForAz`; a Multi-AZ RDS fails over and survives),
+which `simulate(nodes, edges, { deadNodeIds })` removes before tracing — so the
+existing reachability search reports survive/down. The counterweight to Budget:
+a single-AZ build is cheaper but goes dark, a redundant one costs more but holds.
+
 ## Graph rules
 
 Nesting and edge constraints (Phase 1) are **data-driven**, derived entirely
