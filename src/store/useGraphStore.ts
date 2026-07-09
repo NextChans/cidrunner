@@ -10,6 +10,7 @@ import {
   orderByParent,
 } from '@/graph/containment'
 import { simulate, type SimResult } from '@/graph/simulate'
+import { applyInheritedDefaults } from '@/graph/inherit'
 import { sanitizeSnapshot, toSnapshot, type DesignSnapshot } from '@/graph/share'
 
 export type Mode = 'free' | 'challenge'
@@ -321,6 +322,7 @@ export const useGraphStore = create<GraphState>()(
       const siblings = state.nodes.filter((n) => n.parentId === parent.id).length
       const fan = (siblings % 4) * 22
       const node = makeNode(type, { x: 24 + fan, y: 48 + fan }, parent.id)
+      applyInheritedDefaults(node, state.nodes)
       return {
         nodes: [...state.nodes, node],
         selectedNodeId: node.id,
@@ -332,6 +334,7 @@ export const useGraphStore = create<GraphState>()(
   addNodeAt: (type, position, parentId) =>
     set((state) => {
       const node = makeNode(type, position, parentId)
+      applyInheritedDefaults(node, state.nodes)
       return {
         nodes: [...state.nodes, node],
         selectedNodeId: node.id,

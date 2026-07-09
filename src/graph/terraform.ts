@@ -24,6 +24,9 @@ function awsName(id: string): string {
 
 /** Emit order so the file reads network-outward. */
 const ORDER: ResourceType[] = [
+  // account/az are organizational containers — they emit no HCL (ADR 0050) but
+  // are listed so the sort is total.
+  'account', 'az',
   'vpc', 'subnet', 'igw', 'nat', 'sg', 'kms', 'acm', 'cognito', 'secretsmanager',
   'efs', 'alb', 'ec2', 'ecs', 'eks', 'rds', 'elasticache', 's3', 'dynamodb',
   'kinesis', 'sqs', 'sns', 'lambda', 'apigw', 'cloudwatch', 'waf', 'cloudfront', 'route53',

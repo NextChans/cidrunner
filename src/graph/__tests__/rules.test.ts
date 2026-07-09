@@ -17,6 +17,22 @@ describe('graph rules', () => {
     expect(canBeTopLevel('subnet')).toBe(false)
   })
 
+  it('nests the organizational boxes: Account ▸ VPC ▸ AZ ▸ Subnet (ADR 0050)', () => {
+    expect(canBeTopLevel('account')).toBe(true)
+    expect(canBeTopLevel('az')).toBe(false) // an AZ box only lives inside a VPC
+    expect(canContain('account', 'vpc')).toBe(true)
+    expect(canContain('vpc', 'az')).toBe(true)
+    expect(canContain('az', 'subnet')).toBe(true)
+    // Additive: a Subnet still nests directly in a VPC, and a VPC still sits at
+    // the top level.
+    expect(canContain('vpc', 'subnet')).toBe(true)
+    // AZ boxes don't hold VPCs or leaf compute directly.
+    expect(canContain('az', 'vpc')).toBe(false)
+    expect(canContain('az', 'ec2')).toBe(false)
+    expect(isContainer('account')).toBe(true)
+    expect(isContainer('az')).toBe(true)
+  })
+
   it('marks containers', () => {
     expect(isContainer('vpc')).toBe(true)
     expect(isContainer('subnet')).toBe(true)

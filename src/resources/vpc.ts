@@ -13,8 +13,8 @@ export const vpc: ResourceMeta = {
   defaults: {
     cidr_block: '10.0.0.0/16',
   },
-  // Top-level network boundary; holds subnets and VPC-scoped resources.
-  allowedParents: ['canvas'],
+  // Top-level network boundary; may also sit inside an AWS Account box (ADR 0050).
+  allowedParents: ['canvas', 'account'],
   container: true,
   defaultSize: { width: 480, height: 340 },
   fields: [

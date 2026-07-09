@@ -144,17 +144,28 @@ interface ResourceMeta {
 }
 ```
 
-The resource set is **27** blocks — the 10-block MVP set (ADR 0001) plus expansion
+The resource set is **29** blocks — the 10-block MVP set (ADR 0001) plus expansion
 batch 1 ([ADR 0022](decisions/0022-resource-expansion-batch-1.md): DynamoDB,
 CloudFront, Route 53, SQS), batch 2 ([ADR 0026](decisions/0026-resource-expansion-2.md):
 ECS, EKS, ElastiCache, EFS, SNS, CloudWatch), batch 3
 ([ADR 0035](decisions/0035-resource-expansion-3-security-and-streaming.md): Cognito,
-Secrets Manager, KMS, ACM, WAF, Kinesis), and the Lambda + API GW split
+Secrets Manager, KMS, ACM, WAF, Kinesis), the Lambda + API GW split
 ([ADR 0046](decisions/0046-lambda-apigw-split.md): standalone Lambda and a new
-API Gateway REST API block). They group into seven palette categories —
+API Gateway REST API block), and the AWS Account + Availability Zone
+organizational containers ([ADR 0050](decisions/0050-account-az-containers-and-inheritance.md)).
+They group into seven palette categories —
 networking / compute / database / storage / integration / management / 보안·아이덴티티 —
 filtered live by a debounced search input
 ([ADR 0037](decisions/0037-palette-search.md)).
+
+Four of these are **organizational containers** that nest
+`AWS Account ▸ VPC ▸ Availability Zone ▸ Subnet` (additive — a VPC may still sit
+at the top level and a Subnet directly in a VPC). A node created inside a box
+inherits sensible defaults **once at creation** (`graph/inherit.ts`): a Subnet
+carves the next free `/24` from its enclosing VPC and takes its `az` from an
+enclosing AZ box, all still editable. Account and AZ are organizational only —
+they emit no Terraform (an account is provider context; an AZ is a subnet
+property). See [ADR 0050](decisions/0050-account-az-containers-and-inheritance.md).
 
 ## Property editing & validation
 

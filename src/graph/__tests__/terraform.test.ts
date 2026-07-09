@@ -108,6 +108,25 @@ describe('generateTerraform', () => {
     expect(main).not.toContain('aws_lambda_permission')
   })
 
+  it('emits no HCL for Account/AZ boxes; a subnet in an AZ still resolves its VPC (ADR 0050)', () => {
+    const nodes = [
+      N('account-1', 'account', undefined, { account_id: '123456789012' }),
+      N('vpc-1', 'vpc', 'account-1', { cidr_block: '10.0.0.0/16' }),
+      N('az-1', 'az', 'vpc-1', { az: 'a' }),
+      N('subnet-1', 'subnet', 'az-1', { cidr_block: '10.0.1.0/24', az: 'a', public: true }),
+    ]
+    const main = generateTerraform(nodes, [])['main.tf']!
+    // Account/AZ are organizational — no resources of their own.
+    expect(main).not.toContain('aws_account')
+    expect(main).not.toContain('"account_1"')
+    expect(main).not.toContain('"az_1"')
+    expect(main).toContain('resource "aws_vpc" "vpc_1"')
+    // The subnet resolves its enclosing VPC by walking through the AZ box.
+    const subnetBlock = main.split('resource "aws_subnet" "subnet_1"')[1]?.split('\n}')[0] ?? ''
+    expect(subnetBlock).toContain('vpc_id                  = aws_vpc.vpc_1.id')
+    expect(main).not.toContain('REPLACE_ME')
+  })
+
   it('omits rds-only artifacts when the graph has no primary RDS', () => {
     const files = generateTerraform(
       [N('s3-1', 's3', undefined, { versioning: false, encryption: true, block_public_access: true })],

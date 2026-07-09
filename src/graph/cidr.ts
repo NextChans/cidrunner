@@ -51,16 +51,28 @@ export function cidrIssues(nodes: ResourceNodeType[]): Map<string, string[]> {
     if (!list.includes(msg)) issues.set(id, [...list, msg])
   }
 
+  // Walk the parent chain to the enclosing VPC. A subnet may sit directly in a
+  // VPC or inside an AZ box (ADR 0050), so containment/overlap must key on the
+  // enclosing VPC, not the direct parent.
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const enclosingVpc = (n: ResourceNodeType): ResourceNodeType | undefined => {
+    let cur = n.parentId ? byId.get(n.parentId) : undefined
+    while (cur) {
+      if (cur.data.type === 'vpc') return cur
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined
+    }
+    return undefined
+  }
+
   const subnets = nodes
     .filter((n) => n.data.type === 'subnet')
-    .map((n) => ({ node: n, range: parseCidr(n.data.config.cidr_block) }))
+    .map((n) => ({ node: n, range: parseCidr(n.data.config.cidr_block), vpc: enclosingVpc(n) }))
 
-  // 1. Subnet must fit inside its parent VPC's CIDR.
-  for (const { node, range } of subnets) {
-    if (!range || !node.parentId) continue
-    const vpc = nodes.find((v) => v.id === node.parentId && v.data.type === 'vpc')
-    const vpcRange = vpc ? parseCidr(vpc.data.config.cidr_block) : null
-    if (vpc && vpcRange && !contains(vpcRange, range)) {
+  // 1. Subnet must fit inside its enclosing VPC's CIDR.
+  for (const { node, range, vpc } of subnets) {
+    if (!range || !vpc) continue
+    const vpcRange = parseCidr(vpc.data.config.cidr_block)
+    if (vpcRange && !contains(vpcRange, range)) {
       add(
         node.id,
         `Subnet CIDR(${node.data.config.cidr_block})이 VPC CIDR(${vpc.data.config.cidr_block}) 범위를 벗어납니다.`,
@@ -74,7 +86,7 @@ export function cidrIssues(nodes: ResourceNodeType[]): Map<string, string[]> {
       const a = subnets[i]
       const b = subnets[j]
       if (!a || !b || !a.range || !b.range) continue
-      if (!a.node.parentId || a.node.parentId !== b.node.parentId) continue
+      if (!a.vpc || a.vpc.id !== b.vpc?.id) continue
       if (overlaps(a.range, b.range)) {
         const msg = (other: ResourceNodeType) =>
           `같은 VPC의 Subnet(${other.data.label}, ${other.data.config.cidr_block})과 CIDR이 겹칩니다.`

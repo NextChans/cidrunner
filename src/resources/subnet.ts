@@ -15,8 +15,9 @@ export const subnet: ResourceMeta = {
     az: 'a',
     public: false,
   },
-  // A CIDR slice of a VPC; itself a container for compute/database nodes.
-  allowedParents: ['vpc'],
+  // A CIDR slice of a VPC; may sit directly in the VPC or inside an AZ box, and
+  // is itself a container for compute/database nodes (ADR 0050).
+  allowedParents: ['vpc', 'az'],
   container: true,
   defaultSize: { width: 320, height: 190 },
   fields: [
