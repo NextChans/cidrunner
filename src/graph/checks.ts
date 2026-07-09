@@ -1,6 +1,8 @@
 import type { Edge } from '@xyflow/react'
 import type { ResourceNodeType } from '@/store/useGraphStore'
 import { cidrIssues, parseCidr } from '@/graph/cidr'
+import { canBeTopLevel, requiredParentLabel } from '@/graph/rules'
+import { getResource } from '@/resources'
 
 /**
  * Graph-level validation with severity (ADR 0017):
@@ -52,6 +54,24 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
   for (const node of nodes) {
     const t = node.data.type
     const cfg = node.data.config
+
+    // Containment legality (ADR 0045 / QA-001). Containment was only enforced at
+    // *creation* time, so detach, shared-URL/gallery-slot load, and hand-edited
+    // JSON could strip a node's `parentId` and leave a resource that requires a
+    // container orphaned at the canvas root. A resource whose `allowedParents`
+    // does not include 'canvas' (EC2/RDS/NAT/ElastiCache in a subnet; Subnet/
+    // ALB/IGW/SG/ECS/EFS/EKS in a VPC) must resolve to a real parent — otherwise
+    // it is an error, so missions (`allValid`), Terraform export, and the
+    // ingress simulation all gate on it uniformly. Global services
+    // (S3/Cognito/Route53/… — `allowedParents` includes 'canvas') are exempt.
+    const parentNode = node.parentId ? byId.get(node.parentId) : undefined
+    if (!parentNode && !canBeTopLevel(t)) {
+      push(
+        errors,
+        node.id,
+        `${getResource(t).label}은(는) ${requiredParentLabel(t)} 안에 배치되어야 합니다 (현재 최상위에 방치됨).`,
+      )
+    }
 
     if (t === 'nat') {
       const parent = node.parentId ? byId.get(node.parentId) : undefined

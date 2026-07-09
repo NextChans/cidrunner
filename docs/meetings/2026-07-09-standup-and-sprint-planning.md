@@ -260,3 +260,16 @@ extent·상대좌표·렌더순서 + 시각 편입). feature branch → PR → m
   무관 리소스 무시·SG 부착 불변식), `derived` 4.
 - **남은 관심사(F3)**: Lambda+API GW 분리(별도 PR 규모) + 그리디 tracer 백트래킹 재검토(현재
   의도 동작으로 락인) + Lambda VPC 연결 모델 결정.
+
+---
+
+## Hotfix QA-001 (containment-legality — F3 착수 전)
+
+QA 스윕 리포트 QA-001(Major) 해소. 별도 브랜치 `hotfix/qa-001-containment-legality`.
+containment가 **생성 시점에만** 강제되어 detach·공유 URL·슬롯 로드·hand-edit로 만든 "부모 없는
+불법 배치"가 미션·TF·시뮬 어디서도 검증 안 되던 갭. `graphIssues`에 상시 룰 1개 추가 —
+`!canBeTopLevel(t)`이고 해석 가능한 parent가 없으면 **error**(글로벌 서비스는 `canvas` 허용이라
+자동 면제). 미션 ★2 오통과 차단(`allValid` 자동), TF export error 차단 게이트(REPLACE_ME 방지),
+sim 자연 정합. 테스트 **139→152**(containment-legality 13, detach 시나리오 포함), tsc strict·
+oxlint·vite build clean. ADR 0045. feature branch → PR → merge. **F3(그리디 tracer 재설계에
+QA-002 흡수) 착수 준비 완료.**
