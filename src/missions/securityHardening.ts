@@ -1,5 +1,5 @@
 import type { Mission } from './types'
-import { scopedSecurityOk } from './scope'
+import { liveChain, scopedSecurityOk } from './scope'
 
 export const securityHardening: Mission = {
   id: 'security-hardening',
@@ -11,14 +11,13 @@ export const securityHardening: Mission = {
   requiredResources: ['vpc', 'subnet', 'igw', 'alb', 'ec2', 'rds', 'sg'],
   // ★1 3-tier 도달 + DB가 프라이빗 · ★2 + SSH 미개방·DB 암호화 · ★3 + 보안 경고 0
   check: (ctx) => {
-    const { nodes, sim } = ctx
+    const { nodes } = ctx
     const byId = new Map(nodes.map((n) => [n.id, n]))
-    const typeOf = (id: string) => byId.get(id)?.data.type
-    const dbFlow = sim.flows.find((f) => {
-      const path = f.pathNodeIds.map(typeOf)
-      return f.ok && path.includes('alb') && path.includes('ec2') && path.includes('rds')
-    })
-    if (!dbFlow) return 0
+    // ALB → EC2 → RDS as a live chain — matched structurally so a load balancer
+    // that also fans out to a container/other branch doesn't hide the EC2 path
+    // (same fix as the sibling 3-tier missions — ADR 0047/0041 lineage).
+    const chain = liveChain(ctx, ['alb', 'ec2', 'rds'])
+    if (!chain) return 0
 
     const rdsNodes = nodes.filter((n) => n.data.type === 'rds')
     const dbPrivate =
@@ -35,7 +34,7 @@ export const securityHardening: Mission = {
       .every((n) => n.data.config.allow_ssh !== true)
     const dbEncrypted = rdsNodes.every((n) => n.data.config.storage_encrypted !== false)
     if (noSsh && dbEncrypted) stars += 1
-    if (scopedSecurityOk(ctx, dbFlow.pathNodeIds)) stars += 1
+    if (scopedSecurityOk(ctx, chain)) stars += 1
     return stars
   },
 }

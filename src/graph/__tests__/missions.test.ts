@@ -323,6 +323,22 @@ describe('mission checker audit (ADR 0041)', () => {
     expect(stars('container-workload', nodes, edges)).toBeGreaterThanOrEqual(1)
   })
 
+  it('security-hardening clears when the ALB also fans out to a container branch', () => {
+    // The ALB load-balances to an EKS (drawn first, reaching RDS) as well as the
+    // 3-tier EC2. The single traced flow may take the EKS branch (no EC2), but
+    // the mission must still find ALB → EC2 → RDS structurally.
+    const b = vpcThreeTier('security-hardening')
+    const eks = N('eks-x', 'eks', 'vpc-1', { k8s_version: '1.31', node_instance_type: 't3.medium' })
+    const nodes = [...b.nodes, eks]
+    const edges = [
+      E('sgeks', 'sg-6', 'eks-x'),
+      E('albeks', 'alb-7', 'eks-x'), // fan-out branch, ordered before alb → ec2
+      E('eksrds', 'eks-x', 'rds-9'),
+      ...b.edges,
+    ]
+    expect(stars('security-hardening', nodes, edges)).toBe(3)
+  })
+
   it('mission-scoped security ignores a disconnected insecure resource', () => {
     // A dangling public-block-off S3 unrelated to the async pipeline is ignored.
     const b = asyncBuild()
