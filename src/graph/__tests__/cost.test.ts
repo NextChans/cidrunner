@@ -7,7 +7,8 @@ describe('cost — monthly estimate (ADR 0051)', () => {
   it('prices the hourly billers and treats plumbing/boxes as free', () => {
     expect(nodeMonthlyCost(N('nat-1', 'nat'))).toBe(32)
     expect(nodeMonthlyCost(N('alb-1', 'alb'))).toBe(16)
-    expect(nodeMonthlyCost(N('eks-1', 'eks'))).toBe(73)
+    // EKS = control plane (73) + 2 worker nodes; default t3.medium → 73 + 2×30.
+    expect(nodeMonthlyCost(N('eks-1', 'eks'))).toBe(133)
     expect(nodeMonthlyCost(N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }))).toBe(0)
     expect(nodeMonthlyCost(N('subnet-1', 'subnet'))).toBe(0)
     expect(nodeMonthlyCost(N('igw-1', 'igw'))).toBe(0)

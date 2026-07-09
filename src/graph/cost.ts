@@ -52,7 +52,10 @@ const RESOURCE_COST: Partial<Record<ResourceType, Cost>> = {
   // The infamous hourly billers.
   nat: 32, // NAT Gateway — the classic "why is my bill $32?" trap
   alb: 16,
-  eks: 73, // EKS control plane alone, before any nodes
+  // EKS = control plane ($73) + its managed node group. The EKS block is
+  // self-contained (ADR 0026): it provisions 2 worker EC2 of `node_instance_type`,
+  // so the cost must include them — the control plane alone runs nothing.
+  eks: (c) => 73 + 2 * (EC2_MONTHLY[String(c.node_instance_type)] ?? 30),
   ecs: 18, // a small Fargate service
   ec2: (c) => EC2_MONTHLY[String(c.instance_type)] ?? 15,
   rds: (c) => (RDS_MONTHLY[String(c.instance_class)] ?? 25) * (c.multi_az === true ? 2 : 1),

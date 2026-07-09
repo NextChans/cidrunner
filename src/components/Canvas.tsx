@@ -27,6 +27,7 @@ import { canConnect, canContain, canBeTopLevel, isContainer, requiredParentLabel
 import { derivedEdges } from '@/graph/derived'
 import { estimateMonthlyCost } from '@/graph/cost'
 import { graphAzs, applyAzFault } from '@/graph/chaos'
+import { wellArchitectedGrade } from '@/graph/grade'
 import { getMission } from '@/missions'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
@@ -158,6 +159,9 @@ export function Canvas() {
 
   // Chaos mode (ADR 0052): the AZs present in the graph, offered as fault buttons.
   const azs = useMemo(() => graphAzs(nodes), [nodes])
+
+  // Well-Architected grade (ADR 0054): live score across 4 pillars.
+  const grade = useMemo(() => wellArchitectedGrade(nodes, edges), [nodes, edges])
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ resource: ResourceNode }), [])
   const edgeTypes = useMemo<EdgeTypes>(
@@ -317,26 +321,50 @@ export function Canvas() {
           />
         )}
         <Panel position="top-left">
-          <div
-            title="예상 월 비용 (대략치)"
-            className={
-              'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium shadow-lg ' +
-              (budget === undefined
-                ? 'border-surface-border bg-surface-raised text-slate-300'
-                : overBudget
-                  ? 'border-rose-700/70 bg-rose-950/90 text-rose-200'
-                  : 'border-accent/60 bg-emerald-950/90 text-emerald-200')
-            }
-          >
-            <span>💸</span>
-            <span className="tabular-nums">${monthlyCost}/월</span>
-            {budget !== undefined && (
-              <span className="tabular-nums opacity-80">
-                {' '}
-                / 예산 ${budget}
-                {overBudget ? ' ⚠️' : ' ✓'}
+          <div className="flex flex-col gap-1.5">
+            <div
+              title="예상 월 비용 (대략치)"
+              className={
+                'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium shadow-lg ' +
+                (budget === undefined
+                  ? 'border-surface-border bg-surface-raised text-slate-300'
+                  : overBudget
+                    ? 'border-rose-700/70 bg-rose-950/90 text-rose-200'
+                    : 'border-accent/60 bg-emerald-950/90 text-emerald-200')
+              }
+            >
+              <span>💸</span>
+              <span className="tabular-nums">${monthlyCost}/월</span>
+              {budget !== undefined && (
+                <span className="tabular-nums opacity-80">
+                  {' '}
+                  / 예산 ${budget}
+                  {overBudget ? ' ⚠️' : ' ✓'}
+                </span>
+              )}
+            </div>
+            {/* Well-Architected grade (ADR 0054): live letter + 4 pillar scores. */}
+            <div
+              title={`Well-Architected 등급 (종합 ${grade.overall})\n🔒 보안 ${grade.pillars.security} · 🛡 신뢰성 ${grade.pillars.reliability} · 💰 비용 ${grade.pillars.cost} · ⚡ 성능 ${grade.pillars.performance}`}
+              className="flex items-center gap-2 rounded-md border border-surface-border bg-surface-raised px-2.5 py-1 text-xs shadow-lg"
+            >
+              <span
+                className={
+                  'flex h-5 w-5 items-center justify-center rounded font-bold ' +
+                  (grade.overall >= 75
+                    ? 'bg-emerald-500 text-slate-900'
+                    : grade.overall >= 60
+                      ? 'bg-amber-400 text-slate-900'
+                      : 'bg-rose-500 text-white')
+                }
+              >
+                {grade.letter}
               </span>
-            )}
+              <span className="tabular-nums text-slate-400">
+                🔒{grade.pillars.security} 🛡{grade.pillars.reliability} 💰
+                {grade.pillars.cost} ⚡{grade.pillars.performance}
+              </span>
+            </div>
           </div>
         </Panel>
         {azs.length > 0 && (
