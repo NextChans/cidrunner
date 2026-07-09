@@ -40,13 +40,15 @@ export interface SimResult {
   flows: SimFlow[]
   /** Aggregate player-facing summary. */
   message: string
-  /** Union of all flows' path nodes (highlighting). */
+  /** Nodes on *some* live entry→sink path (green highlight) — not just the one
+   * route per flow, so a fanned-out balancer lights every reachable branch. */
   pathNodeIds: string[]
-  /** Union of all flows' path edges. */
+  /** Edges on some live entry→sink path (the 'ok' edges). */
   pathEdgeIds: string[]
-  /** All blocking nodes across flows. */
+  /** Nodes where traffic dead-ends: per-flow blocks + fan-out targets that can't
+   * reach a sink (red highlight). A node on a green path is never listed. */
   blockedNodeIds: string[]
-  /** edge id → hop index within its flow (particle stagger). */
+  /** edge id → hop distance from the nearest entry (particle stagger). */
   edgeHops: Record<string, number>
   /** node id → seconds until the request reaches it (arrival pulse). */
   arrivals: Record<string, number>
@@ -324,38 +326,107 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
     internetIngressBlock(node, byId, nodes)
   const flows = entries.map((entry) => traceFlow(entry, byId, trafficEdges, ingressBlock))
 
-  const pathNodeIds = [...new Set(flows.flatMap((f) => f.pathNodeIds))]
-  const pathEdgeIds = [...new Set(flows.flatMap((f) => f.pathEdgeIds))]
-  const blockedNodeIds = flows
-    .map((f) => f.blockedNodeId)
-    .filter((id): id is string => id !== null)
+  // ── Highlight subgraph ──────────────────────────────────────────────────
+  // The per-flow trace above yields ONE representative route per entry (used by
+  // the banner and by mission checks). For *highlighting*, we light up the full
+  // set of live entry→sink paths instead — so a load balancer that fans out to
+  // two app servers shows BOTH of their paths to the database, not just the one
+  // the DFS happened to pick. Without this, fan-out (ADR 0048) visibly balances
+  // across targets while only one downstream branch lit up (ADR 0047/0048
+  // follow-up).
 
-  const edgeHops: Record<string, number> = {}
-  const arrivals: Record<string, number> = {}
-  const edgeStatus: Record<string, 'ok' | 'blocked'> = {}
-  for (const flow of flows) {
-    flow.pathEdgeIds.forEach((edgeId, i) => {
-      if (!(edgeId in edgeHops)) edgeHops[edgeId] = i
-      // 'ok' always wins over 'blocked' for an edge shared across flows.
-      if (flow.ok) edgeStatus[edgeId] = 'ok'
-      else if (!(edgeId in edgeStatus)) edgeStatus[edgeId] = 'blocked'
-    })
-    flow.pathNodeIds.forEach((nodeId, i) => {
-      const t = i * HOP_SECONDS
-      const prev = arrivals[nodeId]
-      if (prev === undefined || prev > t) arrivals[nodeId] = t
-    })
+  // Forward reachability from entries, recording a hop distance per node and
+  // every traversed edge. An ingress-blocked ALB is reached but NOT expanded —
+  // traffic can't pass through it, so its downstream stays dark.
+  const fdist = new Map<string, number>()
+  const traversed: { id: string; u: string; v: string }[] = []
+  const queue: ResourceNodeType[] = []
+  for (const e of entries) {
+    if (!fdist.has(e.id)) {
+      fdist.set(e.id, 0)
+      queue.push(e)
+    }
+  }
+  while (queue.length) {
+    const u = queue.shift()!
+    if (ingressBlock(u)) continue
+    for (const edge of trafficEdges) {
+      if (edge.source !== u.id) continue
+      const v = byId.get(edge.target)
+      if (!v) continue
+      traversed.push({ id: edge.id, u: u.id, v: v.id })
+      if (!fdist.has(v.id)) {
+        fdist.set(v.id, (fdist.get(u.id) ?? 0) + 1)
+        queue.push(v)
+      }
+    }
   }
 
-  // Load-balancer fan-out: for each reachable, unblocked balancer, slot ALL of
-  // its outgoing traffic edges (even ones off the traced success path) so the
-  // renderer can animate a round-robin distribution across every target.
-  const reached = new Set(pathNodeIds)
-  const blocked = new Set(blockedNodeIds)
+  // Backward reachability: nodes that can still reach a sink (reverse traffic
+  // edges from every sink node).
+  const reachesSink = new Set<string>()
+  const rqueue: string[] = []
+  for (const n of nodes) {
+    if (SINKS.has(n.data.type)) {
+      reachesSink.add(n.id)
+      rqueue.push(n.id)
+    }
+  }
+  while (rqueue.length) {
+    const vId = rqueue.shift()!
+    for (const edge of trafficEdges) {
+      if (edge.target !== vId || !byId.has(edge.source)) continue
+      if (!reachesSink.has(edge.source)) {
+        reachesSink.add(edge.source)
+        rqueue.push(edge.source)
+      }
+    }
+  }
+
+  // An edge is 'ok' (green) when its target can still reach a sink; otherwise it
+  // feeds a dead end (red). Green nodes are the endpoints of ok edges; dead-end
+  // targets join the blocked set so a misconfigured fan-out target shows red.
+  const edgeHops: Record<string, number> = {}
+  const edgeStatus: Record<string, 'ok' | 'blocked'> = {}
+  const greenNodes = new Set<string>()
+  const deadEnds = new Set<string>()
+  for (const t of traversed) {
+    if (!(t.id in edgeHops)) edgeHops[t.id] = fdist.get(t.u) ?? 0
+    if (reachesSink.has(t.v)) {
+      edgeStatus[t.id] = 'ok'
+      greenNodes.add(t.u)
+      greenNodes.add(t.v)
+    } else {
+      if (!(t.id in edgeStatus)) edgeStatus[t.id] = 'blocked'
+      deadEnds.add(t.v)
+    }
+  }
+
+  const pathNodeIds = [...greenNodes]
+  const pathEdgeIds = Object.keys(edgeStatus).filter((id) => edgeStatus[id] === 'ok')
+
+  // Red nodes: per-flow dead ends (incl. ingress blocks) + fan-out targets that
+  // cannot reach a sink. A node that IS on a green path always wins (never red).
+  const blockedNodeIds = [
+    ...new Set([
+      ...flows.map((f) => f.blockedNodeId).filter((id): id is string => id !== null),
+      ...deadEnds,
+    ]),
+  ].filter((id) => !greenNodes.has(id))
+
+  // Arrival pulse timing for the green nodes (hop distance from the entry).
+  const arrivals: Record<string, number> = {}
+  for (const id of greenNodes) {
+    arrivals[id] = (fdist.get(id) ?? 0) * HOP_SECONDS
+  }
+
+  // Load-balancer fan-out: for each reachable, non-ingress-blocked balancer,
+  // slot ALL of its outgoing traffic edges so the renderer can animate a
+  // round-robin distribution across every registered target.
   const fanout: Record<string, { index: number; total: number }> = {}
   for (const node of nodes) {
     if (!BALANCERS.has(node.data.type)) continue
-    if (!reached.has(node.id) || blocked.has(node.id)) continue
+    if (!fdist.has(node.id) || ingressBlock(node)) continue
     const outs = trafficEdges.filter((e) => e.source === node.id && byId.has(e.target))
     if (outs.length < 2) continue // a single target is not a visible fan-out
     outs.forEach((e, index) => {

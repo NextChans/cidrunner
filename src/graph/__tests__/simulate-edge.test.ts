@@ -111,6 +111,40 @@ describe('simulate — traffic viz metadata', () => {
     expect(sim.fanout['t1']).toBeUndefined()
   })
 
+  it('highlights every branch of an HA fan-out, not just one traced path', () => {
+    // ALB → 2 EC2, and BOTH EC2 → RDS. The load balancer distributes to both
+    // app servers, so both downstream branches to the DB must light up 'ok' —
+    // not only the single path the per-flow DFS happens to pick.
+    const sim = simulate(
+      [N('alb1', 'alb'), N('ec2a', 'ec2'), N('ec2b', 'ec2'), N('rds1', 'rds')],
+      [
+        E('la', 'alb1', 'ec2a'),
+        E('lb', 'alb1', 'ec2b'),
+        E('da', 'ec2a', 'rds1'),
+        E('db', 'ec2b', 'rds1'),
+      ],
+    )
+    expect(sim.edgeStatus['la']).toBe('ok')
+    expect(sim.edgeStatus['lb']).toBe('ok')
+    expect(sim.edgeStatus['da']).toBe('ok')
+    expect(sim.edgeStatus['db']).toBe('ok')
+    expect([...sim.pathNodeIds].sort()).toEqual(['alb1', 'ec2a', 'ec2b', 'rds1'])
+    expect(sim.blockedNodeIds).toHaveLength(0)
+  })
+
+  it('marks a fan-out target that cannot reach a sink as a red dead end', () => {
+    // ALB fans out to ec2a (→RDS, ok) and ec2b (no DB). The ec2b branch is
+    // blocked and ec2b is a dead end, but the flow still clears via ec2a.
+    const sim = simulate(
+      [N('alb1', 'alb'), N('ec2a', 'ec2'), N('ec2b', 'ec2'), N('rds1', 'rds')],
+      [E('la', 'alb1', 'ec2a'), E('lb', 'alb1', 'ec2b'), E('da', 'ec2a', 'rds1')],
+    )
+    expect(sim.ok).toBe(true)
+    expect(sim.edgeStatus['la']).toBe('ok')
+    expect(sim.edgeStatus['lb']).toBe('blocked')
+    expect(sim.blockedNodeIds).toContain('ec2b')
+  })
+
   it('marks edges ok on a successful flow and blocked on a failed one', () => {
     const ok = simulate(
       [N('alb1', 'alb'), N('ec21', 'ec2'), N('rds1', 'rds')],
