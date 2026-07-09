@@ -394,12 +394,17 @@ export function simulate(
   const byId = new Map(nodes.map((n) => [n.id, n]))
   // SG edges are attachments, CloudWatch edges are monitoring links, and
   // RDS → RDS edges are replication links (ADR 0019) — none carries request
-  // traffic.
+  // traffic. ACM/WAF/Cognito edges are security attachments too (ADR 0056):
+  // a cert, firewall, or authorizer *fronts* a target without being upstream
+  // of it, so the target stays a valid simulation entry point.
   const trafficEdges = edges.filter((e) => {
     const src = byId.get(e.source)?.data.type
     return (
       src !== 'sg' &&
       src !== 'cloudwatch' &&
+      src !== 'acm' &&
+      src !== 'waf' &&
+      src !== 'cognito' &&
       !(src === 'rds' && byId.get(e.target)?.data.type === 'rds')
     )
   })

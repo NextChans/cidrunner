@@ -20,8 +20,13 @@ export const acm: ResourceMeta = {
     domain_name: 'example.com',
     validation_method: 'DNS',
   },
-  // Regional/global certificate — not inside a VPC, no traffic edges.
+  // Regional/global certificate — not inside a VPC. Draw an edge acm → alb to
+  // *secure* that load balancer (attachment, not traffic — ADR 0056): the ALB
+  // then emits an HTTPS:443 listener. CloudFront is intentionally absent — its
+  // cert must live in us-east-1, which needs a multi-region provider the game
+  // doesn't model (flagged in the export's readiness manifest).
   allowedParents: ['canvas'],
+  connectsTo: ['alb'],
   fields: [
     {
       key: 'domain_name',

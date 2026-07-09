@@ -21,8 +21,12 @@ export const cognito: ResourceMeta = {
     password_min_length: 8,
     email_verification: true,
   },
-  // Regional identity service — not inside a VPC, no traffic edges.
+  // Regional identity service — not inside a VPC. Draw an edge cognito → apigw
+  // to make it the API's authorizer (attachment, not traffic — ADR 0056): the
+  // API Gateway then guards its methods with a COGNITO_USER_POOLS authorizer
+  // instead of `authorization = "NONE"`.
   allowedParents: ['canvas'],
+  connectsTo: ['apigw'],
   fields: [
     {
       key: 'mfa',

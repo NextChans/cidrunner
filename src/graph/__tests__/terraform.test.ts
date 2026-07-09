@@ -168,6 +168,89 @@ describe('generateTerraform', () => {
     expect(dbsg).not.toContain('aws_subnet.pb.id')
   })
 
+  it('wires TLS/WAF/Cognito from security-attachment edges (ADR 0056)', () => {
+    const nodes = [
+      N('vpc', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+      N('pa', 'subnet', 'vpc', { cidr_block: '10.0.1.0/24', az: 'a', public: true }),
+      N('pb', 'subnet', 'vpc', { cidr_block: '10.0.2.0/24', az: 'b', public: true }),
+      N('igw', 'igw', 'vpc', {}),
+      N('sgweb', 'sg', 'vpc', { allow_http: true, allow_https: true, allow_ssh: false }),
+      N('alb', 'alb', 'vpc', { internal: false, listener_port: 80 }),
+      N('ec2', 'ec2', 'pa', { instance_type: 't3.micro', ami: 'auto' }),
+      N('cert', 'acm', undefined, { domain_name: 'app.example.com', validation_method: 'DNS' }),
+      N('fw', 'waf', undefined, { rate_limit: 2000, managed_common_rules: true }),
+      N('fn', 'lambda', undefined, {}),
+      N('api', 'apigw', undefined, { stage_name: 'prod', endpoint_type: 'regional' }),
+      N('pool', 'cognito', undefined, { mfa: 'OFF', password_min_length: 8 }),
+    ]
+    const edges = [
+      E('s1', 'sgweb', 'alb'), E('s2', 'sgweb', 'ec2'), E('t1', 'alb', 'ec2'),
+      E('c1', 'cert', 'alb'),   // ACM → ALB: HTTPS
+      E('w1', 'fw', 'alb'),     // WAF → ALB
+      E('i1', 'api', 'fn'),     // API GW → Lambda proxy
+      E('g1', 'pool', 'api'),   // Cognito → API GW authorizer
+    ]
+    const main = generateTerraform(nodes, edges)['main.tf']!
+
+    // #3 ACM → ALB: an HTTPS:443 listener with the cert, and HTTP:80 redirects.
+    expect(main).toContain('protocol          = "HTTPS"')
+    expect(main).toContain('certificate_arn   = aws_acm_certificate.cert.arn')
+    expect(main).toContain('type = "redirect"')
+    // #4 WAF association to the ALB.
+    expect(main).toContain('resource "aws_wafv2_web_acl_association" "fw_alb"')
+    expect(main).toContain('resource_arn = aws_lb.alb.arn')
+    // #5 Cognito authorizer guards the API method (no longer NONE).
+    expect(main).toContain('type          = "COGNITO_USER_POOLS"')
+    expect(main).toContain('authorization = "COGNITO_USER_POOLS"')
+    const method = main.split('resource "aws_api_gateway_method"')[1]?.split('\nresource ')[0] ?? ''
+    expect(method).not.toContain('authorization = "NONE"')
+  })
+
+  it('never opens the app/db tier to 0.0.0.0/0 — tiered ingress is SG-to-SG only', () => {
+    const nodes = [
+      N('vpc', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+      N('da', 'subnet', 'vpc', { cidr_block: '10.0.3.0/24', az: 'a', public: false }),
+      N('db2', 'subnet', 'vpc', { cidr_block: '10.0.4.0/24', az: 'b', public: false }),
+      // App/DB SGs with every internet toggle OFF.
+      N('sgapp', 'sg', 'vpc', { allow_http: false, allow_https: false, allow_ssh: false }),
+      N('sgdb', 'sg', 'vpc', { allow_http: false, allow_https: false, allow_ssh: false }),
+      N('ec2', 'ec2', 'da', { instance_type: 't3.micro', ami: 'auto' }),
+      N('sgweb', 'sg', 'vpc', { allow_http: true, allow_https: false, allow_ssh: false }),
+      N('alb', 'alb', 'vpc', { internal: false, listener_port: 80 }),
+      N('rds', 'rds', 'db2', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20 }),
+    ]
+    const edges = [
+      E('a1', 'sgweb', 'alb'), E('a2', 'sgapp', 'ec2'), E('a3', 'sgdb', 'rds'),
+      E('t1', 'alb', 'ec2'), E('t2', 'ec2', 'rds'),
+    ]
+    const main = generateTerraform(nodes, edges)['main.tf']!
+    // Ingress portion only — egress is intentionally allow-all 0.0.0.0/0.
+    const ingress = (id: string) =>
+      (main.split(`resource "aws_security_group" "${id}"`)[1]?.split('\nresource ')[0] ?? '')
+        .split('egress {')[0]
+    // Regression guard: the derived data tiers must never fall back to open CIDR.
+    expect(ingress('sgapp')).not.toContain('cidr_blocks = ["0.0.0.0/0"]')
+    expect(ingress('sgdb')).not.toContain('cidr_blocks = ["0.0.0.0/0"]')
+    expect(ingress('sgapp')).toContain('security_groups = [aws_security_group.sgweb.id]')
+  })
+
+  it('ships a machine-readable readiness manifest that flags unwired security (ADR 0056)', () => {
+    const nodes = [
+      N('vpc', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+      N('pa', 'subnet', 'vpc', { cidr_block: '10.0.1.0/24', az: 'a', public: true }),
+      N('sgweb', 'sg', 'vpc', { allow_http: true }),
+      N('alb', 'alb', 'vpc', { internal: false, listener_port: 80 }), // no ACM edge
+      N('ec2', 'ec2', 'pa', { instance_type: 't3.micro', ami: 'auto' }),
+    ]
+    const edges = [E('a1', 'sgweb', 'alb'), E('t1', 'alb', 'ec2')]
+    const files = generateTerraform(nodes, edges)
+    const manifest = files['PRODUCTION-READINESS.md']!
+    expect(manifest).toContain('NOT PRODUCTION READY')
+    expect(manifest).toContain('"productionReady": false')
+    expect(manifest).toContain('alb-plaintext-http') // ALB with no cert flagged
+    expect(manifest).toContain('no-audit-logging')
+  })
+
   it('omits rds-only artifacts when the graph has no primary RDS', () => {
     const files = generateTerraform(
       [N('s3-1', 's3', undefined, { versioning: false, encryption: true, block_public_access: true })],

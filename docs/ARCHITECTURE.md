@@ -344,8 +344,20 @@ gap ([ADR 0055](decisions/0055-terraform-apply-wiring.md)): the generator now
 derives **tiered SG-to-SG ingress** from the traffic topology (app SG ← ALB SG
 on :80, DB SG ← app SG on :3306), places the **DB subnet group and EKS node
 group in private subnets**, and manages **RDS credentials via Secrets Manager**
-(`manage_master_user_password`, no plaintext) with a 7-day backup window. Wiring
-HTTPS/WAF/authorizer/alarm-actions from edges remains a follow-up.
+(`manage_master_user_password`, no plaintext) with a 7-day backup window.
+
+A follow-up review then corrected the fix's *classification* axis
+([ADR 0056](decisions/0056-security-attachment-wiring-and-readiness-manifest.md)):
+TLS/WAF/auth were deferred as if out-of-scope, but their blocks already exist —
+they were merely unwired. ACM/WAF/Cognito now carry **security-attachment edges**
+(source = the security block, excluded from simulation traffic like SG), so
+`acm → alb` emits an **HTTPS:443 listener + HTTP:80 redirect** (killing the
+pending-validation "zombie cert"), `waf → alb|apigw` emits a **Web ACL
+association**, and `cognito → apigw` emits a **COGNITO_USER_POOLS authorizer**.
+Every export also ships **`PRODUCTION-READINESS.md`** — a machine-readable
+manifest that self-declares what the stack does *not* cover (app→secret
+consumption, CMK, audit logs, CloudFront multi-region TLS, alarm actions, single
+NAT), so "apply-ready" never masquerades as "production-ready".
 
 ## Mission registry
 

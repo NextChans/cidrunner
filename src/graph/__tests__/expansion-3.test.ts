@@ -69,10 +69,15 @@ describe('resource expansion batch 3 (ADR 0035)', () => {
   it('extends edge rules for the streaming + secrets blocks', () => {
     expect(canConnect('kinesis', 'lambda')).toBe(true)
     expect(canConnect('secretsmanager', 'kms')).toBe(true)
-    // Standalone identity/security blocks originate no edges.
-    expect(canBeSource('cognito')).toBe(false)
-    expect(canBeSource('acm')).toBe(false)
-    expect(canBeSource('waf')).toBe(false)
+    // Security-attachment edges: cert/firewall/authorizer front a target
+    // without carrying traffic (ADR 0056, superseding ADR 0035's no-edges).
+    expect(canConnect('acm', 'alb')).toBe(true)
+    expect(canConnect('waf', 'alb')).toBe(true)
+    expect(canConnect('waf', 'apigw')).toBe(true)
+    expect(canConnect('cognito', 'apigw')).toBe(true)
+    // …but they front only their valid targets, and KMS still originates none.
+    expect(canConnect('acm', 'apigw')).toBe(false)
+    expect(canConnect('cognito', 'alb')).toBe(false)
     expect(canBeSource('kms')).toBe(false)
     // Not allowed.
     expect(canConnect('kinesis', 's3')).toBe(false)
