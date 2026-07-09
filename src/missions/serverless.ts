@@ -1,4 +1,5 @@
 import type { Mission } from './types'
+import { liveChain } from './scope'
 
 export const serverless: Mission = {
   id: 'serverless',
@@ -11,24 +12,18 @@ export const serverless: Mission = {
   // so a correct solution fronts the function with an explicit API Gateway.
   requiredResources: ['apigw', 'lambda', 's3'],
   // ★1 API GW→Lambda→저장소 도달 · ★2 설정 오류 없음 · ★3 S3 + 버저닝(백업 베스트 프랙티스)
-  check: ({ nodes, sim, allValid }) => {
-    const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
-    const flow = sim.flows.find((f) => {
-      const path = f.pathNodeIds.map(typeOf)
-      return (
-        f.ok &&
-        path[0] === 'apigw' &&
-        path.includes('lambda') &&
-        (path.includes('s3') || path.includes('rds'))
-      )
-    })
-    if (!flow) return 0
+  check: (ctx) => {
+    // API Gateway → Lambda → storage, matched structurally over live edges. Prefer
+    // an S3 sink (its versioning earns ★3); fall back to RDS for the reach star.
+    const s3Chain = liveChain(ctx, ['apigw', 'lambda', 's3'])
+    const chain = s3Chain ?? liveChain(ctx, ['apigw', 'lambda', 'rds'])
+    if (!chain) return 0
     let stars = 1
-    if (allValid) stars += 1
-    const s3OnPath = flow.pathNodeIds
-      .map((id) => nodes.find((n) => n.id === id))
-      .find((n) => n?.data.type === 's3')
-    if (s3OnPath && s3OnPath.data.config.versioning === true) stars += 1
+    if (ctx.allValid) stars += 1
+    if (s3Chain) {
+      const s3 = ctx.nodes.find((n) => n.id === s3Chain[s3Chain.length - 1])
+      if (s3?.data.config.versioning === true) stars += 1
+    }
     return stars
   },
 }

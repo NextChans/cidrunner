@@ -1,6 +1,5 @@
 import type { Mission } from './types'
-import { scopedSecurityOk } from './scope'
-import { liveChain } from './asyncPipeline'
+import { liveChain, scopedSecurityOk } from './scope'
 
 export const eventDriven: Mission = {
   id: 'event-driven',

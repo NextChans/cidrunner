@@ -1,5 +1,5 @@
 import type { Mission } from './types'
-import { scopedSecurityOk } from './scope'
+import { liveChain, scopedSecurityOk } from './scope'
 
 export const globalWeb: Mission = {
   id: 'global-web',
@@ -11,23 +11,11 @@ export const globalWeb: Mission = {
   requiredResources: ['route53', 'cloudfront', 'alb', 'ec2', 'rds'],
   // ★1 R53→CF→ALB→EC2→RDS 도달 · ★2 설정 오류 없음 · ★3 보안 경고 0
   check: (ctx) => {
-    const { nodes, sim, allValid } = ctx
-    const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
-    const flow = sim.flows.find((f) => {
-      const path = f.pathNodeIds.map(typeOf)
-      return (
-        f.ok &&
-        path[0] === 'route53' &&
-        path.includes('cloudfront') &&
-        path.includes('alb') &&
-        path.includes('ec2') &&
-        path[path.length - 1] === 'rds'
-      )
-    })
-    if (!flow) return 0
+    const chain = liveChain(ctx, ['route53', 'cloudfront', 'alb', 'ec2', 'rds'])
+    if (!chain) return 0
     let stars = 1
-    if (allValid) stars += 1
-    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
+    if (ctx.allValid) stars += 1
+    if (scopedSecurityOk(ctx, chain)) stars += 1
     return stars
   },
 }

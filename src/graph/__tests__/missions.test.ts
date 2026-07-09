@@ -295,6 +295,34 @@ describe('mission checker audit (ADR 0041)', () => {
     expect(stars('async-pipeline', nodes, edges)).toBe(3)
   })
 
+  it('container-workload clears when the ALB also fans out to an EC2 branch', () => {
+    // Reported topology: an ALB load-balances to BOTH an EC2 and an EKS cluster,
+    // and both reach the RDS. The single traced flow might take the EC2 branch,
+    // hiding the container path — but the mission grades the live chain
+    // structurally, so ALB → EKS → RDS is found regardless.
+    const nodes = [
+      N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+      N('subnet-1', 'subnet', 'vpc-1', { cidr_block: '10.0.1.0/24', az: 'a', public: true }),
+      N('subnet-2', 'subnet', 'vpc-1', { cidr_block: '10.0.2.0/24', az: 'b', public: true }),
+      N('subnet-3', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'a', public: false }),
+      N('subnet-4', 'subnet', 'vpc-1', { cidr_block: '10.0.4.0/24', az: 'b', public: false }),
+      N('igw-5', 'igw', 'vpc-1', {}),
+      N('sg-6', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }),
+      N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80 }),
+      N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto' }),
+      N('eks-9', 'eks', 'vpc-1', { k8s_version: '1.31', node_instance_type: 't3.medium' }),
+      N('rds-10', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true }),
+    ]
+    const edges = [
+      E('a1', 'sg-6', 'alb-7'), E('a2', 'sg-6', 'ec2-8'), E('a3', 'sg-6', 'eks-9'), E('a4', 'sg-6', 'rds-10'),
+      E('t1', 'alb-7', 'ec2-8'), // EC2 fan-out branch (drawn first)
+      E('t2', 'alb-7', 'eks-9'), // container branch
+      E('t3', 'ec2-8', 'rds-10'),
+      E('t4', 'eks-9', 'rds-10'),
+    ]
+    expect(stars('container-workload', nodes, edges)).toBeGreaterThanOrEqual(1)
+  })
+
   it('mission-scoped security ignores a disconnected insecure resource', () => {
     // A dangling public-block-off S3 unrelated to the async pipeline is ignored.
     const b = asyncBuild()

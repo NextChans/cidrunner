@@ -1,5 +1,5 @@
 import type { Mission } from './types'
-import { scopedSecurityOk } from './scope'
+import { liveChain, scopedSecurityOk } from './scope'
 
 export const staticCdn: Mission = {
   id: 'static-cdn',
@@ -13,21 +13,11 @@ export const staticCdn: Mission = {
   //  (비공개 버킷 유지 — ADR 0041: ★3은 그래프 전체가 아니라 이 미션의 연결된
   //   빌드만 평가하므로, 손대지 않은 시드 그래프가 ★3을 막지 않습니다.)
   check: (ctx) => {
-    const { nodes, sim, allValid } = ctx
-    const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
-    const flow = sim.flows.find((f) => {
-      const path = f.pathNodeIds.map(typeOf)
-      return (
-        f.ok &&
-        path[0] === 'route53' &&
-        path.includes('cloudfront') &&
-        path[path.length - 1] === 's3'
-      )
-    })
-    if (!flow) return 0
+    const chain = liveChain(ctx, ['route53', 'cloudfront', 's3'])
+    if (!chain) return 0
     let stars = 1
-    if (allValid) stars += 1
-    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
+    if (ctx.allValid) stars += 1
+    if (scopedSecurityOk(ctx, chain)) stars += 1
     return stars
   },
 }

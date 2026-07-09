@@ -1,4 +1,5 @@
 import type { Mission } from './types'
+import { liveChain } from './scope'
 
 export const threeTier: Mission = {
   id: 'three-tier',
@@ -9,13 +10,12 @@ export const threeTier: Mission = {
   hint: 'Subnet의 AZ를 서로 다르게 설정하세요. ALB·RDS는 2개 AZ가 필요합니다. Security Group을 각 계층에 연결하면 별 3개!',
   requiredResources: ['vpc', 'subnet', 'igw', 'alb', 'ec2', 'rds', 'sg'],
   // ★1 ALB→EC2→RDS 트래픽 도달 · ★2 오류 없음(멀티 AZ 포함) · ★3 3계층 모두 SG 연결
-  check: ({ nodes, edges, sim, allValid }) => {
+  check: (ctx) => {
+    const { nodes, edges, allValid } = ctx
     const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
-    const reachesDb = sim.flows.some((f) => {
-      const path = f.pathNodeIds.map(typeOf)
-      return f.ok && path.includes('alb') && path.includes('ec2') && path.includes('rds')
-    })
-    if (!reachesDb) return 0
+    // ALB → EC2 → RDS as a live chain (works whether the ALB is the entry or is
+    // fed by CloudFront, and regardless of other ALB fan-out branches).
+    if (!liveChain(ctx, ['alb', 'ec2', 'rds'])) return 0
     let stars = 1
     if (allValid) stars += 1
     const sgAttached = (t: string) =>

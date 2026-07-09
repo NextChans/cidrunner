@@ -1,5 +1,5 @@
 import type { Mission } from './types'
-import { scopedSecurityOk } from './scope'
+import { liveChain, scopedSecurityOk } from './scope'
 
 export const containerWorkload: Mission = {
   id: 'container-workload',
@@ -11,21 +11,13 @@ export const containerWorkload: Mission = {
   requiredResources: ['vpc', 'subnet', 'alb', 'ecs', 'rds'],
   // ★1 ALB→컨테이너→RDS 도달 · ★2 설정 오류 없음(멀티 AZ 포함) · ★3 보안 경고 0
   check: (ctx) => {
-    const { nodes, sim, allValid } = ctx
-    const typeOf = (id: string) => nodes.find((n) => n.id === id)?.data.type
-    const flow = sim.flows.find((f) => {
-      const path = f.pathNodeIds.map(typeOf)
-      return (
-        f.ok &&
-        path.includes('alb') &&
-        path.some((t) => t === 'ecs' || t === 'eks') &&
-        path.includes('rds')
-      )
-    })
-    if (!flow) return 0
+    // ALB → container(ECS/EKS) → RDS, matched structurally over live edges so a
+    // load balancer that also fans out to EC2 doesn't hide the container branch.
+    const chain = liveChain(ctx, ['alb', ['ecs', 'eks'], 'rds'])
+    if (!chain) return 0
     let stars = 1
-    if (allValid) stars += 1
-    if (scopedSecurityOk(ctx, flow.pathNodeIds)) stars += 1
+    if (ctx.allValid) stars += 1
+    if (scopedSecurityOk(ctx, chain)) stars += 1
     return stars
   },
 }
