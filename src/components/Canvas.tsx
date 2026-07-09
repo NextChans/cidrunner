@@ -26,7 +26,7 @@ import { getResource, resources, type ResourceType } from '@/resources'
 import { canConnect, canContain, canBeTopLevel, isContainer, requiredParentLabel } from '@/graph/rules'
 import { derivedEdges } from '@/graph/derived'
 import { estimateMonthlyCost } from '@/graph/cost'
-import { graphAzs } from '@/graph/chaos'
+import { graphAzs, applyAzFault } from '@/graph/chaos'
 import { getMission } from '@/missions'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
 
@@ -167,7 +167,12 @@ export function Canvas() {
 
   // Engine-owned derived edges (ADR 0043) are rendered but never stored: merge
   // them in for display only, so onEdgesChange keeps operating on user edges.
-  const renderedEdges = useMemo(() => [...edges, ...derivedEdges(nodes)], [edges, nodes])
+  // During chaos (ADR 0053), render the AZ-fault's rewired edges so traffic
+  // visually follows a promoted replica instead of pointing at the dead master.
+  const renderedEdges = useMemo(() => {
+    const base = chaosAz ? applyAzFault(nodes, edges, chaosAz).edges : edges
+    return [...base, ...derivedEdges(nodes)]
+  }, [chaosAz, edges, nodes])
 
   // Auto-dismiss the transient notice.
   useEffect(() => {
