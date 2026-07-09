@@ -45,6 +45,172 @@ function ancestorOfType(
   return undefined
 }
 
+/**
+ * A single "not production-ready" gap the generator knows it does NOT emit —
+ * either because it is out of the topology generator's scope (app runtime,
+ * audit pipelines) or because the drawn graph left a security block unwired.
+ */
+interface ReadinessGap {
+  /** Stable, machine-readable key (kebab-case). */
+  id: string
+  severity: 'high' | 'medium' | 'low'
+  title: string
+  detail: string
+}
+
+/**
+ * Builds `PRODUCTION-READINESS.md` (ADR 0056). The Terraform export is
+ * *apply-ready* — it plans and applies — but "applies" is not "production-ready".
+ * Rather than let a plausible-looking stack imply completeness, we ship a
+ * machine-readable manifest that loudly self-declares what is NOT wired, so the
+ * honesty lives in the artifact instead of a README caveat.
+ */
+export function productionReadiness(nodes: ResourceNodeType[], edges: Edge[]): string {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const typeOf = (id: string) => byId.get(id)?.data.type
+  const has = (t: ResourceType) => nodes.some((n) => n.data.type === t)
+  const nodesOf = (t: ResourceType) => nodes.filter((n) => n.data.type === t)
+  const hasIncoming = (nodeId: string, sourceType: ResourceType) =>
+    edges.some((e) => e.target === nodeId && typeOf(e.source) === sourceType)
+
+  const gaps: ReadinessGap[] = []
+
+  // Unwired security blocks on the drawn graph (derivable, but the user didn't
+  // connect them) — the most actionable class.
+  for (const alb of nodesOf('alb')) {
+    if (!hasIncoming(alb.id, 'acm')) {
+      gaps.push({
+        id: 'alb-plaintext-http',
+        severity: 'high',
+        title: `"${alb.data.label}" serves plaintext HTTP (no TLS)`,
+        detail:
+          'No ACM certificate is attached. Draw an `acm → alb` edge to emit an ' +
+          'HTTPS:443 listener and redirect HTTP:80, or terminate TLS upstream.',
+      })
+    }
+  }
+  for (const api of nodesOf('apigw')) {
+    if (!hasIncoming(api.id, 'cognito')) {
+      gaps.push({
+        id: 'apigw-open-auth',
+        severity: 'high',
+        title: `"${api.data.label}" is publicly invokable (authorization = NONE)`,
+        detail:
+          'No authorizer is attached. Draw a `cognito → apigw` edge for a ' +
+          'COGNITO_USER_POOLS authorizer, or add IAM / a custom authorizer.',
+      })
+    }
+  }
+
+  // Out-of-scope by construction — the abstraction cannot represent these, so we
+  // declare rather than emit half-measures.
+  if (has('rds')) {
+    gaps.push({
+      id: 'app-secret-consumption',
+      severity: 'high',
+      title: 'App→DB credential consumption is not wired',
+      detail:
+        'RDS credentials live in a managed Secrets Manager secret ' +
+        '(`manage_master_user_password`), but no IAM policy or environment ' +
+        'injection grants EC2/ECS/EKS workloads read access to that secret ARN. ' +
+        'Wire this in the application deploy, not the topology.',
+    })
+    gaps.push({
+      id: 'aws-managed-kms',
+      severity: 'medium',
+      title: 'Encryption uses AWS-managed keys, not customer-managed (CMK)',
+      detail:
+        'RDS storage and the RDS-managed secret use the default AWS-managed KMS ' +
+        'keys. Regulated/financial workloads should supply a CMK ' +
+        '(`kms_key_id`, `master_user_secret_kms_key_id`).',
+    })
+  }
+  if (has('vpc') || has('alb')) {
+    gaps.push({
+      id: 'no-audit-logging',
+      severity: 'medium',
+      title: 'No audit/flow logging is emitted',
+      detail:
+        'The export contains no VPC Flow Logs, CloudTrail, or ALB access logs. ' +
+        'These have no canvas block; enable them out of band for auditability.',
+    })
+  }
+  if (has('cloudfront')) {
+    gaps.push({
+      id: 'cloudfront-tls-waf-unwired',
+      severity: 'medium',
+      title: 'CloudFront TLS / WAF are not auto-wired',
+      detail:
+        'A CloudFront custom certificate must be in us-east-1 and its WAF must ' +
+        'use scope=CLOUDFRONT — both need a multi-region provider the generator ' +
+        'does not model. Add an aliased us-east-1 provider manually.',
+    })
+  }
+  if (has('cloudwatch')) {
+    gaps.push({
+      id: 'alarms-no-action',
+      severity: 'low',
+      title: 'CloudWatch alarms have no notification action',
+      detail:
+        'Alarms are emitted without `alarm_actions`. Point them at an SNS topic ' +
+        '(requires choosing the destination) to actually page on breach.',
+    })
+  }
+  if (has('nat')) {
+    gaps.push({
+      id: 'single-nat-spof',
+      severity: 'low',
+      title: 'NAT Gateway is a per-AZ single point of failure',
+      detail:
+        'One NAT Gateway serves all private subnets. For AZ-fault tolerance, ' +
+        'deploy one NAT per AZ with per-AZ private route tables.',
+    })
+  }
+
+  const bySeverity = { high: 0, medium: 1, low: 2 }
+  gaps.sort((a, b) => bySeverity[a.severity] - bySeverity[b.severity])
+
+  const jsonBlock = JSON.stringify(
+    { productionReady: gaps.length === 0, gaps: gaps.map(({ id, severity, title }) => ({ id, severity, title })) },
+    null,
+    2,
+  )
+
+  const list = gaps.length
+    ? gaps
+        .map(
+          (g) => `### ${g.severity === 'high' ? '🔴' : g.severity === 'medium' ? '🟠' : '🟡'} ${g.title}
+\`${g.id}\` · **${g.severity}**
+
+${g.detail}`,
+        )
+        .join('\n\n')
+    : 'No gaps known within the generator’s scope for this graph. Still review ' +
+      'region, instance sizing, and organizational guardrails before applying.'
+
+  return `# ⚠️ NOT PRODUCTION READY
+
+This Terraform is **apply-ready** — \`terraform apply\` builds the drawn
+architecture — but "applies cleanly" is not "production-ready". cidrunner is a
+topology prototyping tool: it wires the blocks you draw safely, and declares
+everything it does **not** cover below. Do not ship this to a regulated
+environment without closing these gaps.
+
+## Machine-readable summary
+
+\`\`\`json
+${jsonBlock}
+\`\`\`
+
+## Gaps
+
+${list}
+
+---
+Generated by cidrunner (ADR 0056). This file is deterministic from your canvas.
+`
+}
+
 /** Builds the exported file map (`main.tf`, `variables.tf`, …) for a graph. */
 export function generateTerraform(
   nodes: ResourceNodeType[],
@@ -63,6 +229,13 @@ export function generateTerraform(
     edges
       .filter((e) => e.source === albId && typeOf(e.target) === 'ec2')
       .map((e) => tfName(e.target))
+  // Security-attachment edges into a fronting service (ADR 0056): acm → alb
+  // (TLS cert) and cognito → apigw (authorizer). Like SG edges, the source is
+  // the security block and carries no traffic.
+  const attachedSourceOf = (nodeId: string, sourceType: ResourceType) => {
+    const e = edges.find((e) => e.target === nodeId && typeOf(e.source) === sourceType)
+    return e ? tfName(e.source) : undefined
+  }
   // rds → rds edge marks the target as a read replica of the source.
   const replicaSourceOf = (rdsId: string) => {
     const e = edges.find((e) => e.target === rdsId && typeOf(e.source) === 'rds')
@@ -204,6 +377,10 @@ export function generateTerraform(
             node.data.type === 'apigw'
               ? firstTargetOf(node.id, ['lambda'])?.name
               : undefined,
+          certificate:
+            node.data.type === 'alb' ? attachedSourceOf(node.id, 'acm') : undefined,
+          authorizer:
+            node.data.type === 'apigw' ? attachedSourceOf(node.id, 'cognito') : undefined,
           sgIngress: node.data.type === 'sg' ? sgIngressFor(node.id) : undefined,
           subscribers:
             node.data.type === 'sns' ? targetsOf(node.id, ['sqs', 'lambda']) : undefined,
@@ -288,6 +465,26 @@ export function generateTerraform(
       derived.push(`resource "aws_elasticache_subnet_group" "${v}_cachesg" {
   name       = "${awsName(vpc.id).toLowerCase()}-cache"
   subnet_ids = [${vSubnets.map((s) => `aws_subnet.${tfName(s.id)}.id`).join(', ')}]
+}`)
+    }
+  }
+
+  // WAF associations (ADR 0056): a `waf → alb|apigw` edge binds the web ACL to
+  // that target. ALB associates by its ARN; a REST API by its stage ARN.
+  for (const waf of nodes.filter((n) => n.data.type === 'waf')) {
+    for (const e of edges.filter((e) => e.source === waf.id)) {
+      const targetType = typeOf(e.target)
+      const t = tfName(e.target)
+      const resourceArn =
+        targetType === 'alb'
+          ? `aws_lb.${t}.arn`
+          : targetType === 'apigw'
+            ? `aws_api_gateway_stage.${t}.arn`
+            : undefined
+      if (!resourceArn) continue
+      derived.push(`resource "aws_wafv2_web_acl_association" "${tfName(waf.id)}_${t}" {
+  resource_arn = ${resourceArn}
+  web_acl_arn  = aws_wafv2_web_acl.${tfName(waf.id)}.arn
 }`)
     }
   }
@@ -501,7 +698,9 @@ Notes:
 - EC2 AMIs set to \`auto\` resolve to the latest Amazon Linux 2023 via a data source.
 - Route tables and associations are derived from your topology (IGW → public,
   NAT → private).
-${hasType('rds') ? '- RDS credentials are managed by AWS Secrets Manager (`manage_master_user_password`)\n  — no plaintext password. The DB subnet group spans the VPC\'s PRIVATE subnets;\n  Security Groups allow the app tier in on the DB port.\n' : ''}${hasType('lambda') ? '- Lambda ships an inline hello-world package (archive provider) and an IAM\n  execution role.\n' : ''}${hasType('apigw') ? '- API Gateway proxies to the Lambda it is connected to (apigw → lambda edge)\n  via an AWS_PROXY `{proxy+}` integration — the invoke URL is in the outputs.\n' : ''}- **Cost warning**: NAT Gateway, ALB, and RDS bill hourly. \`terraform destroy\`
+${hasType('rds') ? '- RDS credentials are managed by AWS Secrets Manager (`manage_master_user_password`)\n  — no plaintext password. The DB subnet group spans the VPC\'s PRIVATE subnets;\n  Security Groups allow the app tier in on the DB port.\n' : ''}${hasType('lambda') ? '- Lambda ships an inline hello-world package (archive provider) and an IAM\n  execution role.\n' : ''}${hasType('apigw') ? '- API Gateway proxies to the Lambda it is connected to (apigw → lambda edge)\n  via an AWS_PROXY `{proxy+}` integration — the invoke URL is in the outputs.\n' : ''}${hasType('acm') ? '- An `acm → alb` edge makes that ALB terminate TLS (HTTPS:443 listener +\n  HTTP:80 redirect). The certificate stays PENDING_VALIDATION until its DNS\n  records are published.\n' : ''}${hasType('waf') ? '- A `waf → alb|apigw` edge associates the Web ACL to that target.\n' : ''}${hasType('cognito') ? '- A `cognito → apigw` edge guards the API with a COGNITO_USER_POOLS authorizer.\n' : ''}- **Read \`PRODUCTION-READINESS.md\`** — it lists, machine-readably, what this
+  export does NOT cover (audit logs, app secret consumption, CMK, …).
+- **Cost warning**: NAT Gateway, ALB, and RDS bill hourly. \`terraform destroy\`
   when you are done.
 `
 
@@ -509,6 +708,7 @@ ${hasType('rds') ? '- RDS credentials are managed by AWS Secrets Manager (`manag
     'main.tf': mainTf,
     'variables.tf': vars.join('\n\n') + '\n',
     'README.md': readme,
+    'PRODUCTION-READINESS.md': productionReadiness(nodes, edges),
   }
   if (outputs.length) files['outputs.tf'] = outputs.join('\n\n') + '\n'
   return files

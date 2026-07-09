@@ -20,8 +20,13 @@ export const waf: ResourceMeta = {
     rate_limit: 2000,
     managed_common_rules: true,
   },
-  // Account/region-level ACL — not inside a VPC, no traffic edges.
+  // Account/region-level ACL — not inside a VPC. Draw an edge waf → alb/apigw to
+  // *associate* it (attachment, not traffic — ADR 0056): the generator emits an
+  // `aws_wafv2_web_acl_association` for each target. Scope is REGIONAL, so ALB
+  // and API Gateway are valid; CloudFront (scope=CLOUDFRONT, us-east-1) is out
+  // of scope and flagged in the export's readiness manifest.
   allowedParents: ['canvas'],
+  connectsTo: ['alb', 'apigw'],
   fields: [
     {
       key: 'rate_limit',

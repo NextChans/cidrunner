@@ -80,3 +80,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0053](0053-chaos-rds-failover-and-promotion.md) | 카오스 RDS 복원 — Multi-AZ 페일오버 & 읽기 복제본 승격 (extends 0019·0052) | Accepted | 2026-07-09 |
 | [0054](0054-well-architected-grade.md) | Well-Architected 등급 — 4개 기둥 종합 점수 (+ EKS 비용 정정, extends 0017·0051·0052) | Accepted | 2026-07-09 |
 | [0055](0055-terraform-apply-wiring.md) | Terraform 동작·배치 결함 수정 — 티어드 SG · 프라이빗 배치 · SM 관리형 자격증명 (TF 리뷰, extends 0016·0017·0025) | Accepted | 2026-07-09 |
+| [0056](0056-security-attachment-wiring-and-readiness-manifest.md) | 보안 attachment 배선(HTTPS·WAF·Cognito authorizer)과 프로덕션 준비도 manifest (TF 리뷰 재분류, extends 0035·0046·0055) | Accepted | 2026-07-09 |

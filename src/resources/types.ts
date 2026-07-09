@@ -156,6 +156,18 @@ export interface TfContext {
     /** Lambda proxy target of an API Gateway (apigw → lambda edge). */
     integrationTarget?: string
     /**
+     * ACM certificate securing this ALB (acm → alb attachment edge, ADR 0056).
+     * When present the ALB emits an HTTPS:443 listener and redirects HTTP:80,
+     * instead of a plaintext HTTP listener.
+     */
+    certificate?: string
+    /**
+     * Cognito user pool authorizing this API Gateway (cognito → apigw attachment
+     * edge, ADR 0056). When present the API's method uses a COGNITO_USER_POOLS
+     * authorizer instead of `authorization = "NONE"`.
+     */
+    authorizer?: string
+    /**
      * Derived tiered ingress for a Security Group (ADR 0055): for each resource
      * this SG is attached to, the source SGs that send it traffic + the target
      * port — so the emitted SG allows `ALB-SG → app:80`, `app-SG → rds:3306`,

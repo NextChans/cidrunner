@@ -57,6 +57,47 @@ resource "aws_lb_target_group_attachment" "${name}_${t}" {
 }`,
       )
       .join('')
+    // With an ACM certificate attached (acm → alb edge, ADR 0056) the ALB
+    // terminates TLS: HTTPS:443 forwards to the targets and HTTP:80 redirects
+    // up to it, so no plaintext traffic is served. Without a cert we keep the
+    // plain HTTP listener on the configured port (the readiness manifest flags
+    // the missing TLS).
+    const cert = refs.certificate
+    const listeners = cert
+      ? `resource "aws_lb_listener" "${name}_https" {
+  load_balancer_arn = aws_lb.${name}.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = aws_acm_certificate.${cert}.arn
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.${name}_tg.arn
+  }
+}
+
+resource "aws_lb_listener" "${name}_listener" {
+  load_balancer_arn = aws_lb.${name}.arn
+  port              = 80
+  protocol          = "HTTP"
+  default_action {
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}`
+      : `resource "aws_lb_listener" "${name}_listener" {
+  load_balancer_arn = aws_lb.${name}.arn
+  port              = ${port}
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.${name}_tg.arn
+  }
+}`
     return `resource "aws_lb" "${name}" {
   name               = "${awsName}"
   internal           = ${config.internal ? 'true' : 'false'}
@@ -77,14 +118,6 @@ resource "aws_lb_target_group" "${name}_tg" {
   }
 }
 
-resource "aws_lb_listener" "${name}_listener" {
-  load_balancer_arn = aws_lb.${name}.arn
-  port              = ${port}
-  protocol          = "HTTP"
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.${name}_tg.arn
-  }
-}${attachments}`
+${listeners}${attachments}`
   },
 }

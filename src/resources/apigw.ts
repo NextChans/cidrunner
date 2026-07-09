@@ -59,6 +59,24 @@ export const apigw: ResourceMeta = {
     // never a silently broken API with no backend.
     const lambda = refs.integrationTarget
     const lambdaFn = lambda ? `aws_lambda_function.${lambda}` : 'REPLACE_ME'
+    // A Cognito user pool attached via a `cognito → apigw` edge (ADR 0056) turns
+    // the open `authorization = "NONE"` method into a COGNITO_USER_POOLS-guarded
+    // one. Without it the API stays public (flagged in the readiness manifest).
+    const pool = refs.authorizer
+    const authorizerBlock = pool
+      ? `
+
+resource "aws_api_gateway_authorizer" "${name}_authorizer" {
+  name          = "${awsName}-cognito"
+  type          = "COGNITO_USER_POOLS"
+  rest_api_id   = aws_api_gateway_rest_api.${name}.id
+  provider_arns = [aws_cognito_user_pool.${pool}.arn]
+}`
+      : ''
+    const methodAuth = pool
+      ? `authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.${name}_authorizer.id`
+      : `authorization = "NONE"`
     const permission = lambda
       ? `
 
@@ -91,8 +109,8 @@ resource "aws_api_gateway_method" "${name}_proxy" {
   rest_api_id   = aws_api_gateway_rest_api.${name}.id
   resource_id   = aws_api_gateway_resource.${name}_proxy.id
   http_method   = "ANY"
-  authorization = "NONE"
-}
+  ${methodAuth}
+}${authorizerBlock}
 
 resource "aws_api_gateway_integration" "${name}_lambda" {
   rest_api_id             = aws_api_gateway_rest_api.${name}.id
