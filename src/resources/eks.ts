@@ -53,6 +53,17 @@ export const eks: ResourceMeta = {
     const subnets = (subnetPool.length ? subnetPool : ['REPLACE_ME'])
       .map((s) => `aws_subnet.${s}.id`)
       .join(', ')
+    // Worker nodes belong in PRIVATE subnets, not public ones (ADR 0055).
+    const nodePool = refs.privateSubnets?.length ? refs.privateSubnets : subnetPool
+    const nodeSubnets = (nodePool.length ? nodePool : ['REPLACE_ME'])
+      .map((s) => `aws_subnet.${s}.id`)
+      .join(', ')
+    // Attached Security Groups (SG → eks edges) join the cluster ENIs so the
+    // control plane / nodes can reach the data tier (ADR 0055).
+    const clusterSgs = (refs.securityGroups ?? []).map((s) => `aws_security_group.${s}.id`)
+    const clusterSgLine = clusterSgs.length
+      ? `\n    security_group_ids = [${clusterSgs.join(', ')}]`
+      : ''
     const clusterPrefix = `${awsName.slice(0, 20)}-c-`
     const nodePrefix = `${awsName.slice(0, 20)}-n-`
     return `resource "aws_iam_role" "${name}_cluster_role" {
@@ -77,7 +88,7 @@ resource "aws_eks_cluster" "${name}" {
   version  = "${version}"
   role_arn = aws_iam_role.${name}_cluster_role.arn
   vpc_config {
-    subnet_ids = [${subnets}]
+    subnet_ids = [${subnets}]${clusterSgLine}
   }
   depends_on = [aws_iam_role_policy_attachment.${name}_cluster_policy]
   tags = { Name = "${displayName}" }
@@ -114,7 +125,7 @@ resource "aws_eks_node_group" "${name}_nodes" {
   cluster_name    = aws_eks_cluster.${name}.name
   node_group_name = "${awsName}-nodes"
   node_role_arn   = aws_iam_role.${name}_node_role.arn
-  subnet_ids      = [${subnets}]
+  subnet_ids      = [${nodeSubnets}]
   instance_types  = ["${instanceType}"]
   scaling_config {
     desired_size = 2

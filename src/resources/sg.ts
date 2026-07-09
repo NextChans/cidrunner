@@ -42,10 +42,26 @@ export const sg: ResourceMeta = {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }`
+    // Tiered SG-to-SG ingress derived from the traffic topology (ADR 0055):
+    // e.g. app SG allows the ALB SG on :80, RDS SG allows the app SG on :3306 —
+    // so the exported stack actually passes traffic, not just `validate`s.
+    const tiered = (refs.sgIngress ?? [])
+      .map(
+        (r) => `
+  ingress {
+    description     = "${r.desc}"
+    from_port       = ${r.port}
+    to_port         = ${r.port}
+    protocol        = "tcp"
+    security_groups = [aws_security_group.${r.fromSg}.id]
+  }`,
+      )
+      .join('')
     const ingress =
       (config.allow_http ? rule(80, 'HTTP') : '') +
       (config.allow_https ? rule(443, 'HTTPS') : '') +
-      (config.allow_ssh ? rule(22, 'SSH') : '')
+      (config.allow_ssh ? rule(22, 'SSH') : '') +
+      tiered
     // No `name` attribute: AWS reserves the `sg-` prefix, and our ids start with
     // it — let AWS generate the name and tag it instead.
     return `resource "aws_security_group" "${name}" {

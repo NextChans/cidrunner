@@ -19,12 +19,13 @@ describe('terraform apply-readiness (ADR 0025)', () => {
     expect(files['main.tf']).toContain('region = var.aws_region')
   })
 
-  it('emits db_password as a sensitive variable with no default', () => {
+  it('manages RDS credentials via Secrets Manager — no plaintext password (ADR 0055)', () => {
     const { nodes, edges } = bestPracticeTopology()
-    const vars = generateTerraform(nodes, edges)['variables.tf'] ?? ''
-    const block = vars.split('variable "db_password"')[1]?.split('\n}')[0] ?? ''
-    expect(block).toContain('sensitive   = true')
-    expect(block).not.toContain('default')
+    const files = generateTerraform(nodes, edges)
+    // No db_password variable, no plaintext password reference; RDS-managed instead.
+    expect(files['variables.tf']).not.toContain('variable "db_password"')
+    expect(files['main.tf']).not.toContain('var.db_password')
+    expect(files['main.tf']).toContain('manage_master_user_password = true')
   })
 
   it('marks an orphaned resource loudly (REPLACE_ME) instead of a broken ref', () => {

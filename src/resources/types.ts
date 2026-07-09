@@ -155,6 +155,13 @@ export interface TfContext {
     kmsKey?: string
     /** Lambda proxy target of an API Gateway (apigw → lambda edge). */
     integrationTarget?: string
+    /**
+     * Derived tiered ingress for a Security Group (ADR 0055): for each resource
+     * this SG is attached to, the source SGs that send it traffic + the target
+     * port — so the emitted SG allows `ALB-SG → app:80`, `app-SG → rds:3306`,
+     * etc., instead of only the internet toggles.
+     */
+    sgIngress?: { fromSg: string; port: number; desc: string }[]
   }
 }
 

@@ -79,3 +79,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0052](0052-chaos-mode-fault-injection.md) | 카오스 모드 — AZ 장애 주입 (비용↔복원력 딜레마, extends 0047·0050·0051) | Accepted | 2026-07-09 |
 | [0053](0053-chaos-rds-failover-and-promotion.md) | 카오스 RDS 복원 — Multi-AZ 페일오버 & 읽기 복제본 승격 (extends 0019·0052) | Accepted | 2026-07-09 |
 | [0054](0054-well-architected-grade.md) | Well-Architected 등급 — 4개 기둥 종합 점수 (+ EKS 비용 정정, extends 0017·0051·0052) | Accepted | 2026-07-09 |
+| [0055](0055-terraform-apply-wiring.md) | Terraform 동작·배치 결함 수정 — 티어드 SG · 프라이빗 배치 · SM 관리형 자격증명 (TF 리뷰, extends 0016·0017·0025) | Accepted | 2026-07-09 |
