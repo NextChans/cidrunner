@@ -65,6 +65,14 @@ export interface SimResult {
    * green vs. red in/out direction effect on traffic edges.
    */
   edgeStatus: Record<string, 'ok' | 'blocked'>
+  /**
+   * Replication flow (ADR 0019 + F3): read-replica node id → seconds until
+   * replicated data reaches it (its primary's arrival + one hop). Present only
+   * when the primary RDS is on a live request path, so the RDS → RDS edge and
+   * the replica node animate an indigo replication pulse distinct from the green
+   * request traffic.
+   */
+  replicaArrivals: Record<string, number>
 }
 
 /** Types that terminate a successful request (the "DB / storage" tier). */
@@ -319,6 +327,7 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
       arrivals: {},
       fanout: {},
       edgeStatus: {},
+      replicaArrivals: {},
     }
   }
 
@@ -434,6 +443,22 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
     })
   }
 
+  // Replication flow: once request traffic lands on a primary RDS, data streams
+  // to each of its read replicas (rds → rds edges, filtered out of trafficEdges
+  // as they carry no request traffic). Give each replica an arrival one hop after
+  // its primary, but only when the primary is actually reached.
+  const replicaArrivals: Record<string, number> = {}
+  for (const e of edges) {
+    const src = byId.get(e.source)
+    const dst = byId.get(e.target)
+    if (src?.data.type !== 'rds' || dst?.data.type !== 'rds') continue
+    const primaryArrival = arrivals[e.source]
+    if (primaryArrival === undefined) continue
+    const t = primaryArrival + HOP_SECONDS
+    const prev = replicaArrivals[e.target]
+    if (prev === undefined || prev > t) replicaArrivals[e.target] = t
+  }
+
   const okCount = flows.filter((f) => f.ok).length
   const ok = okCount === flows.length
   const message = ok
@@ -453,5 +478,6 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
     arrivals,
     fanout,
     edgeStatus,
+    replicaArrivals,
   }
 }

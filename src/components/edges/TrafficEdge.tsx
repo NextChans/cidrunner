@@ -7,6 +7,8 @@ const CYCLE = 1.4
 /** Traffic on a successful flow vs. a blocked one (ADR 0049). */
 const OK_COLOR = '#34d399'
 const BLOCKED_COLOR = '#fb7185'
+/** Replication (rds → rds) flow color — indigo, matching the static link. */
+const REPL_COLOR = '#818cf8'
 
 /**
  * Edge renderer. Security-Group edges (source = SG) render as a dashed rose
@@ -60,14 +62,59 @@ export function TrafficEdge({
     )
   }
 
-  // Replication link (primary → read replica): indigo dashed, no traffic.
+  // Replication link (primary → read replica): indigo dashed. It carries no
+  // request traffic, but once data lands on the primary the simulation streams
+  // it to the replica — animate an indigo particle + converging arrival pulse so
+  // the replication flow is visible, distinct from green request traffic.
   if (isReplication) {
+    const replArrival = sim?.replicaArrivals[target]
+    const replicating = replArrival !== undefined
+    const begin = replicating ? Math.max(0, replArrival - HOP_SECONDS) : 0
+    const replPathId = `repl-path-${id}`
     return (
-      <BaseEdge
-        id={`repl-${id}`}
-        path={edgePath}
-        style={{ stroke: '#818cf8', strokeWidth: 1.5, strokeDasharray: '6 3', opacity: 0.8 }}
-      />
+      <>
+        <BaseEdge
+          id={replPathId}
+          path={edgePath}
+          style={{
+            stroke: REPL_COLOR,
+            strokeWidth: replicating ? 2 : 1.5,
+            strokeDasharray: '6 3',
+            opacity: replicating ? 1 : 0.8,
+          }}
+        />
+        {replicating && (
+          <>
+            <circle r={3.5} fill={REPL_COLOR}>
+              <animateMotion
+                dur={`${CYCLE}s`}
+                begin={`${begin}s`}
+                repeatCount="indefinite"
+                rotate="auto"
+              >
+                <mpath href={`#${replPathId}`} />
+              </animateMotion>
+            </circle>
+            {/* Converging ring where replicated data arrives at the replica. */}
+            <circle cx={targetX} cy={targetY} fill="none" stroke={REPL_COLOR} strokeWidth={2}>
+              <animate
+                attributeName="r"
+                values="12;2"
+                dur={`${CYCLE}s`}
+                begin={`${begin + CYCLE / 2}s`}
+                repeatCount="indefinite"
+              />
+              <animate
+                attributeName="opacity"
+                values="0;0.95;0"
+                dur={`${CYCLE}s`}
+                begin={`${begin + CYCLE / 2}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+          </>
+        )}
+      </>
     )
   }
 

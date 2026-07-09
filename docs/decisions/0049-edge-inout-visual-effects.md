@@ -19,7 +19,9 @@
 - **색상** — `'blocked'`는 rose(`#fb7185`), 그 외 emerald(`#34d399`). 이동 파티클·엣지 stroke·in/out 링 모두 동일 색으로 통일해 한눈에 성공/차단 판별.
 - **타이밍** — fan-out 엣지(ADR 0048)는 라운드로빈 슬롯 begin, 경로 엣지는 hop begin을 그대로 사용해 세 효과(파티클·out·in)가 한 사이클로 동기화.
 
-구현은 [TrafficEdge](../../src/components/edges/TrafficEdge.tsx)의 SVG `<animate>`/`<animateMotion>`. 부착·복제 엣지의 조기 반환 분기는 그대로 두어 다른 엣지 타입의 대시 스타일과 구별 유지.
+구현은 [TrafficEdge](../../src/components/edges/TrafficEdge.tsx)의 SVG `<animate>`/`<animateMotion>`. 부착(SG) 엣지의 조기 반환 분기는 그대로 두어 대시 스타일 구별 유지.
+
+**복제 흐름 시각화 (ADR 0019 + F3 후속)** — RDS → RDS 복제 엣지는 요청 트래픽을 나르지 않지만(ADR 0019), 프라이머리에 요청 데이터가 도달하면 복제본으로 스트리밍된다. 이를 표시하기 위해 `SimResult.replicaArrivals`(복제본 노드 id → 프라이머리 arrival + 1홉)를 추가했다. 프라이머리가 라이브 경로 위에 있을 때만 채워지며, 이때 RDS → RDS 엣지가 **인디고**(#818cf8) 파티클 + 복제본 도착 수렴 링으로 애니메이션되고, 복제본 노드가 인디고 arrival pulse(`.repl-arrival`)를 낸다. 색을 인디고로 통일해 녹색 요청 트래픽과 명확히 구별 — "요청이 프라이머리에 쓰이고, 복제본으로 복제된다"가 한눈에 읽힌다. 프라이머리 미도달 시 복제 흐름도 표시 안 됨(복제할 데이터가 없음).
 
 ## Consequences
 

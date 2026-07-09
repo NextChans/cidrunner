@@ -63,6 +63,9 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
   const blocked = sim?.blockedNodeIds.includes(id) ?? false
   const onPath = !blocked && (sim?.pathNodeIds.includes(id) ?? false)
   const arrival = sim?.arrivals[id]
+  // A read replica receiving replicated data pulses indigo, one hop after its
+  // primary (ADR 0019 + F3 replication-flow viz).
+  const replArrival = sim?.replicaArrivals[id]
   // An RDS that is the target of an rds → rds edge is a read replica (ADR 0019).
   const isReplica = useGraphStore(
     (s) =>
@@ -147,6 +150,14 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
           an active ALB while it fans traffic out to its targets. */}
       {data.type === 'alb' && onPath && (
         <span className="lb-pulse pointer-events-none absolute inset-0 rounded-lg" />
+      )}
+      {/* Replication arrival pulse (indigo): a read replica receiving data from
+          its primary during a simulation. */}
+      {replArrival !== undefined && (
+        <span
+          className="repl-arrival pointer-events-none absolute inset-0 rounded-lg"
+          style={{ animationDelay: `${replArrival}s` }}
+        />
       )}
       {showTarget && <Handle type="target" position={Position.Left} className="!bg-accent" />}
       <Icon size={18} className={meta.color} />
