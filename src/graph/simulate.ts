@@ -73,6 +73,12 @@ export interface SimResult {
    * request traffic.
    */
   replicaArrivals: Record<string, number>
+  /**
+   * Chaos mode (ADR 0052): node ids knocked out by an injected fault (e.g. an AZ
+   * failure). They are excluded from the trace and rendered dimmed. Empty on a
+   * normal run.
+   */
+  deadNodeIds: string[]
 }
 
 /** Types that terminate a successful request (the "DB / storage" tier). */
@@ -292,8 +298,30 @@ function traceFlow(
   }
 }
 
+/** Options for {@link simulate}. */
+export interface SimOptions {
+  /**
+   * Chaos mode (ADR 0052): node ids knocked out by an injected fault. They are
+   * removed from the graph before tracing, so flows that depended on them fail
+   * while redundant designs survive.
+   */
+  deadNodeIds?: ReadonlySet<string>
+}
+
 /** Runs the simulation over the whole graph: one flow per entry point. */
-export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
+export function simulate(
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  opts: SimOptions = {},
+): SimResult {
+  const dead = opts.deadNodeIds ?? new Set<string>()
+  const deadNodeIds = [...dead]
+  // Chaos mode: a downed node is treated as absent — it cannot be an entry, a
+  // hop, or a sink, and edges touching it carry nothing.
+  if (dead.size) {
+    nodes = nodes.filter((n) => !dead.has(n.id))
+    edges = edges.filter((e) => !dead.has(e.source) && !dead.has(e.target))
+  }
   const byId = new Map(nodes.map((n) => [n.id, n]))
   // SG edges are attachments, CloudWatch edges are monitoring links, and
   // RDS → RDS edges are replication links (ADR 0019) — none carries request
@@ -328,6 +356,7 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
       fanout: {},
       edgeStatus: {},
       replicaArrivals: {},
+      deadNodeIds,
     }
   }
 
@@ -479,5 +508,6 @@ export function simulate(nodes: ResourceNodeType[], edges: Edge[]): SimResult {
     fanout,
     edgeStatus,
     replicaArrivals,
+    deadNodeIds,
   }
 }
