@@ -33,11 +33,11 @@ F1.5/F2에서 이월된 P0.7 항목이다.
 | 미션 | 이전 | 이후 | 근거 |
 | --- | --- | --- | --- |
 | **서버리스 API** | `lambda → s3` | `apigw → lambda → s3` (requiredResources에 `apigw` 추가, `check`는 `path[0]==='apigw'`) | 미션의 본질이 "API Gateway를 Lambda에 연결". 이제 실제 블록으로 학습. |
-| **비동기 파이프라인** | `lambda → sqs → lambda → dynamodb` | 변경 없음 | 생산자 Lambda가 진입점. Lambda는 여전히 `ENTRY_CAPABLE`이라 콤보 없이도 그대로 클리어. HTTP 프론트는 스코프 밖. |
-| **이벤트 드리븐** | `lambda → sns → sqs → lambda → dynamodb` | 변경 없음 | 동일 — Pub/Sub 패턴이 본질, API GW 불필요. |
+| **비동기 파이프라인** | `lambda → sqs → lambda → dynamodb` | check 재작성(구조적 체인 매칭) | 아래 후속 참고 |
+| **이벤트 드리븐** | `lambda → sns → sqs → lambda → dynamodb` | check 재작성(구조적 체인 매칭) | 동일 |
 | **데이터 파이프라인** | `kinesis → lambda → s3` | 변경 없음 | Kinesis가 진입점(ADR 0036). Lambda는 컨슈머 홉. |
 
-즉 코드 변경이 필요한 미션은 **서버리스 API 1개**. 나머지 3개는 Lambda 단독 진입이 그대로 유효함을 회귀 테스트로 확인(락인).
+**후속 정정 (같은 F3 아크)** — 초기 판단은 async/event가 "코드 변경 불필요"였다(bare Lambda 진입이 그대로 유효하므로). 그러나 리뷰에서, 플레이어가 생산자 Lambda **앞에 API Gateway를 두면**(현실적 구성) 진입점이 `apigw`가 되어 `path[0]==='lambda'` 판정이 깨지고, 생산자가 다른 sink(S3 등)로 **분기**하면 단일 추적 경로가 큐 경로를 놓쳐 오탐하는 것이 확인됐다. async/event check를 **단일 flow 경로 검사 → 라이브(ok) 엣지 위 구조적 체인 매칭**(`liveChain`, ADR 0047의 active-subgraph `pathEdgeIds` 사용)으로 재작성했다. 이제 API Gateway 프론트·분기와 무관하게 `Lambda→SQS→Lambda→DynamoDB`(및 SNS 팬아웃) 패턴이 존재하면 클리어. 서버리스 API 1개 + async/event 2개 = 코드 변경 미션 3개.
 
 ## Consequences
 
