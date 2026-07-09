@@ -339,6 +339,18 @@ describe('mission checker audit (ADR 0041)', () => {
     expect(stars('security-hardening', nodes, edges)).toBe(3)
   })
 
+  it('tutorial recognizes a public Subnet nested via an AZ box (Account▸VPC▸AZ▸Subnet)', () => {
+    // The subnet's DIRECT parent is the AZ box, not the VPC — the mission must
+    // still count it by walking the parent chain to the enclosing VPC (ADR 0050).
+    const nodes = [
+      N('account-1', 'account', undefined, {}),
+      N('vpc-1', 'vpc', 'account-1', { cidr_block: '10.0.0.0/16' }),
+      N('az-1', 'az', 'vpc-1', { az: 'a' }),
+      N('subnet-1', 'subnet', 'az-1', { cidr_block: '10.0.1.0/24', az: 'a', public: true }),
+    ]
+    expect(stars('tutorial', nodes, [])).toBeGreaterThanOrEqual(2)
+  })
+
   it('mission-scoped security ignores a disconnected insecure resource', () => {
     // A dangling public-block-off S3 unrelated to the async pipeline is ignored.
     const b = asyncBuild()
