@@ -79,6 +79,8 @@ interface GraphState {
   simulation: SimResult | null
   /** MiniMap visibility — defaults off on small screens where it hides the canvas. */
   showMiniMap: boolean
+  /** Playback audio on/off (ADR 0058) — persisted; muting silences mid-pass. */
+  soundOn: boolean
   /** Open node context menu (right-click), or null when closed (ADR 0028). */
   contextMenu: ContextMenuState | null
   /**
@@ -149,6 +151,7 @@ interface GraphState {
   /** Injects (or clears) an AZ failure and re-runs the sim on the survivors. */
   setChaos: (az: string | null) => void
   toggleMiniMap: () => void
+  toggleSound: () => void
   setContextMenu: (menu: ContextMenuState | null) => void
   /** Sets (or clears) the drop-target highlight during a node drag (ADR 0040). */
   setDropTarget: (target: { id: string; valid: boolean } | null) => void
@@ -591,6 +594,9 @@ export const useGraphStore = create<GraphState>()(
 
   toggleMiniMap: () => set((state) => ({ showMiniMap: !state.showMiniMap })),
 
+  soundOn: true,
+  toggleSound: () => set((state) => ({ soundOn: !state.soundOn })),
+
   setContextMenu: (contextMenu) => set({ contextMenu }),
   setDropTarget: (dropTarget) =>
     set((state) => {
@@ -691,6 +697,7 @@ export const useGraphStore = create<GraphState>()(
           // existing saved designs are never discarded).
           slots: s.slots,
           earnedBadges: s.earnedBadges,
+          soundOn: s.soundOn,
         }),
         // Rehydrate through the same whitelist as shared URLs (ADR 0023). If
         // the stored graph fails sanitation we keep it as-is — local data is
