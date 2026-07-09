@@ -241,11 +241,15 @@ Two edge kinds carry no traffic and are skipped: Security-Group *attachments*
 and RDS → RDS *replication links* (dashed indigo, target shows a `REPLICA` badge
 and emits `replicate_source_db` —
 [ADR 0019](decisions/0019-rds-read-replica-as-edge.md)).
-The `SimResult` carries `flows[]` plus derived aggregates (`edgeHops`,
-`arrivals`, `blockedNodeIds`, `fanout`, `edgeStatus`). Playback: SVG particles
+The `SimResult` carries `flows[]` (one representative route per entry, for the
+banner + mission checks) plus a **highlight subgraph** computed separately:
+`pathNodeIds` / `edgeHops` / `edgeStatus` / `arrivals` cover *every* live
+entry→sink path (forward-reachable from an entry ∩ backward-reachable to a sink),
+so a load balancer fanning out to two app servers lights **both** of their paths
+to the database — not just the one the DFS picked. Playback: SVG particles
 staggered per hop (0.45s), a green **arrival pulse** when the request reaches
-each node (data lands), red pulses on blocking nodes, and a banner listing every
-flow with its outcome. See [ADR 0012](decisions/0012-traffic-simulation-model.md)
+each node (data lands), red pulses on blocking nodes and on fan-out targets that
+can't reach a sink, and a banner listing every flow with its outcome. See [ADR 0012](decisions/0012-traffic-simulation-model.md)
 and [ADR 0018](decisions/0018-multi-flow-playback-and-palette-categories.md).
 
 **Traffic visualization** — an active ALB fans traffic out across **all** of its

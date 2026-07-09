@@ -19,8 +19,9 @@
 
 ## Consequences
 
-- **부하 분산 인지** — ALB가 등록된 모든 타깃으로 시간차 파티클을 발사하고 노드가 맥동해, 승리 경로가 1개여도 로드 밸런싱이 시각적으로 명확.
-- **백트래킹과 정합** — dead-end 타깃(ADR 0047의 EC2-A)도 fan-out에 포함돼 "LB는 분산하지만 그 경로는 완결 안 됨"이 노드 색(막힌 노드 red)으로 구분됨.
+- **부하 분산 인지** — ALB가 등록된 모든 타깃으로 시간차 파티클을 발사하고 노드가 맥동해, 로드 밸런싱이 시각적으로 명확.
+- **다운스트림 정합 (ADR 0047 하이라이트 개정)** — fan-out이 ALB→N 타깃을 분산해 보여주므로, 각 타깃의 sink까지의 경로도 **모두** green으로 켜져야 한다. 하이라이트를 "전체 라이브 entry→sink 서브그래프"로 계산(ADR 0047 참고)해, `ALB→EC2-A→RDS`와 `ALB→EC2-B→RDS`가 모두 green이 된다. 초기 구현은 DFS 대표 경로 1개만 켜서 한쪽 EC2→RDS만 green이던 모순을 후속 수정.
+- **dead-end 타깃** — sink에 도달 못 하는 fan-out 타깃(예: DB 미연결 EC2)은 그 엣지가 blocked(red), 노드가 red dead-end로 표시돼 "LB는 분산하지만 그 백엔드는 미완결"이 명확.
 - **성능** — 활성 밸런서의 엣지에만 적용, sim은 보통 소수 엣지만 하이라이트. SVG `animateMotion`/CSS keyframe으로 GPU 친화적. 100 노드에서도 부드러움.
 - **확장 가능** — `BALANCERS` 집합으로 향후 다른 분산 리소스 추가 용이.
 - **테스트** — fan-out 슬롯팅(다중 타깃 index/total, 단일 타깃 미적용)을 `simulate-edge.test.ts`에 락인.

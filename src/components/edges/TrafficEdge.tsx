@@ -105,34 +105,34 @@ export function TrafficEdge({
             </animateMotion>
           </circle>
           {/* Outgoing: an expanding ring where traffic leaves the source. */}
-          <circle cx={sourceX} cy={sourceY} fill="none" stroke={color} strokeWidth={1.5}>
+          <circle cx={sourceX} cy={sourceY} fill="none" stroke={color} strokeWidth={2}>
             <animate
               attributeName="r"
-              values="1;7"
+              values="2;12"
               dur={`${CYCLE}s`}
               begin={`${begin}s`}
               repeatCount="indefinite"
             />
             <animate
               attributeName="opacity"
-              values="0.9;0"
+              values="0.95;0"
               dur={`${CYCLE}s`}
               begin={`${begin}s`}
               repeatCount="indefinite"
             />
           </circle>
           {/* Incoming: a converging ring where traffic arrives at the target. */}
-          <circle cx={targetX} cy={targetY} fill="none" stroke={color} strokeWidth={1.5}>
+          <circle cx={targetX} cy={targetY} fill="none" stroke={color} strokeWidth={2}>
             <animate
               attributeName="r"
-              values="7;1"
+              values="12;2"
               dur={`${CYCLE}s`}
               begin={`${begin + CYCLE / 2}s`}
               repeatCount="indefinite"
             />
             <animate
               attributeName="opacity"
-              values="0;0.9;0"
+              values="0;0.95;0"
               dur={`${CYCLE}s`}
               begin={`${begin + CYCLE / 2}s`}
               repeatCount="indefinite"
