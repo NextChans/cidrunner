@@ -1,14 +1,22 @@
 import type { Mission, MissionCheckContext } from './types'
 
-/** Is there a public Subnet nested directly inside a VPC? (shared by check + steps) */
+/**
+ * Is there a public Subnet inside a VPC? (shared by check + steps). Walks the
+ * parent chain to the enclosing VPC, so a Subnet nested inside an AZ box
+ * (Subnet ▸ AZ ▸ VPC — ADR 0050) still counts, not only a direct VPC child.
+ */
 function hasPublicSubnetInVpc(nodes: MissionCheckContext['nodes']): boolean {
-  const vpc = nodes.find((n) => n.data.type === 'vpc')
-  if (!vpc) return false
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const enclosingVpc = (start: (typeof nodes)[number]): boolean => {
+    let cur = start.parentId ? byId.get(start.parentId) : undefined
+    while (cur) {
+      if (cur.data.type === 'vpc') return true
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined
+    }
+    return false
+  }
   return nodes.some(
-    (n) =>
-      n.data.type === 'subnet' &&
-      n.parentId === vpc.id &&
-      n.data.config.public === true,
+    (n) => n.data.type === 'subnet' && n.data.config.public === true && enclosingVpc(n),
   )
 }
 
