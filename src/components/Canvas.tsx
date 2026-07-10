@@ -134,6 +134,7 @@ export function Canvas() {
   const rf = useReactFlow<ResourceNodeType>()
   const nodes = useGraphStore((s) => s.nodes)
   const edges = useGraphStore((s) => s.edges)
+  const securityGroups = useGraphStore((s) => s.securityGroups)
   const setNodes = useGraphStore((s) => s.setNodes)
   const setEdges = useGraphStore((s) => s.setEdges)
   const setSelected = useGraphStore((s) => s.setSelected)
@@ -161,7 +162,10 @@ export function Canvas() {
   const azs = useMemo(() => graphAzs(nodes), [nodes])
 
   // Well-Architected grade (ADR 0054): live score across 4 pillars.
-  const grade = useMemo(() => wellArchitectedGrade(nodes, edges), [nodes, edges])
+  const grade = useMemo(
+    () => wellArchitectedGrade(nodes, edges, securityGroups),
+    [nodes, edges, securityGroups],
+  )
 
   const nodeTypes = useMemo<NodeTypes>(() => ({ resource: ResourceNode }), [])
   const edgeTypes = useMemo<EdgeTypes>(

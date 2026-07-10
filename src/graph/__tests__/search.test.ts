@@ -28,8 +28,10 @@ describe('resource search filter', () => {
   it('matches the category label (보안·아이덴티티)', () => {
     const r = filterResources('아이덴티티')
     const types = r.map((m) => m.type)
-    // The whole 보안·아이덴티티 group surfaces via the category label.
-    expect(types).toEqual(expect.arrayContaining(['cognito', 'secretsmanager', 'kms', 'acm', 'waf', 'sg']))
+    // The whole 보안·아이덴티티 group surfaces via the category label. Security
+    // Group is no longer a palette resource (ADR 0059) — it's a library, not a node.
+    expect(types).toEqual(expect.arrayContaining(['cognito', 'secretsmanager', 'kms', 'acm', 'waf']))
+    expect(types).not.toContain('sg')
   })
 
   it('returns an empty list when nothing matches', () => {

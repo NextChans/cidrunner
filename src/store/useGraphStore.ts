@@ -13,6 +13,11 @@ import { simulate, type SimResult } from '@/graph/simulate'
 import { applyAzFault } from '@/graph/chaos'
 import { applyInheritedDefaults } from '@/graph/inherit'
 import { sanitizeSnapshot, toSnapshot, type DesignSnapshot } from '@/graph/share'
+import {
+  assignedSgIds,
+  makeSecurityGroup,
+  type SecurityGroupDef,
+} from '@/graph/securityGroups'
 
 export type Mode = 'free' | 'challenge'
 
@@ -99,6 +104,14 @@ interface GraphState {
   slots: GallerySlot[]
   /** Ids of badges already announced to the player — persisted (ADR 0032). */
   earnedBadges: string[]
+  /**
+   * Security-group definitions (ADR 0059). SGs are a firewall ruleset *assigned*
+   * to resources (`config.securityGroupIds`), not a canvas node — so they live
+   * here, persisted + undoable, and never appear as nodes/edges.
+   */
+  securityGroups: SecurityGroupDef[]
+  /** SG whose members are currently highlighted (chip click), or null. Transient. */
+  highlightSgId: string | null
 
   setMode: (mode: Mode) => void
   /** Click-to-add: places the node into a valid container automatically. */
@@ -137,7 +150,22 @@ interface GraphState {
   /** Sets the live palette search query (ADR 0037). */
   setSearch: (query: string) => void
   /** Replaces the whole design (shared URL / JSON import). */
-  loadDesign: (nodes: ResourceNodeType[], edges: Edge[], missionId?: string) => void
+  loadDesign: (
+    nodes: ResourceNodeType[],
+    edges: Edge[],
+    missionId?: string,
+    securityGroups?: SecurityGroupDef[],
+  ) => void
+  /** Creates a new empty security group and returns its id (ADR 0059). */
+  addSecurityGroup: () => string
+  /** Patches a security group's name/rules. */
+  updateSecurityGroup: (id: string, patch: Partial<Omit<SecurityGroupDef, 'id'>>) => void
+  /** Deletes a security group and unassigns it from every resource. */
+  removeSecurityGroup: (id: string) => void
+  /** Assigns/unassigns a security group to a resource node (toggle). */
+  toggleNodeSecurityGroup: (nodeId: string, sgId: string) => void
+  /** Highlights the members of a security group on the canvas (chip click). */
+  setHighlightSg: (sgId: string | null) => void
   /** Best star record per mission id — persisted (Editor Fundamentals sprint). */
   bestStars: Record<string, number>
   /** Records a mission result, keeping the historical maximum. */
@@ -171,6 +199,16 @@ interface GraphState {
 
 // Monotonic disambiguator so two slots saved in the same millisecond differ.
 let slotSeq = 0
+
+// Monotonic counter for security-group ids, re-seeded from loaded designs so a
+// restored collection never mints a duplicate id.
+let sgSeq = 0
+function bumpSgSeq(sgs: SecurityGroupDef[]) {
+  for (const sg of sgs) {
+    const tail = Number(sg.id.split('-').pop())
+    if (Number.isFinite(tail) && tail > sgSeq) sgSeq = tail
+  }
+}
 
 /** Seed graph: a VPC ▸ public Subnet ▸ EC2, demonstrating valid nesting. */
 const initialNodes: ResourceNodeType[] = [
@@ -316,6 +354,8 @@ export const useGraphStore = create<GraphState>()(
   showAchievements: false,
   slots: [],
   earnedBadges: [],
+  securityGroups: [],
+  highlightSgId: null,
 
   setMode: (mode) => set({ mode }),
 
@@ -558,11 +598,13 @@ export const useGraphStore = create<GraphState>()(
 
   setSearch: (search) => set({ search }),
 
-  loadDesign: (nodes, edges, missionId) => {
+  loadDesign: (nodes, edges, missionId, securityGroups = []) => {
     bumpNodeSeq(nodes)
+    bumpSgSeq(securityGroups)
     set({
       nodes: normalizeContainment(nodes),
       edges,
+      securityGroups,
       selectedNodeId: null,
       activeMissionId: missionId ?? null,
       ...(missionId ? { mode: 'challenge' as const } : {}),
@@ -570,6 +612,53 @@ export const useGraphStore = create<GraphState>()(
       notice: null,
     })
   },
+
+  addSecurityGroup: () => {
+    sgSeq += 1
+    const sg = makeSecurityGroup(`sg-${sgSeq}`, sgSeq)
+    set((state) => ({ securityGroups: [...state.securityGroups, sg] }))
+    return sg.id
+  },
+
+  updateSecurityGroup: (id, patch) =>
+    set((state) => ({
+      securityGroups: state.securityGroups.map((sg) =>
+        sg.id === id ? { ...sg, ...patch } : sg,
+      ),
+    })),
+
+  removeSecurityGroup: (id) =>
+    set((state) => ({
+      securityGroups: state.securityGroups.filter((sg) => sg.id !== id),
+      // Strip the deleted SG from every resource that wore it.
+      nodes: state.nodes.map((n) => {
+        const ids = assignedSgIds(n)
+        if (!ids.includes(id)) return n
+        const next = ids.filter((sgId) => sgId !== id)
+        const config = { ...n.data.config }
+        if (next.length) config.securityGroupIds = next
+        else delete config.securityGroupIds
+        return { ...n, data: { ...n.data, config } }
+      }),
+      simulation: null,
+      highlightSgId: state.highlightSgId === id ? null : state.highlightSgId,
+    })),
+
+  toggleNodeSecurityGroup: (nodeId, sgId) =>
+    set((state) => ({
+      nodes: state.nodes.map((n) => {
+        if (n.id !== nodeId) return n
+        const ids = assignedSgIds(n)
+        const next = ids.includes(sgId) ? ids.filter((x) => x !== sgId) : [...ids, sgId]
+        const config = { ...n.data.config }
+        if (next.length) config.securityGroupIds = next
+        else delete config.securityGroupIds
+        return { ...n, data: { ...n.data, config } }
+      }),
+      simulation: null,
+    })),
+
+  setHighlightSg: (highlightSgId) => set({ highlightSgId }),
 
   bestStars: {},
   recordStars: (missionId, stars) =>
@@ -618,7 +707,12 @@ export const useGraphStore = create<GraphState>()(
       const slot: GallerySlot = {
         id: `s-${now.toString(36)}-${slotSeq}`,
         name: name.trim() || `설계 ${state.slots.length + 1}`,
-        snapshot: toSnapshot(state.nodes, state.edges, state.activeMissionId),
+        snapshot: toSnapshot(
+          state.nodes,
+          state.edges,
+          state.activeMissionId,
+          state.securityGroups,
+        ),
         createdAt: now,
         updatedAt: now,
       }
@@ -636,9 +730,11 @@ export const useGraphStore = create<GraphState>()(
       return
     }
     bumpNodeSeq(clean.nodes)
+    bumpSgSeq(clean.securityGroups)
     set({
       nodes: normalizeContainment(clean.nodes),
       edges: clean.edges,
+      securityGroups: clean.securityGroups,
       selectedNodeId: null,
       activeMissionId: clean.missionId ?? null,
       ...(clean.missionId ? { mode: 'challenge' as const } : {}),
@@ -670,6 +766,8 @@ export const useGraphStore = create<GraphState>()(
     set({
       nodes: initialNodes,
       edges: [],
+      securityGroups: [],
+      highlightSgId: null,
       selectedNodeId: null,
       activeMissionId: null,
       notice: null,
@@ -698,6 +796,10 @@ export const useGraphStore = create<GraphState>()(
           slots: s.slots,
           earnedBadges: s.earnedBadges,
           soundOn: s.soundOn,
+          // Security groups (ADR 0059). Persisted alongside the graph; an older
+          // payload without it (SGs as nodes+edges) is migrated by the sanitizer
+          // in `merge` below, which folds legacy sg nodes into this collection.
+          securityGroups: s.securityGroups,
         }),
         // Rehydrate through the same whitelist as shared URLs (ADR 0023). If
         // the stored graph fails sanitation we keep it as-is — local data is
@@ -706,23 +808,35 @@ export const useGraphStore = create<GraphState>()(
           const p = (persisted ?? {}) as Record<string, unknown>
           const merged = { ...current, ...p } as GraphState
           if (Array.isArray(p.nodes)) {
-            const clean = sanitizeSnapshot({ v: 1, nodes: p.nodes, edges: p.edges ?? [] })
+            const clean = sanitizeSnapshot({
+              v: 2,
+              nodes: p.nodes,
+              edges: p.edges ?? [],
+              sg: p.securityGroups,
+            })
             if (clean) {
               merged.nodes = normalizeContainment(clean.nodes)
               merged.edges = clean.edges
+              merged.securityGroups = clean.securityGroups
             }
           }
           return merged
         },
         onRehydrateStorage: () => (state) => {
-          if (state) bumpNodeSeq(state.nodes)
+          if (state) {
+            bumpNodeSeq(state.nodes)
+            bumpSgSeq(state.securityGroups)
+          }
         },
       },
     ),
     {
-      // Undo/redo tracks only the design graph (ADR 0023).
-      partialize: (s) => ({ nodes: s.nodes, edges: s.edges }),
-      equality: (a, b) => a.nodes === b.nodes && a.edges === b.edges,
+      // Undo/redo tracks the design graph + SG collection (ADR 0023/0059) —
+      // creating, editing, or assigning an SG is one undoable step. Assignment
+      // itself mutates node.data.config, already covered by `nodes`.
+      partialize: (s) => ({ nodes: s.nodes, edges: s.edges, securityGroups: s.securityGroups }),
+      equality: (a, b) =>
+        a.nodes === b.nodes && a.edges === b.edges && a.securityGroups === b.securityGroups,
       handleSet: (handleSet) => debouncedLeadingHandleSet(handleSet),
       limit: 100,
     },

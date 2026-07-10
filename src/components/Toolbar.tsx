@@ -65,8 +65,8 @@ export function Toolbar() {
 
   const share = async () => {
     // Mission context rides along so a shared submission opens gradable.
-    const { nodes, edges, activeMissionId } = useGraphStore.getState()
-    const url = encodeShareUrl(nodes, edges, activeMissionId)
+    const { nodes, edges, activeMissionId, securityGroups } = useGraphStore.getState()
+    const url = encodeShareUrl(nodes, edges, activeMissionId, securityGroups)
     try {
       await navigator.clipboard.writeText(url)
       setNotice('공유 링크가 클립보드에 복사되었습니다.', 'info')
@@ -77,10 +77,10 @@ export function Toolbar() {
   }
 
   const exportJson = () => {
-    const { nodes, edges, activeMissionId } = useGraphStore.getState()
+    const { nodes, edges, activeMissionId, securityGroups } = useGraphStore.getState()
     downloadText(
       'cidrunner-design.json',
-      JSON.stringify(toSnapshot(nodes, edges, activeMissionId), null, 2),
+      JSON.stringify(toSnapshot(nodes, edges, activeMissionId, securityGroups), null, 2),
     )
     setNotice('설계를 cidrunner-design.json으로 저장했습니다.', 'info')
   }
@@ -92,7 +92,7 @@ export function Toolbar() {
         setNotice('불러오기 실패: cidrunner 설계 파일이 아닙니다.')
         return
       }
-      loadDesign(design.nodes, design.edges, design.missionId)
+      loadDesign(design.nodes, design.edges, design.missionId, design.securityGroups)
       setNotice('설계를 불러왔습니다.', 'info')
     } catch {
       setNotice('불러오기 실패: JSON을 읽을 수 없습니다.')
@@ -200,21 +200,20 @@ export function Toolbar() {
       <button
         type="button"
         onClick={() => {
-          const { nodes, edges } = useGraphStore.getState()
+          const { nodes, edges, securityGroups } = useGraphStore.getState()
           // Apply-ready contract (QA-001 / ADR 0045): a graph error means the
           // export would emit REPLACE_ME markers (e.g. an orphaned resource with
           // no parent reference), so block export until the design validates.
-          const errorCount = [...getGraphIssues(nodes, edges).errors.values()].reduce(
-            (sum, msgs) => sum + msgs.length,
-            0,
-          )
+          const errorCount = [
+            ...getGraphIssues(nodes, edges, securityGroups).errors.values(),
+          ].reduce((sum, msgs) => sum + msgs.length, 0)
           if (errorCount > 0) {
             setNotice(
               `설계에 오류 ${errorCount}건이 있어 Terraform으로 내보낼 수 없습니다. 빨간 오류를 먼저 해결하세요.`,
             )
             return
           }
-          void downloadTerraformZip(nodes, edges)
+          void downloadTerraformZip(nodes, edges, securityGroups)
         }}
         className={iconBtn}
       >

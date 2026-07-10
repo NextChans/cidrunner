@@ -5,7 +5,9 @@ import { getResource } from '@/resources'
 import { canBeSource, canBeTarget } from '@/graph/rules'
 import { getGraphIssues } from '@/graph/checks'
 import { DERIVED_SOURCE_HANDLE, DERIVED_TARGET_HANDLE } from '@/graph/derived'
+import { assignedSgIds } from '@/graph/securityGroups'
 import { useGraphStore, type ResourceNodeType } from '@/store/useGraphStore'
+import { sgColor } from '../SecurityGroups'
 
 /** Containers can't shrink below this, so their header and children stay visible. */
 const MIN_CONTAINER = { width: 160, height: 100 }
@@ -50,13 +52,22 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
   const showSource = canBeSource(data.type)
   const showTarget = canBeTarget(data.type)
   const hasError = useGraphStore(
-    (s) => (getGraphIssues(s.nodes, s.edges).errors.get(id)?.length ?? 0) > 0,
+    (s) => (getGraphIssues(s.nodes, s.edges, s.securityGroups).errors.get(id)?.length ?? 0) > 0,
   )
   const hasWarning = useGraphStore(
-    (s) => (getGraphIssues(s.nodes, s.edges).warnings.get(id)?.length ?? 0) > 0,
+    (s) => (getGraphIssues(s.nodes, s.edges, s.securityGroups).warnings.get(id)?.length ?? 0) > 0,
   )
   const invalid = hasError || (meta.validate?.(data.config) ?? []).length > 0
   const sim = useGraphStore((s) => s.simulation)
+  // Security-group assignment (ADR 0059): colored shield chips make the wearing
+  // resource's SGs visible; hovering an SG in the library highlights its members.
+  const securityGroups = useGraphStore((s) => s.securityGroups)
+  const highlightSgId = useGraphStore((s) => s.highlightSgId)
+  const sgIds = assignedSgIds({ data } as ResourceNodeType)
+  const sgChips = sgIds
+    .map((sgId) => securityGroups.find((sg) => sg.id === sgId))
+    .filter((sg): sg is NonNullable<typeof sg> => sg !== undefined)
+  const sgHighlighted = highlightSgId !== null && sgIds.includes(highlightSgId)
   // Drop-target highlight during a drag (ADR 0040): null = not the target,
   // true = a valid drop, false = the rules reject this container.
   const dropValid = useGraphStore((s) => (s.dropTarget?.id === id ? s.dropTarget.valid : null))
@@ -146,6 +157,9 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
                   : selected
                     ? 'border-accent ring-1 ring-accent'
                     : 'border-surface-border',
+        // Same-SG highlight (ADR 0059): outline is independent of the border/ring
+        // states above, so it layers without conflicting.
+        sgHighlighted && 'outline outline-2 outline-offset-2 outline-rose-400',
       )}
     >
       {/* Chaos mode (ADR 0052): a downed node from an injected AZ failure. */}
@@ -205,6 +219,28 @@ function ResourceNodeComponent({ id, data, selected }: NodeProps<ResourceNodeTyp
             </span>
           )}
         </span>
+        {/* Assigned Security Groups (ADR 0059): colored shield chips — a resource
+            wears a ruleset, it does not connect to one with an edge. */}
+        {sgChips.length > 0 && (
+          <span className="mt-0.5 flex flex-wrap gap-0.5">
+            {sgChips.map((sg) => {
+              const color = sgColor(sg.id, securityGroups)
+              return (
+                <span
+                  key={sg.id}
+                  className={clsx(
+                    'flex items-center gap-0.5 rounded border px-1 text-[8px] leading-tight',
+                    color.chip,
+                  )}
+                  title={`보안 그룹: ${sg.name}`}
+                >
+                  <span className={clsx('h-1 w-1 rounded-full', color.dot)} />
+                  {sg.name}
+                </span>
+              )
+            })}
+          </span>
+        )}
       </div>
       {hasWarning && !invalid && !blocked && !onPath && (
         <span className="text-xs" title="보안 경고">

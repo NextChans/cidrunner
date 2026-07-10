@@ -70,6 +70,7 @@ export function MissionList() {
   const mode = useGraphStore((s) => s.mode)
   const nodes = useGraphStore((s) => s.nodes)
   const edges = useGraphStore((s) => s.edges)
+  const securityGroups = useGraphStore((s) => s.securityGroups)
   const activeMissionId = useGraphStore((s) => s.activeMissionId)
   const setActiveMission = useGraphStore((s) => s.setActiveMission)
   const setMode = useGraphStore((s) => s.setMode)
@@ -81,15 +82,23 @@ export function MissionList() {
   // Live clear-check context: simulate the graph and sweep validation once
   // (per-node config checks plus graph-level errors and security warnings).
   const ctx = useMemo<MissionCheckContext>(() => {
-    const issues = getGraphIssues(nodes, edges)
+    const issues = getGraphIssues(nodes, edges, securityGroups)
     const allValid = nodes.every(
       (n) =>
         (getResource(n.data.type).validate?.(n.data.config) ?? []).length === 0 &&
         (issues.errors.get(n.id)?.length ?? 0) === 0,
     )
     const securityOk = nodes.every((n) => (issues.warnings.get(n.id)?.length ?? 0) === 0)
-    return { nodes, edges, sim: simulate(nodes, edges), allValid, securityOk, issues }
-  }, [nodes, edges])
+    return {
+      nodes,
+      edges,
+      securityGroups,
+      sim: simulate(nodes, edges),
+      allValid,
+      securityOk,
+      issues,
+    }
+  }, [nodes, edges, securityGroups])
 
   // Budget mode (ADR 0051): live monthly-cost estimate, shown against a
   // mission's optional budget target.

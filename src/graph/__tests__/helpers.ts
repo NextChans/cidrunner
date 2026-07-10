@@ -24,8 +24,14 @@ export function E(id: string, source: string, target: string): Edge {
   return { id, source, target }
 }
 
-/** A best-practice 3-tier + serverless topology used across suites. */
+/**
+ * A best-practice 3-tier + serverless topology used across suites. Security
+ * Groups are assigned via `config.securityGroupIds` and a `securityGroups`
+ * collection (ADR 0059) — no sg nodes/edges. Consumers that emit Terraform or
+ * grade the graph pass `securityGroups` through.
+ */
 export function bestPracticeTopology() {
+  const sgIds = { securityGroupIds: ['sg-7'] }
   const nodes = [
     N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }, 'Prod VPC'),
     N('subnet-1', 'subnet', 'vpc-1', { cidr_block: '10.0.1.0/24', az: 'a', public: true }, 'Public A'),
@@ -34,9 +40,8 @@ export function bestPracticeTopology() {
     N('subnet-4', 'subnet', 'vpc-1', { cidr_block: '10.0.12.0/24', az: 'b', public: false }, 'Private B'),
     N('igw-5', 'igw', 'vpc-1', {}, 'IGW'),
     N('nat-6', 'nat', 'subnet-1', {}, 'NAT'),
-    N('sg-7', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }, 'Web SG'),
-    N('alb-8', 'alb', 'vpc-1', { internal: false, listener_port: 80 }, 'Web ALB'),
-    N('ec2-9', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto' }, 'App Server'),
+    N('alb-8', 'alb', 'vpc-1', { internal: false, listener_port: 80, ...sgIds }, 'Web ALB'),
+    N('ec2-9', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto', ...sgIds }, 'App Server'),
     N(
       'rds-10',
       'rds',
@@ -47,6 +52,7 @@ export function bestPracticeTopology() {
         allocated_storage: 20,
         multi_az: true,
         storage_encrypted: true,
+        ...sgIds,
       },
       'Main DB',
     ),
@@ -60,12 +66,12 @@ export function bestPracticeTopology() {
     ),
   ]
   const edges = [
-    E('a1', 'sg-7', 'alb-8'),
-    E('a2', 'sg-7', 'ec2-9'),
-    E('a3', 'sg-7', 'rds-10'),
     E('t1', 'alb-8', 'ec2-9'),
     E('t2', 'ec2-9', 'rds-10'),
     E('t3', 'lambda-12', 's3-11'),
   ]
-  return { nodes, edges }
+  const securityGroups = [
+    { id: 'sg-7', name: 'Web SG', allowHttp: true, allowHttps: true, allowSsh: false },
+  ]
+  return { nodes, edges, securityGroups }
 }

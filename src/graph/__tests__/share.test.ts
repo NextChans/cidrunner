@@ -15,13 +15,44 @@ function packHash(snapshot: unknown): string {
 
 describe('share', () => {
   it('round-trips a design through the URL hash', () => {
-    const { nodes, edges } = bestPracticeTopology()
-    const design = designFromHash(packHash(toSnapshot(nodes, edges)))
+    const { nodes, edges, securityGroups } = bestPracticeTopology()
+    const design = designFromHash(packHash(toSnapshot(nodes, edges, null, securityGroups)))
     expect(design).not.toBeNull()
     expect(design!.nodes).toHaveLength(nodes.length)
     expect(design!.edges).toHaveLength(edges.length)
     expect(design!.nodes.find((n) => n.id === 'subnet-1')?.parentId).toBe('vpc-1')
     expect(design!.nodes.find((n) => n.id === 'rds-10')?.data.config.engine).toBe('mysql')
+    // Security groups (ADR 0059) round-trip as a collection + assignment.
+    expect(design!.securityGroups).toHaveLength(1)
+    expect(design!.securityGroups[0]!.id).toBe('sg-7')
+    expect(design!.nodes.find((n) => n.id === 'rds-10')?.data.config.securityGroupIds).toEqual([
+      'sg-7',
+    ])
+  })
+
+  it('migrates a legacy v1 design (sg nodes + attachment edges) to the collection', () => {
+    // Immutable #g= URLs shared before ADR 0059 must keep loading: legacy sg
+    // nodes become defs and their attachment edges become assignments.
+    const legacy = {
+      v: 1 as const,
+      nodes: [
+        N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+        N('sg-1', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: true }, 'Web SG'),
+        N('ec2-1', 'ec2', 'vpc-1', { instance_type: 't3.micro', ami: 'auto' }),
+      ],
+      edges: [E('a1', 'sg-1', 'ec2-1')],
+    }
+    const design = sanitizeSnapshot(legacy)
+    expect(design).not.toBeNull()
+    // sg node dropped from the canvas graph, folded into the collection.
+    expect(design!.nodes.some((n) => n.data.type === 'sg')).toBe(false)
+    expect(design!.securityGroups).toHaveLength(1)
+    expect(design!.securityGroups[0]).toMatchObject({ id: 'sg-1', name: 'Web SG', allowSsh: true })
+    // Attachment edge → assignment; the sg edge is not kept as a traffic edge.
+    expect(design!.nodes.find((n) => n.id === 'ec2-1')?.data.config.securityGroupIds).toEqual([
+      'sg-1',
+    ])
+    expect(design!.edges.some((e) => e.source === 'sg-1' || e.target === 'sg-1')).toBe(false)
   })
 
   it('restores a resized container to its resized size, not its created size', () => {

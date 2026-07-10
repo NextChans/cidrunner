@@ -4,8 +4,8 @@ import { bestPracticeTopology, E, N } from './helpers'
 
 describe('generateTerraform', () => {
   it('emits every expected resource for the best-practice topology', () => {
-    const { nodes, edges } = bestPracticeTopology()
-    const files = generateTerraform(nodes, edges)
+    const { nodes, edges, securityGroups } = bestPracticeTopology()
+    const files = generateTerraform(nodes, edges, securityGroups)
     const main = files['main.tf']!
 
     // Derived plumbing (ADR 0016).

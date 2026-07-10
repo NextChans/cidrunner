@@ -8,19 +8,27 @@ import { getMission } from '@/missions'
 import { getResource } from '@/resources'
 import type { ResourceNodeType } from '@/store/useGraphStore'
 import type { MissionCheckContext } from '@/missions/types'
+import type { SecurityGroupDef } from '@/graph/securityGroups'
 import { E, N } from './helpers'
 
 /** Builds a live mission-check context exactly as the MissionPanel does. */
-function ctxFor(nodes: ResourceNodeType[], edges: Edge[]): MissionCheckContext {
-  const issues = graphIssues(nodes, edges)
+function ctxFor(
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  securityGroups: SecurityGroupDef[] = [],
+): MissionCheckContext {
+  const issues = graphIssues(nodes, edges, securityGroups)
   const allValid = nodes.every(
     (n) =>
       (getResource(n.data.type).validate?.(n.data.config) ?? []).length === 0 &&
       (issues.errors.get(n.id)?.length ?? 0) === 0,
   )
   const securityOk = nodes.every((n) => (issues.warnings.get(n.id)?.length ?? 0) === 0)
-  return { nodes, edges, sim: simulate(nodes, edges), allValid, securityOk, issues }
+  return { nodes, edges, securityGroups, sim: simulate(nodes, edges), allValid, securityOk, issues }
 }
+
+const WEB_SG: SecurityGroupDef = { id: 'sg-6', name: 'Web SG', allowHttp: true, allowHttps: true, allowSsh: false }
+const withSg = (id: string) => ({ securityGroupIds: [id] })
 
 /** Kinesis → Lambda → S3 real-time ingestion pipeline. */
 function pipelineTopology() {
@@ -42,10 +50,9 @@ function secureAuthTopology() {
     N('subnet-3', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'a', public: false }),
     N('subnet-4', 'subnet', 'vpc-1', { cidr_block: '10.0.4.0/24', az: 'b', public: false }),
     N('igw-5', 'igw', 'vpc-1', {}),
-    N('sg-6', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }),
-    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80 }),
-    N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto' }),
-    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true }),
+    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80, ...withSg('sg-6') }),
+    N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto', ...withSg('sg-6') }),
+    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true, ...withSg('sg-6') }),
     N('cloudfront-10', 'cloudfront', undefined, { price_class: 'PriceClass_200' }),
     N('cognito-11', 'cognito', undefined, { mfa: 'OPTIONAL', password_min_length: 12, email_verification: true }),
     N('secrets-12', 'secretsmanager', undefined, { recovery_window_days: 30 }),
@@ -54,15 +61,12 @@ function secureAuthTopology() {
     N('waf-15', 'waf', undefined, { rate_limit: 2000, managed_common_rules: true }),
   ]
   const edges = [
-    E('a1', 'sg-6', 'alb-7'),
-    E('a2', 'sg-6', 'ec2-8'),
-    E('a3', 'sg-6', 'rds-9'),
     E('o1', 'cloudfront-10', 'alb-7'),
     E('t1', 'alb-7', 'ec2-8'),
     E('t2', 'ec2-8', 'rds-9'),
     E('k1', 'secrets-12', 'kms-13'),
   ]
-  return { nodes, edges }
+  return { nodes, edges, sg: [WEB_SG] }
 }
 
 describe('resource expansion batch 3 (ADR 0035)', () => {
@@ -136,8 +140,8 @@ describe('resource expansion batch 3 (ADR 0035)', () => {
   })
 
   it('emits the security/identity stack and wires Secrets Manager to KMS', () => {
-    const { nodes, edges } = secureAuthTopology()
-    const files = generateTerraform(nodes, edges)
+    const { nodes, edges, sg } = secureAuthTopology()
+    const files = generateTerraform(nodes, edges, sg)
     const main = files['main.tf']!
     expect(main).toContain('resource "aws_cognito_user_pool" "cognito_11"')
     expect(main).toContain('resource "aws_cognito_user_pool_client" "cognito_11_client"')
@@ -171,14 +175,14 @@ describe('resource expansion batch 3 (ADR 0035)', () => {
     const p = pipelineTopology()
     expect(getMission('data-pipeline')!.check!(ctxFor(p.nodes, p.edges))).toBe(3)
     const s = secureAuthTopology()
-    expect(getMission('secure-auth-web')!.check!(ctxFor(s.nodes, s.edges))).toBe(3)
+    expect(getMission('secure-auth-web')!.check!(ctxFor(s.nodes, s.edges, s.sg))).toBe(3)
   })
 
   it('does not clear the auth mission when the security stack is incomplete', () => {
-    const { nodes, edges } = secureAuthTopology()
+    const { nodes, edges, sg } = secureAuthTopology()
     // Drop the WAF block — the traffic path still works but the stack is short.
     const noWaf = nodes.filter((n) => n.id !== 'waf-15')
-    expect(getMission('secure-auth-web')!.check!(ctxFor(noWaf, edges))).toBe(0)
+    expect(getMission('secure-auth-web')!.check!(ctxFor(noWaf, edges, sg))).toBe(0)
   })
 
   it('does not clear the pipeline mission without the Lambda hop', () => {

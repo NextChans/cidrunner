@@ -2,14 +2,18 @@ import { Shield } from 'lucide-react'
 import type { ResourceMeta } from './types'
 
 /**
- * Security Group — stateful virtual firewall. Draw an edge SG → resource to
- * *attach* it (attachment edges are not traffic — see ADR 0017). The MVP
- * simplifies rules to common inbound toggles (ADR 0011); egress is allow-all.
+ * Security Group — stateful virtual firewall. As of ADR 0059 an SG is NOT a
+ * canvas node/edge: it is a definition in the store's `securityGroups`
+ * collection, *assigned* to resources via the Inspector (`config.securityGroupIds`).
+ * This meta stays in the registry only so the Terraform generator can still emit
+ * `aws_security_group` blocks from synthetic nodes (materializeSecurityGroups) —
+ * it is excluded from the palette (`resourceList`). Rules simplify to common
+ * inbound toggles (ADR 0011); egress is allow-all.
  */
 export const sg: ResourceMeta = {
   type: 'sg',
   label: 'Security Group',
-  description: '스테이트풀 방화벽 — 엣지로 리소스에 연결',
+  description: '스테이트풀 방화벽 — 인스펙터에서 리소스에 지정',
   category: 'security',
   icon: Shield,
   color: 'text-rose-400',
@@ -18,11 +22,8 @@ export const sg: ResourceMeta = {
     allow_https: true,
     allow_ssh: false,
   },
-  // A VPC-scoped firewall; attach to any VPC-bound resource that owns ENIs by
-  // drawing an edge (ADR 0042). Lambda is intentionally absent: this game models
-  // Lambda as a non-VPC, canvas-level function, and an SG is VPC-scoped.
+  // Never placed on the canvas (ADR 0059); allowedParents kept nominal.
   allowedParents: ['vpc'],
-  connectsTo: ['alb', 'ec2', 'rds', 'ecs', 'eks', 'elasticache', 'efs'],
   fields: [
     { key: 'allow_http', label: 'HTTP (80) 허용', type: 'boolean' },
     { key: 'allow_https', label: 'HTTPS (443) 허용', type: 'boolean' },

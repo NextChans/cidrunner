@@ -39,12 +39,13 @@ describe('graph rules', () => {
     expect(isContainer('ec2')).toBe(false)
   })
 
-  it('enforces edge rules including attachments and replication', () => {
+  it('enforces edge rules including replication', () => {
     expect(canConnect('alb', 'ec2')).toBe(true)
     expect(canConnect('ec2', 'rds')).toBe(true)
-    expect(canConnect('sg', 'ec2')).toBe(true) // attachment
     expect(canConnect('rds', 'rds')).toBe(true) // replication
     expect(canConnect('ec2', 'alb')).toBe(false)
     expect(canConnect('s3', 'rds')).toBe(false)
+    // Security Groups are assigned, not wired (ADR 0059): no sg edges.
+    expect(canConnect('sg', 'ec2')).toBe(false)
   })
 })

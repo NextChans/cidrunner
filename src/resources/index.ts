@@ -87,7 +87,6 @@ export const resourceList: ResourceMeta[] = [
   sqs,
   sns,
   cloudwatch,
-  sg,
   cognito,
   secretsmanager,
   kms,

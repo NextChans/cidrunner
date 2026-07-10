@@ -3,6 +3,7 @@ import type { ResourceType } from '@/resources/types'
 import type { ResourceNodeType } from '@/store/useGraphStore'
 import type { SimResult } from '@/graph/simulate'
 import type { GraphIssues } from '@/graph/checks'
+import type { SecurityGroupDef } from '@/graph/securityGroups'
 
 /**
  * Inputs to a mission's clear check (Phase 5 / ADR 0014). The MissionPanel
@@ -12,6 +13,8 @@ import type { GraphIssues } from '@/graph/checks'
 export interface MissionCheckContext {
   nodes: ResourceNodeType[]
   edges: Edge[]
+  /** Security-group definitions (ADR 0059) — SG assignment is `config.securityGroupIds`. */
+  securityGroups: SecurityGroupDef[]
   /** Result of running the traffic simulation on the current graph. */
   sim: SimResult
   /** True when no node has any validation error (config, required, graph). */
