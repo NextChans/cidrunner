@@ -17,7 +17,7 @@ function ctxFor(nodes: ResourceNodeType[], edges: Edge[] = []): MissionCheckCont
       (issues.errors.get(n.id)?.length ?? 0) === 0,
   )
   const securityOk = nodes.every((n) => (issues.warnings.get(n.id)?.length ?? 0) === 0)
-  return { nodes, edges, sim: simulate(nodes, edges), allValid, securityOk, issues }
+  return { nodes, edges, securityGroups: [], sim: simulate(nodes, edges), allValid, securityOk, issues }
 }
 
 /** Indices of the tutorial steps that report done for a given graph. */

@@ -14,9 +14,13 @@ export function PropertyForm({ node }: { node: ResourceNodeType }) {
   const updateNodeConfig = useGraphStore((s) => s.updateNodeConfig)
   // Select cached arrays (or undefined) directly — defaulting to a fresh []
   // inside the selector would return a new reference every snapshot and loop.
-  const graphErrors = useGraphStore((s) => getGraphIssues(s.nodes, s.edges).errors.get(node.id))
+  // Pass securityGroups (ADR 0059): omitting it lets getGraphIssues mint a fresh
+  // [] default per call, invalidating its shared memo every render → #185 loop.
+  const graphErrors = useGraphStore((s) =>
+    getGraphIssues(s.nodes, s.edges, s.securityGroups).errors.get(node.id),
+  )
   const graphWarnings = useGraphStore((s) =>
-    getGraphIssues(s.nodes, s.edges).warnings.get(node.id),
+    getGraphIssues(s.nodes, s.edges, s.securityGroups).warnings.get(node.id),
   )
   const meta = getResource(node.data.type)
   const fields = meta.fields ?? []

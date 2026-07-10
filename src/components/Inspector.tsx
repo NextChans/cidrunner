@@ -4,6 +4,7 @@ import { getGraphIssues } from '@/graph/checks'
 import { useGraphStore } from '@/store/useGraphStore'
 import { MissionPanel } from './MissionPanel'
 import { PropertyForm } from './PropertyForm'
+import { SecurityGroupAssign } from './SecurityGroups'
 
 /** The selected-node detail view — shared by the desktop aside and the mobile drawer. */
 export function InspectorBody() {
@@ -14,12 +15,14 @@ export function InspectorBody() {
   const updateNodeLabel = useGraphStore((s) => s.updateNodeLabel)
   const graphErrorCount = useGraphStore((s) =>
     s.selectedNodeId
-      ? (getGraphIssues(s.nodes, s.edges).errors.get(s.selectedNodeId)?.length ?? 0)
+      ? (getGraphIssues(s.nodes, s.edges, s.securityGroups).errors.get(s.selectedNodeId)?.length ??
+        0)
       : 0,
   )
   const graphWarningCount = useGraphStore((s) =>
     s.selectedNodeId
-      ? (getGraphIssues(s.nodes, s.edges).warnings.get(s.selectedNodeId)?.length ?? 0)
+      ? (getGraphIssues(s.nodes, s.edges, s.securityGroups).warnings.get(s.selectedNodeId)
+          ?.length ?? 0)
       : 0,
   )
 
@@ -86,6 +89,8 @@ export function InspectorBody() {
           </dl>
 
           <PropertyForm node={node} />
+
+          <SecurityGroupAssign node={node} />
 
           <button
             type="button"

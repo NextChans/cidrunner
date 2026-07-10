@@ -2,6 +2,7 @@ import { Search, X } from 'lucide-react'
 import { CATEGORY_LABELS, CATEGORY_ORDER } from '@/resources/types'
 import { useResourceSearch } from '@/hooks/useResourceSearch'
 import { useGraphStore } from '@/store/useGraphStore'
+import { SecurityGroupLibrary } from './SecurityGroups'
 
 /**
  * Shared id the `/` shortcut focuses (see {@link useKeyboardShortcuts}). Only
@@ -124,6 +125,9 @@ export function PaletteBody({ searchInputId }: { searchInputId?: string }) {
           </p>
         )}
       </div>
+      {/* Security groups are a library of firewall rulesets (ADR 0059), not
+          draggable nodes — kept out of the search-filtered resource list. */}
+      {!active && <SecurityGroupLibrary />}
     </div>
   )
 }

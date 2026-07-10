@@ -106,13 +106,13 @@ describe('resource expansion (ADR 0022)', () => {
     const s = staticSite()
     const sSim = simulate(s.nodes, s.edges)
     const sIssues = graphIssues(s.nodes, s.edges)
-    const sCtx = { ...s, sim: sSim, allValid: true, securityOk: true, issues: sIssues }
+    const sCtx = { ...s, securityGroups: [], sim: sSim, allValid: true, securityOk: true, issues: sIssues }
     expect(getMission('static-cdn')!.check!(sCtx)).toBe(3)
 
     const p = pipeline()
     const pSim = simulate(p.nodes, p.edges)
     const pIssues = graphIssues(p.nodes, p.edges)
-    const pCtx = { ...p, sim: pSim, allValid: true, securityOk: true, issues: pIssues }
+    const pCtx = { ...p, securityGroups: [], sim: pSim, allValid: true, securityOk: true, issues: pIssues }
     expect(getMission('async-pipeline')!.check!(pCtx)).toBe(3)
     // Not cleared without the queue hop.
     const direct = {
@@ -120,7 +120,7 @@ describe('resource expansion (ADR 0022)', () => {
       edges: [E('e1', 'lambda-1', 'dynamodb-4')],
     }
     const dSim = simulate(direct.nodes, direct.edges)
-    const dCtx = { ...direct, sim: dSim, allValid: true, securityOk: true, issues: pIssues }
+    const dCtx = { ...direct, securityGroups: [], sim: dSim, allValid: true, securityOk: true, issues: pIssues }
     expect(getMission('async-pipeline')!.check!(dCtx)).toBe(0)
   })
 })

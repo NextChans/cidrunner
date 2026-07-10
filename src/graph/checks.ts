@@ -3,6 +3,7 @@ import type { ResourceNodeType } from '@/store/useGraphStore'
 import { cidrIssues, parseCidr } from '@/graph/cidr'
 import { canBeTopLevel, requiredParentLabel } from '@/graph/rules'
 import { getResource } from '@/resources'
+import { assignedSgIds, type SecurityGroupDef } from '@/graph/securityGroups'
 
 /**
  * Graph-level validation with severity (ADR 0017):
@@ -24,10 +25,15 @@ function push(map: Map<string, string[]>, id: string, msg: string) {
   if (!list.includes(msg)) map.set(id, [...list, msg])
 }
 
-export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssues {
+export function graphIssues(
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  securityGroups: SecurityGroupDef[] = [],
+): GraphIssues {
   const errors = new Map<string, string[]>()
   const warnings = new Map<string, string[]>()
   const byId = new Map(nodes.map((n) => [n.id, n]))
+  const sgById = new Map(securityGroups.map((sg) => [sg.id, sg]))
 
   // CIDR containment + sibling overlap (ADR 0015) are errors.
   for (const [id, msgs] of cidrIssues(nodes)) {
@@ -46,10 +52,15 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
     nodes.filter((n) => n.data.type === 'subnet' && vpcOf(n)?.id === vpcId)
   const distinctAzs = (subnets: ResourceNodeType[]) =>
     new Set(subnets.map((s) => String(s.data.config.az ?? 'a'))).size
-  const attachedSGs = (nodeId: string) =>
-    edges.filter(
-      (e) => e.target === nodeId && byId.get(e.source)?.data.type === 'sg',
-    )
+  // Security groups are now an assignment on the resource (ADR 0059), not an
+  // inbound attachment edge. "Has an SG" = its config lists ≥1 known SG id.
+  const hasSg = (node: ResourceNodeType) =>
+    assignedSgIds(node).some((id) => sgById.has(id))
+  const NO_SG = '연결된 Security Group이 없습니다 (인스펙터에서 보안 그룹 지정).'
+  // SSH-open now lives on the SG def; surface it on each resource wearing that
+  // SG so it shows on the node badge and counts toward scoped mission grading.
+  const sshOpen = (node: ResourceNodeType) =>
+    assignedSgIds(node).some((id) => sgById.get(id)?.allowSsh === true)
 
   for (const node of nodes) {
     const t = node.data.type
@@ -102,8 +113,8 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
           push(warnings, node.id, '인터넷 연결 ALB인데 VPC에 Internet Gateway가 없습니다.')
         }
       }
-      if (attachedSGs(node.id).length === 0) {
-        push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
+      if (!hasSg(node)) {
+        push(warnings, node.id, NO_SG)
       }
     }
 
@@ -126,17 +137,18 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
       if (cfg.storage_encrypted === false) {
         push(warnings, node.id, '스토리지 암호화가 꺼져 있습니다.')
       }
-      if (attachedSGs(node.id).length === 0) {
-        push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
+      if (!hasSg(node)) {
+        push(warnings, node.id, NO_SG)
       }
     }
 
-    if (t === 'ec2' && attachedSGs(node.id).length === 0) {
-      push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
+    if (t === 'ec2' && !hasSg(node)) {
+      push(warnings, node.id, NO_SG)
     }
 
-    if (t === 'sg' && cfg.allow_ssh === true) {
-      push(warnings, node.id, 'SSH(22)가 인터넷(0.0.0.0/0)에 개방되어 있습니다.')
+    // A resource wearing an SG that opens SSH(22) to 0.0.0.0/0 (ADR 0059).
+    if (sshOpen(node)) {
+      push(warnings, node.id, '연결된 Security Group이 SSH(22)를 인터넷(0.0.0.0/0)에 개방합니다.')
     }
 
     if (t === 's3') {
@@ -196,22 +208,22 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
       if (parent?.data.type === 'subnet' && parent.data.config.public === true) {
         push(warnings, node.id, '캐시가 퍼블릭 Subnet에 있습니다 — 프라이빗 Subnet 권장.')
       }
-      if (attachedSGs(node.id).length === 0) {
-        push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
+      if (!hasSg(node)) {
+        push(warnings, node.id, NO_SG)
       }
     }
 
     // EFS mount targets need an SG; encryption-at-rest is best practice.
     if (t === 'efs') {
       if (cfg.encrypted === false) push(warnings, node.id, '저장 데이터 암호화가 꺼져 있습니다.')
-      if (attachedSGs(node.id).length === 0) {
-        push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
+      if (!hasSg(node)) {
+        push(warnings, node.id, NO_SG)
       }
     }
 
     // A Fargate service needs an SG for its ENIs.
-    if (t === 'ecs' && attachedSGs(node.id).length === 0) {
-      push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
+    if (t === 'ecs' && !hasSg(node)) {
+      push(warnings, node.id, NO_SG)
     }
 
     // EKS control plane + node group span ≥2 AZ subnets and need an SG for the
@@ -224,8 +236,8 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
           push(errors, node.id, 'EKS는 서로 다른 AZ의 Subnet 2개 이상이 필요합니다.')
         }
       }
-      if (attachedSGs(node.id).length === 0) {
-        push(warnings, node.id, '연결된 Security Group이 없습니다 (SG에서 엣지로 연결).')
+      if (!hasSg(node)) {
+        push(warnings, node.id, NO_SG)
       }
     }
 
@@ -300,17 +312,30 @@ export function graphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssu
 }
 
 // Single-entry memo: every consumer reads the same store snapshot, so caching
-// the last (nodes, edges) pair is enough to share one computation per render.
+// the last (nodes, edges, securityGroups) triple is enough to share one
+// computation per render.
 let lastNodes: ResourceNodeType[] | null = null
 let lastEdges: Edge[] | null = null
+let lastSgs: SecurityGroupDef[] | null = null
 let lastResult: GraphIssues | null = null
 
+// Shared stable default: a fresh `[]` per call would flip the `!== lastSgs`
+// check every render, invalidating the memo and returning a new object each
+// time — which loops useSyncExternalStore selectors (#185). One frozen array
+// keeps 2-arg callers stable.
+const EMPTY_SGS: readonly SecurityGroupDef[] = Object.freeze([])
+
 /** Memoized {@link graphIssues} keyed on the store's array identities. */
-export function getGraphIssues(nodes: ResourceNodeType[], edges: Edge[]): GraphIssues {
-  if (nodes !== lastNodes || edges !== lastEdges || !lastResult) {
+export function getGraphIssues(
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  securityGroups: SecurityGroupDef[] = EMPTY_SGS as SecurityGroupDef[],
+): GraphIssues {
+  if (nodes !== lastNodes || edges !== lastEdges || securityGroups !== lastSgs || !lastResult) {
     lastNodes = nodes
     lastEdges = edges
-    lastResult = graphIssues(nodes, edges)
+    lastSgs = securityGroups
+    lastResult = graphIssues(nodes, edges, securityGroups)
   }
   return lastResult
 }

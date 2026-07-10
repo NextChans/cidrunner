@@ -4,6 +4,7 @@ import { graphIssues } from './checks'
 import { simulate } from './simulate'
 import { graphAzs, applyAzFault } from './chaos'
 import { nodeMonthlyCost } from './cost'
+import type { SecurityGroupDef } from './securityGroups'
 
 /**
  * Well-Architected grade (ADR 0054) — a lightweight, heuristic score across four
@@ -29,7 +30,11 @@ function connected(id: string, edges: Edge[]): boolean {
   return edges.some((e) => e.source === id || e.target === id)
 }
 
-export function wellArchitectedGrade(nodes: ResourceNodeType[], edges: Edge[]): Grade {
+export function wellArchitectedGrade(
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  securityGroups: SecurityGroupDef[] = [],
+): Grade {
   const empty: Grade = {
     pillars: { security: 0, reliability: 0, cost: 0, performance: 0 },
     overall: 0,
@@ -38,7 +43,7 @@ export function wellArchitectedGrade(nodes: ResourceNodeType[], edges: Edge[]): 
   if (nodes.length === 0) return empty
 
   const byId = new Map(nodes.map((n) => [n.id, n]))
-  const issues = graphIssues(nodes, edges)
+  const issues = graphIssues(nodes, edges, securityGroups)
   const healthy = simulate(nodes, edges).ok
 
   // 🔒 Security — start full, penalize each node carrying a warning.

@@ -8,19 +8,27 @@ import { getMission } from '@/missions'
 import { getResource } from '@/resources'
 import type { ResourceNodeType } from '@/store/useGraphStore'
 import type { MissionCheckContext } from '@/missions/types'
+import type { SecurityGroupDef } from '@/graph/securityGroups'
 import { E, N } from './helpers'
 
 /** Builds a live mission-check context exactly as the MissionPanel does. */
-function ctxFor(nodes: ResourceNodeType[], edges: Edge[]): MissionCheckContext {
-  const issues = graphIssues(nodes, edges)
+function ctxFor(
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  securityGroups: SecurityGroupDef[] = [],
+): MissionCheckContext {
+  const issues = graphIssues(nodes, edges, securityGroups)
   const allValid = nodes.every(
     (n) =>
       (getResource(n.data.type).validate?.(n.data.config) ?? []).length === 0 &&
       (issues.errors.get(n.id)?.length ?? 0) === 0,
   )
   const securityOk = nodes.every((n) => (issues.warnings.get(n.id)?.length ?? 0) === 0)
-  return { nodes, edges, sim: simulate(nodes, edges), allValid, securityOk, issues }
+  return { nodes, edges, securityGroups, sim: simulate(nodes, edges), allValid, securityOk, issues }
 }
+
+const WEB_SG: SecurityGroupDef = { id: 'sg-6', name: 'Web SG', allowHttp: true, allowHttps: true, allowSsh: false }
+const withSg = (id: string) => ({ securityGroupIds: [id] })
 
 /** ALB → ECS → RDS container workload (best-practice, secure). */
 function containerTopology() {
@@ -31,25 +39,18 @@ function containerTopology() {
     N('subnet-3', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'a', public: false }, 'Priv A'),
     N('subnet-4', 'subnet', 'vpc-1', { cidr_block: '10.0.4.0/24', az: 'b', public: false }, 'Priv B'),
     N('igw-5', 'igw', 'vpc-1', {}, 'IGW'),
-    N('sg-6', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }, 'Web SG'),
-    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80 }, 'Web ALB'),
-    N('ecs-8', 'ecs', 'vpc-1', { cpu: '512', desired_count: 2 }, 'App Service'),
+    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80, ...withSg('sg-6') }, 'Web ALB'),
+    N('ecs-8', 'ecs', 'vpc-1', { cpu: '512', desired_count: 2, ...withSg('sg-6') }, 'App Service'),
     N(
       'rds-9',
       'rds',
       'subnet-4',
-      { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true },
+      { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true, ...withSg('sg-6') },
       'App DB',
     ),
   ]
-  const edges = [
-    E('a1', 'sg-6', 'alb-7'),
-    E('a2', 'sg-6', 'ecs-8'),
-    E('a3', 'sg-6', 'rds-9'),
-    E('t1', 'alb-7', 'ecs-8'),
-    E('t2', 'ecs-8', 'rds-9'),
-  ]
-  return { nodes, edges }
+  const edges = [E('t1', 'alb-7', 'ecs-8'), E('t2', 'ecs-8', 'rds-9')]
+  return { nodes, edges, sg: [WEB_SG] }
 }
 
 /** Lambda → SNS → SQS → Lambda → DynamoDB event-driven fan-out. */
@@ -79,23 +80,19 @@ function globalWebTopology() {
     N('subnet-3', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'a', public: false }),
     N('subnet-4', 'subnet', 'vpc-1', { cidr_block: '10.0.4.0/24', az: 'b', public: false }),
     N('igw-5', 'igw', 'vpc-1', {}),
-    N('sg-6', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }),
-    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80 }),
-    N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto' }),
-    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true }),
+    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80, ...withSg('sg-6') }),
+    N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto', ...withSg('sg-6') }),
+    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true, ...withSg('sg-6') }),
     N('cloudfront-10', 'cloudfront', undefined, { price_class: 'PriceClass_200' }),
     N('route53-11', 'route53', undefined, { domain_name: 'example.com' }),
   ]
   const edges = [
-    E('a1', 'sg-6', 'alb-7'),
-    E('a2', 'sg-6', 'ec2-8'),
-    E('a3', 'sg-6', 'rds-9'),
     E('t1', 'alb-7', 'ec2-8'),
     E('t2', 'ec2-8', 'rds-9'),
     E('o1', 'cloudfront-10', 'alb-7'),
     E('d1', 'route53-11', 'cloudfront-10'),
   ]
-  return { nodes, edges }
+  return { nodes, edges, sg: [WEB_SG] }
 }
 
 /** Multi-AZ RDS + cross-AZ read replica for disaster recovery. */
@@ -198,8 +195,8 @@ describe('resource expansion batch 2 (ADR 0026)', () => {
   })
 
   it('emits apply-ready Terraform for a container topology (ECS Fargate)', () => {
-    const { nodes, edges } = containerTopology()
-    const main = generateTerraform(nodes, edges)['main.tf']!
+    const { nodes, edges, sg } = containerTopology()
+    const main = generateTerraform(nodes, edges, sg)['main.tf']!
     expect(main).toContain('resource "aws_ecs_cluster" "ecs_8"')
     expect(main).toContain('resource "aws_ecs_task_definition" "ecs_8_task"')
     expect(main).toContain('resource "aws_ecs_service" "ecs_8_svc"')
@@ -296,11 +293,11 @@ describe('resource expansion batch 2 (ADR 0026)', () => {
 
   it('clears all four new missions at three stars on clean builds', () => {
     const c = containerTopology()
-    expect(getMission('container-workload')!.check!(ctxFor(c.nodes, c.edges))).toBe(3)
+    expect(getMission('container-workload')!.check!(ctxFor(c.nodes, c.edges, c.sg))).toBe(3)
     const ev = eventTopology()
     expect(getMission('event-driven')!.check!(ctxFor(ev.nodes, ev.edges))).toBe(3)
     const gw = globalWebTopology()
-    expect(getMission('global-web')!.check!(ctxFor(gw.nodes, gw.edges))).toBe(3)
+    expect(getMission('global-web')!.check!(ctxFor(gw.nodes, gw.edges, gw.sg))).toBe(3)
     const dr = drTopology()
     expect(getMission('disaster-recovery')!.check!(ctxFor(dr.nodes, dr.edges))).toBe(3)
   })

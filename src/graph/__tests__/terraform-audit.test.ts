@@ -12,16 +12,16 @@ import { bestPracticeTopology, N } from './helpers'
  */
 describe('terraform apply-readiness (ADR 0025)', () => {
   it('parameterizes the region and never hard-codes it in the provider', () => {
-    const { nodes, edges } = bestPracticeTopology()
-    const files = generateTerraform(nodes, edges)
+    const { nodes, edges, securityGroups } = bestPracticeTopology()
+    const files = generateTerraform(nodes, edges, securityGroups)
     expect(files['variables.tf']).toContain('variable "aws_region"')
     expect(files['variables.tf']).toContain('default     = "ap-northeast-2"')
     expect(files['main.tf']).toContain('region = var.aws_region')
   })
 
   it('manages RDS credentials via Secrets Manager — no plaintext password (ADR 0055)', () => {
-    const { nodes, edges } = bestPracticeTopology()
-    const files = generateTerraform(nodes, edges)
+    const { nodes, edges, securityGroups } = bestPracticeTopology()
+    const files = generateTerraform(nodes, edges, securityGroups)
     // No db_password variable, no plaintext password reference; RDS-managed instead.
     expect(files['variables.tf']).not.toContain('variable "db_password"')
     expect(files['main.tf']).not.toContain('var.db_password')

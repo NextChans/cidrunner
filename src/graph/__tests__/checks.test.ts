@@ -4,8 +4,8 @@ import { bestPracticeTopology, E, N } from './helpers'
 
 describe('graphIssues', () => {
   it('passes a best-practice topology with zero errors and warnings', () => {
-    const { nodes, edges } = bestPracticeTopology()
-    const issues = graphIssues(nodes, edges)
+    const { nodes, edges, securityGroups } = bestPracticeTopology()
+    const issues = graphIssues(nodes, edges, securityGroups)
     expect(issues.errors.size).toBe(0)
     expect(issues.warnings.size).toBe(0)
   })
@@ -35,18 +35,24 @@ describe('graphIssues', () => {
   })
 
   it('warns on insecure configuration', () => {
+    // SSH-open now lives on the SG def and surfaces on each wearing resource
+    // (ADR 0059): rds-1 wears an SSH-open SG, so its warning list carries it.
     const issues = graphIssues(
       [
         N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
         N('s1', 'subnet', 'vpc-1', { cidr_block: '10.0.1.0/24', az: 'a', public: true }),
         N('s2', 'subnet', 'vpc-1', { cidr_block: '10.0.2.0/24', az: 'b', public: true }),
-        N('sg-1', 'sg', 'vpc-1', { allow_ssh: true }),
-        N('rds-1', 'rds', 's1', { engine: 'mysql', storage_encrypted: false }),
+        N('rds-1', 'rds', 's1', {
+          engine: 'mysql',
+          storage_encrypted: false,
+          securityGroupIds: ['sg-1'],
+        }),
         N('s3-1', 's3', undefined, { encryption: false, block_public_access: false }),
       ],
       [],
+      [{ id: 'sg-1', name: 'SG', allowHttp: true, allowHttps: true, allowSsh: true }],
     )
-    expect(issues.warnings.get('sg-1')?.[0]).toContain('SSH')
+    expect(issues.warnings.get('rds-1')?.join()).toContain('SSH')
     expect(issues.warnings.get('rds-1')?.join()).toContain('퍼블릭 Subnet')
     expect(issues.warnings.get('rds-1')?.join()).toContain('암호화')
     expect(issues.warnings.get('s3-1')?.join()).toContain('퍼블릭 액세스')

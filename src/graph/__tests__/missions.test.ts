@@ -2,27 +2,55 @@ import { describe, expect, it } from 'vitest'
 import type { Edge } from '@xyflow/react'
 import { simulate } from '@/graph/simulate'
 import { graphIssues } from '@/graph/checks'
-import { canConnect } from '@/graph/rules'
+import { isSgAssignable } from '@/graph/securityGroups'
 import { getMission } from '@/missions'
 import { getResource, type ResourceType } from '@/resources'
 import type { ResourceNodeType } from '@/store/useGraphStore'
 import type { MissionCheckContext } from '@/missions/types'
+import type { SecurityGroupDef } from '@/graph/securityGroups'
 import { E, N } from './helpers'
 
+/** The canonical Web SG assigned across 3-tier builds (ADR 0059). */
+const WEB_SG: SecurityGroupDef = {
+  id: 'sg-6',
+  name: 'Web SG',
+  allowHttp: true,
+  allowHttps: true,
+  allowSsh: false,
+}
+/** A second SG def used by the assignment-rules block. */
+const WEB_SG_2: SecurityGroupDef = {
+  id: 'sg-2',
+  name: 'SG',
+  allowHttp: true,
+  allowHttps: true,
+  allowSsh: false,
+}
+/** Assigns a security group to a resource config (mirrors the store). */
+const withSg = (sgId: string) => ({ securityGroupIds: [sgId] })
+
 /** Builds a live mission-check context exactly as the MissionPanel does. */
-function ctxFor(nodes: ResourceNodeType[], edges: Edge[]): MissionCheckContext {
-  const issues = graphIssues(nodes, edges)
+function ctxFor(
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  securityGroups: SecurityGroupDef[] = [],
+): MissionCheckContext {
+  const issues = graphIssues(nodes, edges, securityGroups)
   const allValid = nodes.every(
     (n) =>
       (getResource(n.data.type).validate?.(n.data.config) ?? []).length === 0 &&
       (issues.errors.get(n.id)?.length ?? 0) === 0,
   )
   const securityOk = nodes.every((n) => (issues.warnings.get(n.id)?.length ?? 0) === 0)
-  return { nodes, edges, sim: simulate(nodes, edges), allValid, securityOk, issues }
+  return { nodes, edges, securityGroups, sim: simulate(nodes, edges), allValid, securityOk, issues }
 }
 
-const stars = (id: string, nodes: ResourceNodeType[], edges: Edge[]) =>
-  getMission(id)!.check!(ctxFor(nodes, edges))
+const stars = (
+  id: string,
+  nodes: ResourceNodeType[],
+  edges: Edge[],
+  securityGroups: SecurityGroupDef[] = [],
+) => getMission(id)!.check!(ctxFor(nodes, edges, securityGroups))
 
 /**
  * The store's initial seed graph (VPC ▸ public Subnet ▸ EC2, no SG). A fresh
@@ -58,16 +86,12 @@ function vpcThreeTier(missionId: string) {
     N('subnet-3', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'a', public: false }),
     N('subnet-4', 'subnet', 'vpc-1', { cidr_block: '10.0.4.0/24', az: 'b', public: false }),
     N('igw-5', 'igw', 'vpc-1', {}),
-    N('sg-6', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }),
-    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80 }),
-    N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto' }),
-    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true, multi_az: true }),
+    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80, ...withSg('sg-6') }),
+    N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto', ...withSg('sg-6') }),
+    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true, multi_az: true, ...withSg('sg-6') }),
   ]
-  const edges = [
-    E('a1', 'sg-6', 'alb-7'), E('a2', 'sg-6', 'ec2-8'), E('a3', 'sg-6', 'rds-9'),
-    E('t1', 'alb-7', 'ec2-8'), E('t2', 'ec2-8', 'rds-9'),
-  ]
-  return { id: missionId, nodes, edges }
+  const edges = [E('t1', 'alb-7', 'ec2-8'), E('t2', 'ec2-8', 'rds-9')]
+  return { id: missionId, nodes, edges, sg: [WEB_SG] }
 }
 
 function serverlessBuild() {
@@ -115,16 +139,12 @@ function containerBuild() {
     N('subnet-3', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'a', public: false }),
     N('subnet-4', 'subnet', 'vpc-1', { cidr_block: '10.0.4.0/24', az: 'b', public: false }),
     N('igw-5', 'igw', 'vpc-1', {}),
-    N('sg-6', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }),
-    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80 }),
-    N('ecs-8', 'ecs', 'vpc-1', { cpu: '512', desired_count: 2 }),
-    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true }),
+    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80, ...withSg('sg-6') }),
+    N('ecs-8', 'ecs', 'vpc-1', { cpu: '512', desired_count: 2, ...withSg('sg-6') }),
+    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true, ...withSg('sg-6') }),
   ]
-  const edges = [
-    E('a1', 'sg-6', 'alb-7'), E('a2', 'sg-6', 'ecs-8'), E('a3', 'sg-6', 'rds-9'),
-    E('t1', 'alb-7', 'ecs-8'), E('t2', 'ecs-8', 'rds-9'),
-  ]
-  return { id: 'container-workload', nodes, edges }
+  const edges = [E('t1', 'alb-7', 'ecs-8'), E('t2', 'ecs-8', 'rds-9')]
+  return { id: 'container-workload', nodes, edges, sg: [WEB_SG] }
 }
 
 function globalWebBuild() {
@@ -135,19 +155,17 @@ function globalWebBuild() {
     N('subnet-3', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'a', public: false }),
     N('subnet-4', 'subnet', 'vpc-1', { cidr_block: '10.0.4.0/24', az: 'b', public: false }),
     N('igw-5', 'igw', 'vpc-1', {}),
-    N('sg-6', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }),
-    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80 }),
-    N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto' }),
-    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true }),
+    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80, ...withSg('sg-6') }),
+    N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto', ...withSg('sg-6') }),
+    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true, ...withSg('sg-6') }),
     N('cloudfront-10', 'cloudfront', undefined, { price_class: 'PriceClass_200' }),
     N('route53-11', 'route53', undefined, { domain_name: 'example.com' }),
   ]
   const edges = [
-    E('a1', 'sg-6', 'alb-7'), E('a2', 'sg-6', 'ec2-8'), E('a3', 'sg-6', 'rds-9'),
     E('t1', 'alb-7', 'ec2-8'), E('t2', 'ec2-8', 'rds-9'),
     E('o1', 'cloudfront-10', 'alb-7'), E('d1', 'route53-11', 'cloudfront-10'),
   ]
-  return { id: 'global-web', nodes, edges }
+  return { id: 'global-web', nodes, edges, sg: [WEB_SG] }
 }
 
 function eventBuild() {
@@ -198,10 +216,9 @@ function secureAuthBuild() {
     N('subnet-3', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'a', public: false }),
     N('subnet-4', 'subnet', 'vpc-1', { cidr_block: '10.0.4.0/24', az: 'b', public: false }),
     N('igw-5', 'igw', 'vpc-1', {}),
-    N('sg-6', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }),
-    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80 }),
-    N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto' }),
-    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true }),
+    N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80, ...withSg('sg-6') }),
+    N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto', ...withSg('sg-6') }),
+    N('rds-9', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true, ...withSg('sg-6') }),
     N('cloudfront-10', 'cloudfront', undefined, { price_class: 'PriceClass_200' }),
     N('cognito-11', 'cognito', undefined, { mfa: 'OPTIONAL', password_min_length: 12, email_verification: true }),
     N('secrets-12', 'secretsmanager', undefined, { recovery_window_days: 30 }),
@@ -209,10 +226,9 @@ function secureAuthBuild() {
     N('waf-15', 'waf', undefined, { rate_limit: 2000, managed_common_rules: true }),
   ]
   const edges = [
-    E('a1', 'sg-6', 'alb-7'), E('a2', 'sg-6', 'ec2-8'), E('a3', 'sg-6', 'rds-9'),
     E('o1', 'cloudfront-10', 'alb-7'), E('t1', 'alb-7', 'ec2-8'), E('t2', 'ec2-8', 'rds-9'),
   ]
-  return { id: 'secure-auth-web', nodes, edges }
+  return { id: 'secure-auth-web', nodes, edges, sg: [WEB_SG] }
 }
 
 /** All twelve canonical builds, keyed by mission id. */
@@ -243,7 +259,8 @@ const SEED_SAFE = [
 describe('mission checker audit (ADR 0041)', () => {
   it('every canonical build clears its mission at three stars', () => {
     for (const b of BUILDS) {
-      expect(stars(b.id, b.nodes, b.edges), `${b.id} clean build`).toBe(3)
+      const sg = ('sg' in b ? b.sg : []) as SecurityGroupDef[]
+      expect(stars(b.id, b.nodes, b.edges, sg), `${b.id} clean build`).toBe(3)
     }
   })
 
@@ -265,11 +282,10 @@ describe('mission checker audit (ADR 0041)', () => {
 
   it('security hardening still honours an SSH-open SG inside the build (no false 3★)', () => {
     const b = vpcThreeTier('security-hardening')
-    const sshOpen = b.nodes.map((n) =>
-      n.id === 'sg-6' ? { ...n, data: { ...n.data, config: { ...n.data.config, allow_ssh: true } } } : n,
-    )
-    // The SG is reached via its attachment edges, so its warning still scopes in.
-    expect(stars('security-hardening', sshOpen, b.edges)).toBeLessThan(3)
+    // Flip the assigned SG to open SSH (ADR 0059): the warning now surfaces on
+    // every wearing resource, so it still scopes into the build and caps stars.
+    const sg = [{ ...b.sg[0]!, allowSsh: true }]
+    expect(stars('security-hardening', b.nodes, b.edges, sg)).toBeLessThan(3)
   })
 
   it('async pipeline clears with an API Gateway in front of the producer + an S3 fork', () => {
@@ -307,20 +323,18 @@ describe('mission checker audit (ADR 0041)', () => {
       N('subnet-3', 'subnet', 'vpc-1', { cidr_block: '10.0.3.0/24', az: 'a', public: false }),
       N('subnet-4', 'subnet', 'vpc-1', { cidr_block: '10.0.4.0/24', az: 'b', public: false }),
       N('igw-5', 'igw', 'vpc-1', {}),
-      N('sg-6', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }),
-      N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80 }),
-      N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto' }),
-      N('eks-9', 'eks', 'vpc-1', { k8s_version: '1.31', node_instance_type: 't3.medium' }),
-      N('rds-10', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true }),
+      N('alb-7', 'alb', 'vpc-1', { internal: false, listener_port: 80, ...withSg('sg-6') }),
+      N('ec2-8', 'ec2', 'subnet-3', { instance_type: 't3.micro', ami: 'auto', ...withSg('sg-6') }),
+      N('eks-9', 'eks', 'vpc-1', { k8s_version: '1.31', node_instance_type: 't3.medium', ...withSg('sg-6') }),
+      N('rds-10', 'rds', 'subnet-4', { engine: 'mysql', instance_class: 'db.t3.micro', allocated_storage: 20, storage_encrypted: true, ...withSg('sg-6') }),
     ]
     const edges = [
-      E('a1', 'sg-6', 'alb-7'), E('a2', 'sg-6', 'ec2-8'), E('a3', 'sg-6', 'eks-9'), E('a4', 'sg-6', 'rds-10'),
       E('t1', 'alb-7', 'ec2-8'), // EC2 fan-out branch (drawn first)
       E('t2', 'alb-7', 'eks-9'), // container branch
       E('t3', 'ec2-8', 'rds-10'),
       E('t4', 'eks-9', 'rds-10'),
     ]
-    expect(stars('container-workload', nodes, edges)).toBeGreaterThanOrEqual(1)
+    expect(stars('container-workload', nodes, edges, [WEB_SG])).toBeGreaterThanOrEqual(1)
   })
 
   it('security-hardening clears when the ALB also fans out to a container branch', () => {
@@ -328,15 +342,18 @@ describe('mission checker audit (ADR 0041)', () => {
     // 3-tier EC2. The single traced flow may take the EKS branch (no EC2), but
     // the mission must still find ALB → EC2 → RDS structurally.
     const b = vpcThreeTier('security-hardening')
-    const eks = N('eks-x', 'eks', 'vpc-1', { k8s_version: '1.31', node_instance_type: 't3.medium' })
+    const eks = N('eks-x', 'eks', 'vpc-1', {
+      k8s_version: '1.31',
+      node_instance_type: 't3.medium',
+      ...withSg('sg-6'),
+    })
     const nodes = [...b.nodes, eks]
     const edges = [
-      E('sgeks', 'sg-6', 'eks-x'),
       E('albeks', 'alb-7', 'eks-x'), // fan-out branch, ordered before alb → ec2
       E('eksrds', 'eks-x', 'rds-9'),
       ...b.edges,
     ]
-    expect(stars('security-hardening', nodes, edges)).toBe(3)
+    expect(stars('security-hardening', nodes, edges, b.sg)).toBe(3)
   })
 
   it('tutorial recognizes a public Subnet nested via an AZ box (Account▸VPC▸AZ▸Subnet)', () => {
@@ -359,20 +376,17 @@ describe('mission checker audit (ADR 0041)', () => {
   })
 })
 
-describe('Security Group attach rules (ADR 0042)', () => {
-  const attachable: ResourceType[] = ['ec2', 'alb', 'rds', 'ecs', 'eks', 'elasticache', 'efs']
-  const notAttachable: ResourceType[] = ['lambda', 'nat', 'igw', 's3', 'dynamodb', 'cloudfront', 'route53', 'sqs', 'sns', 'vpc', 'subnet']
+describe('Security Group assignment rules (ADR 0059, supersedes 0042)', () => {
+  const assignable: ResourceType[] = ['ec2', 'alb', 'rds', 'ecs', 'eks', 'elasticache', 'efs']
+  const notAssignable: ResourceType[] = ['lambda', 'nat', 'igw', 's3', 'dynamodb', 'cloudfront', 'route53', 'sqs', 'sns', 'vpc', 'subnet']
 
-  it('an SG may attach to every VPC-bound resource that owns ENIs', () => {
-    for (const t of attachable) expect(canConnect('sg', t), `sg → ${t}`).toBe(true)
+  it('marks exactly the VPC-bound ENI-owning resources as SG-assignable', () => {
+    for (const t of assignable) expect(isSgAssignable(t), `${t} assignable`).toBe(true)
+    for (const t of notAssignable) expect(isSgAssignable(t), `${t} not assignable`).toBe(false)
   })
 
-  it('an SG may not attach to non-VPC / non-ENI resources', () => {
-    for (const t of notAttachable) expect(canConnect('sg', t), `sg → ${t}`).toBe(false)
-  })
-
-  it('the "no SG attached" warning fires for exactly the attachable set (no contradiction)', () => {
-    // Each resource that CAN be warned MUST be attachable, and vice-versa.
+  it('the "no SG" warning fires for exactly the assignable set (no contradiction)', () => {
+    // Each resource that CAN be warned MUST be SG-assignable, and vice-versa.
     const vpc = N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' })
     const s1 = N('subnet-1', 'subnet', 'vpc-1', { cidr_block: '10.0.1.0/24', az: 'a', public: false })
     const s2 = N('subnet-2', 'subnet', 'vpc-1', { cidr_block: '10.0.2.0/24', az: 'b', public: false })
@@ -386,24 +400,22 @@ describe('Security Group attach rules (ADR 0042)', () => {
       ['efs', N('efs-1', 'efs', 'vpc-1', { encrypted: true, performance_mode: 'generalPurpose' })],
     ]
     for (const [t, node] of cases) {
-      const issues = graphIssues([vpc, s1, s2, node], [])
+      const issues = graphIssues([vpc, s1, s2, node], [], [])
       const warned = (issues.warnings.get(node.id) ?? []).some((w) => w.includes('Security Group'))
       expect(warned, `${t} should warn on missing SG`).toBe(true)
-      expect(canConnect('sg', t), `${t} warned ⇒ attachable`).toBe(true)
+      expect(isSgAssignable(t), `${t} warned ⇒ assignable`).toBe(true)
     }
   })
 
-  it('attaching an SG clears the ECS/EKS/cache/EFS "no SG" warning', () => {
+  it('assigning an SG clears the ECS/EKS "no SG" warning', () => {
     const nodes = [
       N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
       N('subnet-1', 'subnet', 'vpc-1', { cidr_block: '10.0.1.0/24', az: 'a', public: false }),
       N('subnet-2', 'subnet', 'vpc-1', { cidr_block: '10.0.2.0/24', az: 'b', public: false }),
-      N('sg-2', 'sg', 'vpc-1', { allow_http: true, allow_https: true, allow_ssh: false }),
-      N('ecs-3', 'ecs', 'vpc-1', { cpu: '256', desired_count: 1 }),
-      N('eks-4', 'eks', 'vpc-1', { k8s_version: '1.31', node_instance_type: 't3.medium' }),
+      N('ecs-3', 'ecs', 'vpc-1', { cpu: '256', desired_count: 1, ...withSg('sg-2') }),
+      N('eks-4', 'eks', 'vpc-1', { k8s_version: '1.31', node_instance_type: 't3.medium', ...withSg('sg-2') }),
     ]
-    const edges = [E('a1', 'sg-2', 'ecs-3'), E('a2', 'sg-2', 'eks-4')]
-    const issues = graphIssues(nodes, edges)
+    const issues = graphIssues(nodes, [], [WEB_SG_2])
     expect((issues.warnings.get('ecs-3') ?? []).join()).not.toContain('Security Group')
     expect((issues.warnings.get('eks-4') ?? []).join()).not.toContain('Security Group')
   })

@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { MousePointer2, Spline, Play } from 'lucide-react'
+import { MousePointer2, Spline, Shield, Play } from 'lucide-react'
 import { useGraphStore } from '@/store/useGraphStore'
 
 const FLAG = 'cidrunner-onboarded'
 
 /**
- * First-visit welcome overlay (ADR 0023). Teaches the three ideas newcomers
- * miss — drag-to-nest, "connections are edges (Security Groups too)", and
- * playback — then hands off to the tutorial mission or free mode. Shown once;
- * suppressed when the session started from a shared link.
+ * First-visit welcome overlay (ADR 0023). Teaches the ideas newcomers miss —
+ * drag-to-nest, connections-are-edges, Security-Groups-are-assigned (ADR 0059),
+ * and playback — then hands off to the tutorial mission or free mode. Shown
+ * once; suppressed when the session started from a shared link.
  */
 export function Onboarding({ suppressed }: { suppressed: boolean }) {
   const [open, setOpen] = useState(() => localStorage.getItem(FLAG) === null)
@@ -50,11 +50,18 @@ export function Onboarding({ suppressed }: { suppressed: boolean }) {
             </span>
           </li>
           <li className="flex items-start gap-3">
-            <Spline size={16} className="mt-0.5 shrink-0 text-rose-300" />
+            <Spline size={16} className="mt-0.5 shrink-0 text-accent-soft" />
             <span>
-              연결은 노드 가장자리 <b>핸들을 드래그</b>해 만듭니다.{' '}
-              <b>Security Group도 엣지로 연결</b>해 리소스에 부착합니다 — 콘솔과 다른 이
-              도구만의 문법입니다.
+              트래픽 <b>연결</b>은 노드 가장자리 <b>핸들을 드래그</b>해 만듭니다 — 데이터가
+              흐르는 방향입니다.
+            </span>
+          </li>
+          <li className="flex items-start gap-3">
+            <Shield size={16} className="mt-0.5 shrink-0 text-rose-300" />
+            <span>
+              <b>Security Group</b>은 팔레트 하단에서 만들고, 리소스를 선택해 인스펙터에서{' '}
+              <b>지정</b>합니다 — 흐르는 연결이 아니라 리소스에 <b>붙는 방화벽 규칙</b>이라
+              콘솔처럼 여러 리소스가 공유할 수 있습니다.
             </span>
           </li>
           <li className="flex items-start gap-3">

@@ -17,6 +17,7 @@ function ctxOf(
   return {
     nodes,
     edges,
+    securityGroups: [],
     sim: simulate(nodes, edges),
     allValid: overrides.allValid ?? true,
     securityOk: overrides.securityOk ?? true,
