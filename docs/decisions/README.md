@@ -84,3 +84,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0057](0057-ops-challenge-star-gates.md) | 운영 챌린지 티어 — 비용·카오스를 별점 게이트로 (extends 0051-0053) | Accepted | 2026-07-09 |
 | [0058](0058-playback-audio.md) | 재생 사운드 — 홉 틱·도착 차임·차단 버즈, Web Audio 합성 (extends 0012·0047-0049) | Accepted | 2026-07-09 |
 | [0059](0059-security-groups-as-assignment.md) | 보안 그룹 재설계 — 엣지 부착 → 리소스 할당(칩+라이브러리), Terraform 어댑터·영구 마이그레이션 (supersedes 0017·0042) | Accepted | 2026-07-10 |
+| [0060](0060-edge-auto-orient.md) | 엣지 자동 방향 정렬 — 반대로 그어도 유효한 방향으로 (다중 핸들 리소스 방향 혼동 해소) | Accepted | 2026-07-10 |

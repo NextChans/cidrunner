@@ -74,9 +74,11 @@ export function PaletteBody({ searchInputId }: { searchInputId?: string }) {
   const { results, active } = useResourceSearch()
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div className="flex min-h-0 flex-1 flex-col">
       <PaletteSearch inputId={searchInputId} />
-      <div className="min-h-0 flex-1 space-y-3 p-2 pt-0">
+      {/* The resource list scrolls INSIDE this box so the SG library below is a
+          pinned footer, not a sibling the flex-1 list overflows onto (ADR 0059). */}
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2 pt-0">
         {CATEGORY_ORDER.map((category) => {
           const items = results.filter((m) => m.category === category)
           if (items.length === 0) return null

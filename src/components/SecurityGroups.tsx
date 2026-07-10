@@ -74,7 +74,7 @@ export function SecurityGroupLibrary() {
     nodes.filter((n) => assignedSgIds(n).includes(sgId)).length
 
   return (
-    <div className="border-t border-surface-border px-2 py-3">
+    <div className="max-h-[38%] shrink-0 overflow-y-auto border-t border-surface-border bg-surface-raised px-2 py-3">
       <div className="mb-2 flex items-center justify-between px-1">
         <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
           <Shield size={12} className="text-rose-400" />

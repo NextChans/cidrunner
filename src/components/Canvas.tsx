@@ -205,9 +205,28 @@ export function Canvas() {
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const source = nodes.find((n) => n.id === connection.source)
-      const target = nodes.find((n) => n.id === connection.target)
+      let conn = connection
+      let source = nodes.find((n) => n.id === conn.source)
+      let target = nodes.find((n) => n.id === conn.target)
       if (!source || !target || source.id === target.id) return
+      // Auto-orient (ADR 0060): nodes like ALB carry BOTH a source and a target
+      // handle (ALB forwards to EC2 *and* receives from CloudFront/ACM/WAF), so
+      // dragging from the handle nearest the peer often produces the reverse of
+      // what the user means. If the drawn direction is illegal but the opposite
+      // is legal, silently flip it — the tiers only connect one way.
+      if (
+        !canConnect(source.data.type, target.data.type) &&
+        canConnect(target.data.type, source.data.type)
+      ) {
+        conn = {
+          ...conn,
+          source: connection.target,
+          target: connection.source,
+          sourceHandle: connection.targetHandle ?? null,
+          targetHandle: connection.sourceHandle ?? null,
+        }
+        ;[source, target] = [target, source]
+      }
       if (!canConnect(source.data.type, target.data.type)) {
         setNotice(
           `${getResource(source.data.type).label} → ${getResource(target.data.type).label} 연결은 허용되지 않습니다.`,
@@ -227,7 +246,7 @@ export function Canvas() {
         }
       }
       stopSimulation()
-      setEdges(addEdge({ ...connection, type: 'traffic' }, edges))
+      setEdges(addEdge({ ...conn, type: 'traffic' }, edges))
     },
     [nodes, edges, setEdges, setNotice, stopSimulation],
   )
