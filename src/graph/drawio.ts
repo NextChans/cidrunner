@@ -44,18 +44,29 @@ const RES_ICON: Partial<Record<ResourceType, string>> = {
   kms: 'key_management_service',
   acm: 'certificate_manager',
   waf: 'waf',
+  kinesis: 'kinesis',
 }
 
-/** Icon background colour by palette category (AWS service group colours). */
-const CATEGORY_FILL: Record<ResourceCategory, string> = {
-  network: '#8C4FFF',
-  compute: '#ED7100',
-  database: '#4D72F3',
-  storage: '#7AA116',
-  integration: '#E7157B',
-  management: '#E7157B',
-  security: '#DD344C',
+/**
+ * Per-category gradient colours matching AWS's current (2024/2025/2026) icon
+ * palette — the modern resourceIcon uses a north gradient (darker `fill` at the
+ * bottom, lighter `grad` at the top) rather than a flat fill.
+ */
+const CATEGORY_COLOR: Record<ResourceCategory, { fill: string; grad: string }> = {
+  network: { fill: '#4D27AA', grad: '#8C4FFF' },
+  compute: { fill: '#D05C17', grad: '#F78E04' },
+  database: { fill: '#2E27AD', grad: '#527FFF' },
+  storage: { fill: '#3F7E1E', grad: '#7AA116' },
+  integration: { fill: '#B0084D', grad: '#E7157B' },
+  management: { fill: '#B0084D', grad: '#E7157B' },
+  security: { fill: '#BD0816', grad: '#DD344C' },
 }
+
+/** Standard AWS4 resourceIcon connection points. */
+const AWS_POINTS =
+  'points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],' +
+  '[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],' +
+  '[1,0.5,0],[1,0.75,0]]'
 
 /** Default leaf icon box (AWS4 icons are square). */
 const LEAF = 78
@@ -96,34 +107,22 @@ function containerStyle(node: ResourceNodeType): string {
   }
 }
 
-/** Leaf resource-icon style. */
+/** Leaf resource-icon style (modern AWS gradient resourceIcon template). */
 function leafStyle(type: ResourceType): string {
   const meta = getResource(type)
   const icon = RES_ICON[type]
-  const fill = CATEGORY_FILL[meta.category]
+  const { fill, grad } = CATEGORY_COLOR[meta.category]
   if (!icon) {
     // No AWS4 icon mapped — a labelled rounded box still reads.
     return `rounded=1;whiteSpace=wrap;html=1;fillColor=${fill};strokeColor=none;fontColor=#FFFFFF;fontSize=11;`
   }
-  // strokeColor=#ffffff is the canonical resourceIcon template — it renders the
-  // glyph white on the colored square (the modern AWS icon look).
+  // Modern AWS resourceIcon: north gradient, white glyph, fixed aspect.
   return (
-    'sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;' +
-    `fillColor=${fill};strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;` +
-    'align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;whiteSpace=wrap;' +
-    `shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.${icon};`
+    `sketch=0;${AWS_POINTS};outlineConnect=0;fontColor=#232F3E;` +
+    `gradientColor=${grad};gradientDirection=north;fillColor=${fill};strokeColor=#ffffff;` +
+    'dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;' +
+    `fontStyle=0;aspect=fixed;whiteSpace=wrap;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.${icon};`
   )
-}
-
-/** Depth in the containment tree — so parents are emitted before children. */
-function depthOf(node: ResourceNodeType, byId: Map<string, ResourceNodeType>): number {
-  let d = 0
-  let cur = node.parentId ? byId.get(node.parentId) : undefined
-  while (cur && d < 100) {
-    d += 1
-    cur = cur.parentId ? byId.get(cur.parentId) : undefined
-  }
-  return d
 }
 
 /** Builds a draw.io `.drawio` XML document for the design. */
@@ -136,23 +135,77 @@ export function generateDrawio(
   const sgName = new Map(securityGroups.map((sg) => [sg.id, sg.name]))
   const ids = new Set(nodes.map((n) => n.id))
 
+  // Export-layout overrides (do NOT mutate the store nodes).
+  const parentOf = new Map<string, string>()
+  const posOf = new Map<string, { x: number; y: number }>()
+  const sizeOf = new Map<string, { w: number; h: number }>()
+
+  // Account reflow (차니 요청): regional/global services live at the canvas top
+  // level, above the account box. Fold every orphan (parent-less, non-account)
+  // node into a strip along the top INSIDE the account, push the account's other
+  // children down to clear it, and grow the account to fit.
+  const account = nodes.find((n) => n.data.type === 'account')
+  if (account) {
+    const orphans = nodes.filter((n) => n.id !== account.id && !n.parentId)
+    if (orphans.length > 0) {
+      const accW = Number(account.style?.width ?? account.measured?.width ?? 1600)
+      const cellW = 210
+      const cellH = 120
+      const padX = 24
+      const padTop = 40
+      const perRow = Math.max(1, Math.floor((accW - padX * 2) / cellW))
+      const rows = Math.ceil(orphans.length / perRow)
+      const stripH = padTop + rows * cellH + 16
+      orphans.forEach((n, i) => {
+        parentOf.set(n.id, account.id)
+        posOf.set(n.id, {
+          x: padX + (i % perRow) * cellW,
+          y: padTop + Math.floor(i / perRow) * cellH,
+        })
+      })
+      // Push the account's existing direct children (VPC, …) below the strip.
+      for (const n of nodes) {
+        if (n.parentId === account.id) {
+          posOf.set(n.id, { x: n.position.x, y: n.position.y + stripH })
+        }
+      }
+      const accH = Number(account.style?.height ?? account.measured?.height ?? 1200)
+      sizeOf.set(account.id, { w: accW, h: accH + stripH })
+    }
+  }
+
+  const effectiveParent = (n: ResourceNodeType) => parentOf.get(n.id) ?? n.parentId
+  // Depth by the EFFECTIVE parent so reparented orphans sort after the account.
+  const depth = (n: ResourceNodeType): number => {
+    let d = 0
+    let cur: ResourceNodeType | undefined = n
+    const seen = new Set<string>()
+    while (cur && d < 100 && !seen.has(cur.id)) {
+      seen.add(cur.id)
+      const p = effectiveParent(cur)
+      if (!p || !ids.has(p)) break
+      d += 1
+      cur = byId.get(p)
+    }
+    return d
+  }
+
   // Parents must precede children in the XML.
-  const ordered = [...nodes].sort((a, b) => depthOf(a, byId) - depthOf(b, byId))
+  const ordered = [...nodes].sort((a, b) => depth(a) - depth(b))
 
   const cells: string[] = []
   for (const node of ordered) {
     const meta = getResource(node.data.type)
     const isContainer = meta.container === true
-    const parent = node.parentId && ids.has(node.parentId) ? `n-${node.parentId}` : '1'
+    const parentId = effectiveParent(node)
+    const parent = parentId && ids.has(parentId) ? `n-${parentId}` : '1'
     const style = isContainer ? containerStyle(node) : leafStyle(node.data.type)
 
     // Size: containers keep their authored region; leaves are square icons.
-    const w = isContainer
-      ? Number(node.style?.width ?? node.measured?.width ?? 240)
-      : LEAF
-    const h = isContainer
-      ? Number(node.style?.height ?? node.measured?.height ?? 160)
-      : LEAF
+    const size = sizeOf.get(node.id)
+    const w = size?.w ?? (isContainer ? Number(node.style?.width ?? node.measured?.width ?? 240) : LEAF)
+    const h = size?.h ?? (isContainer ? Number(node.style?.height ?? node.measured?.height ?? 160) : LEAF)
+    const pos = posOf.get(node.id) ?? node.position
 
     // Label: name + any assigned Security Groups (which aren't nodes — ADR 0059).
     const sgs = assignedSgIds(node)
@@ -162,7 +215,7 @@ export function generateDrawio(
 
     cells.push(
       `        <mxCell id="n-${esc(node.id)}" value="${esc(label)}" style="${esc(style)}" vertex="1" parent="${esc(parent)}">\n` +
-        `          <mxGeometry x="${node.position.x}" y="${node.position.y}" width="${w}" height="${h}" as="geometry" />\n` +
+        `          <mxGeometry x="${pos.x}" y="${pos.y}" width="${w}" height="${h}" as="geometry" />\n` +
         `        </mxCell>`,
     )
   }

@@ -64,6 +64,30 @@ describe('generateDrawio (ADR 0064)', () => {
     expect(xml).toContain('strokeColor=#ffffff')
   })
 
+  it('maps Kinesis to its resource icon (regression: was unmapped → blank box)', () => {
+    const xml = generateDrawio([N('k-1', 'kinesis', undefined, {})])
+    expect(xml).toContain('resIcon=mxgraph.aws4.kinesis;')
+  })
+
+  it('folds parent-less global services into the account box (차니 요청)', () => {
+    // Regional/global services sit at the canvas top level; export should reparent
+    // them into the account so it visually encloses everything.
+    const nodes = [
+      N('account-1', 'account', undefined, {}),
+      N('vpc-1', 'vpc', 'account-1', { cidr_block: '10.0.0.0/16' }),
+      N('waf-1', 'waf', undefined, {}),
+      N('s3-1', 's3', undefined, {}),
+    ]
+    // account needs an authored size to base the reflow on.
+    nodes[0]!.style = { width: 1600, height: 1200 }
+    const xml = generateDrawio(nodes)
+    // Globals reparented under the account, not left at the root layer ("1").
+    expect(xml).toMatch(/id="n-waf-1"[^>]*parent="n-account-1"/)
+    expect(xml).toMatch(/id="n-s3-1"[^>]*parent="n-account-1"/)
+    // The account grew past its authored height to make room for the strip.
+    expect(xml).toMatch(/id="n-account-1"[\s\S]*?height="1[3-9]\d\d"/)
+  })
+
   it('uses public vs private subnet group icons from config', () => {
     const nodes = [
       N('v', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
