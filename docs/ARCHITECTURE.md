@@ -1,7 +1,9 @@
 # Architecture
 
-> Reflects the MVP (Phases 0–5): editor, property validation, traffic
-> simulation, Terraform export, and the mission system.
+> Reflects the MVP (Phases 0–5) plus the v2 expansion: editor, property
+> validation, traffic simulation with looping playback audio, Terraform and
+> draw.io export, the mission system (built-in + data-driven custom missions),
+> and Security Groups as a resource-assignment overlay (ADR 0059).
 
 ## Overview
 
@@ -24,7 +26,7 @@ console and docs. See [ADR 0008](decisions/0008-korean-first-ui-no-i18n.md).
 ```
 App
 └─ Layout                     responsive shell (3-pane ≥md / drawers <md)
-   ├─ Palette         (left)    searchable, draggable list of the 27 resource types
+   ├─ Palette         (left)    searchable, draggable list of the 30 resource types + SG library footer
    ├─ Canvas          (center)  React Flow editor — nodes, edges, nesting
    │  └─ ResourceNode           one node renderer, driven by ResourceMeta
    ├─ Inspector       (right)   per-resource property form (Phase 2)
@@ -76,8 +78,10 @@ is the source of truth:
 
 - `mode` — `'free' | 'challenge'`
 - `nodes` / `edges` — the React Flow graph (`nodes` typed as `ResourceNodeType`)
+- `securityGroups` — the Security Group collection (`SecurityGroupDef[]`); SGs are **not** nodes/edges (ADR 0059)
 - `selectedNodeId` — drives the Inspector
-- `activeMissionId` — drives the MissionPanel
+- `activeMissionId` / `customMission` — drive the MissionPanel (the active custom-mission spec, if any)
+- `soundOn` — playback-audio mute toggle (persisted)
 - `mobileDrawers` — `{ palette, inspector, missions }` open flags for the `<md` drawers (`setDrawer`)
 - `notice` — transient player-facing message for a rejected drop/edge (`setNotice`)
 
@@ -88,21 +92,27 @@ interface NodeData {
   type: ResourceType                 // which resource this block is
   label: string                      // display label
   config: Record<string, unknown>    // editable settings (seeded from defaults)
+                                      // incl. config.securityGroupIds: string[] (ADR 0059)
 }
 ```
 
 Nesting uses React Flow's native `parentId` + `extent: 'parent'` (a Subnet's
-`parentId` is its VPC, and so on).
+`parentId` is its VPC, and so on). A resource's assigned Security Groups live in
+`config.securityGroupIds` (referencing `securityGroups` by id), not as edges.
 
 **Persistence & sharing** ([ADR 0020](decisions/0020-save-and-share.md)): the
 store is wrapped in zustand's `persist` — durable design state
-(`nodes`/`edges`/`mode`/`activeMissionId`/`bestStars`, plus gallery `slots` and
-`earnedBadges`) autosaves to localStorage (versioned, with a migrate hook);
-transient UI never persists. Designs also serialize to a
-versioned JSON snapshot carried in a shareable `#g=` URL fragment or a
-downloadable `.json` file; incoming snapshots are rebuilt field-by-field from a
-whitelist ([`src/graph/share.ts`](../src/graph/share.ts)). Graph modules are
-unit-tested with Vitest in CI ([ADR 0021](decisions/0021-test-safety-net.md)).
+(`nodes`/`edges`/`securityGroups`/`mode`/`activeMissionId`/`customMission`/`bestStars`/`soundOn`,
+plus gallery `slots` and `earnedBadges`) autosaves to localStorage (versioned,
+with a migrate hook); transient UI never persists. Designs also serialize to a
+versioned JSON snapshot (`v:2` carries the SG collection in `sg`) carried in a
+shareable `#g=` URL fragment or a downloadable `.json` file; incoming snapshots
+are rebuilt field-by-field from a whitelist, with legacy `v:1` sg-node/attachment
+edges migrated into the collection and unknown resource types skipped rather than
+rejected ([`src/graph/share.ts`](../src/graph/share.ts), ADR 0059 + 0061). A
+custom mission travels independently in a `#m=` fragment (`src/missions/custom.ts`,
+sharing the base64url codec — ADR 0065). Graph modules are unit-tested with
+Vitest in CI (230 tests — [ADR 0021](decisions/0021-test-safety-net.md)).
 
 **Gallery** ([ADR 0033](decisions/0033-gallery-multi-slot.md)): `slots` holds
 named designs, each carrying the *same* versioned snapshot used for sharing, so
@@ -144,16 +154,20 @@ interface ResourceMeta {
 }
 ```
 
-The resource set is **29** blocks — the 10-block MVP set (ADR 0001) plus expansion
-batch 1 ([ADR 0022](decisions/0022-resource-expansion-batch-1.md): DynamoDB,
-CloudFront, Route 53, SQS), batch 2 ([ADR 0026](decisions/0026-resource-expansion-2.md):
-ECS, EKS, ElastiCache, EFS, SNS, CloudWatch), batch 3
+The resource set is **30** buildable blocks — the 10-block MVP set (ADR 0001)
+plus expansion batch 1 ([ADR 0022](decisions/0022-resource-expansion-batch-1.md):
+DynamoDB, CloudFront, Route 53, SQS), batch 2
+([ADR 0026](decisions/0026-resource-expansion-2.md): ECS, EKS, ElastiCache, EFS,
+SNS, CloudWatch), batch 3
 ([ADR 0035](decisions/0035-resource-expansion-3-security-and-streaming.md): Cognito,
 Secrets Manager, KMS, ACM, WAF, Kinesis), the Lambda + API GW split
 ([ADR 0046](decisions/0046-lambda-apigw-split.md): standalone Lambda and a new
-API Gateway REST API block), and the AWS Account + Availability Zone
-organizational containers ([ADR 0050](decisions/0050-account-az-containers-and-inheritance.md)).
-They group into seven palette categories —
+API Gateway REST API block), the AWS Account + Availability Zone
+organizational containers ([ADR 0050](decisions/0050-account-az-containers-and-inheritance.md)),
+and ECR + CloudTrail ([ADR 0062](decisions/0062-ecr-cloudtrail-resources.md)).
+Security Group is still in the registry (so export can materialize it) but is
+**not** in the palette `resourceList` — it is an assignment overlay, not a block
+(ADR 0059). Resources group into seven palette categories —
 networking / compute / database / storage / integration / management / 보안·아이덴티티 —
 filtered live by a debounced search input
 ([ADR 0037](decisions/0037-palette-search.md)).
@@ -174,9 +188,11 @@ The Inspector's form is data-driven (Phase 2): `PropertyForm` reads a resource's
 the store's `updateNodeConfig`. `ResourceMeta.validate` runs on every render for
 real-time feedback — errors show as a red badge + message list in the Inspector
 and a red outline on the node. Reusable checks live in
-[`src/resources/validators.ts`](../src/resources/validators.ts). Security Group
-rules are simplified to inbound toggles — see
-[ADR 0011](decisions/0011-inspector-property-form-and-validation.md).
+[`src/resources/validators.ts`](../src/resources/validators.ts). Security Groups
+are edited in the palette's SG library (name + inbound HTTP/HTTPS/SSH toggles) and
+assigned to a resource from the Inspector as chips, writing `config.securityGroupIds`
+— see [ADR 0011](decisions/0011-inspector-property-form-and-validation.md) and
+[ADR 0059](decisions/0059-security-groups-as-assignment.md).
 
 On top of per-node checks, [`src/graph/checks.ts`](../src/graph/checks.ts) runs
 **graph-level validation with two severities** (memoized per store snapshot):
@@ -187,7 +203,8 @@ On top of per-node checks, [`src/graph/checks.ts`](../src/graph/checks.ts) runs
   public subnet, an ALB or RDS without the multi-AZ subnets it requires.
 - **Warnings (amber)** — apply-able but insecure / non-best-practice: SSH open
   to 0.0.0.0/0, a DB in a public subnet, disabled encryption or S3
-  public-access block, a missing Security Group attachment.
+  public-access block, an ENI-owning resource with no Security Group assigned
+  (`config.securityGroupIds` empty).
 
 Both feed the node outline, the Inspector badge + message lists (⚠ red / 🛡
 amber), and the mission context (`allValid`, `securityOk`) — see
@@ -252,13 +269,19 @@ predicates — `canContain`, `canBeTopLevel`, `canConnect`, `canBeSource`,
   detached from their VPC). See [ADR 0040](decisions/0040-containment-audit-normalize-feedback.md).
 - **Edges** — a connection `source → target` is allowed only when the source's
   `connectsTo` lists the target's type; connection handles are rendered only
-  where a node may be an edge source and/or target.
-- **SG attachment (ADR 0042)** — an SG attaches by drawing `SG → resource`. Its
-  `connectsTo` set is exactly the VPC-bound, ENI-owning resources
-  (`ec2`, `alb`, `rds`, `ecs`, `eks`, `elasticache`, `efs`) and matches, one-for-one,
-  the set for which `checks.ts` raises a "no SG attached" warning — so a warned
-  resource is always attachable (no "attach it" / "not allowed" contradiction).
-  Lambda is intentionally excluded (modeled as a non-VPC, canvas-level function).
+  where a node may be an edge source and/or target. When a resource has both
+  source and target handles, `onConnect` **auto-orients** a connection: if the
+  drawn direction is illegal but the reverse is legal, it silently flips (the
+  hierarchy is a one-way DAG, so this is safe) — fixing the "ALB → EC2 rejected
+  because the near handle read as EC2 → ALB" confusion. See
+  [ADR 0060](decisions/0060-edge-auto-orient.md).
+- **Security Groups are not edges (ADR 0059)** — SGs live in the store's
+  `securityGroups` collection and are assigned to resources via
+  `config.securityGroupIds`, not by drawing an edge. `isSgAssignable` gates the
+  ENI-owning set (`ec2`, `alb`, `rds`, `ecs`, `eks`, `elasticache`, `efs`) — the
+  same set `checks.ts` warns about when unassigned. `assignedSgIds(node)` reads
+  the config. Lambda is intentionally excluded (a non-VPC, canvas-level function).
+  See [`src/graph/securityGroups.ts`](../src/graph/securityGroups.ts).
 - **Feedback** — a rejected drop or edge sets a transient `notice` string in the
   store, surfaced as a toast over the canvas.
 
@@ -275,11 +298,13 @@ QA-002): a flow succeeds if *any* path from the entry reaches a sink, so a
 completed branch is no longer masked by an incomplete sibling drawn first. A
 non-reverting `visited` set keeps it O(V+E) and terminates on cycles; a failed
 flow reports its deepest attempt so the block hint points at a real dead end.
-Two edge kinds carry no traffic and are skipped: Security-Group *attachments*
-(dashed rose, [ADR 0017](decisions/0017-security-model-and-severity-validation.md))
-and RDS → RDS *replication links* (dashed indigo, target shows a `REPLICA` badge
+Security Groups no longer appear as edges (ADR 0059), so the tracer skips only
+RDS → RDS *replication links* (dashed indigo, target shows a `REPLICA` badge
 and emits `replicate_source_db` —
-[ADR 0019](decisions/0019-rds-read-replica-as-edge.md)).
+[ADR 0019](decisions/0019-rds-read-replica-as-edge.md)) and the
+security-attachment edges from ACM/WAF/Cognito (ADR 0056, below). ECR image
+pulls and CloudTrail log delivery are excluded from tracing too — neither is
+request traffic ([ADR 0062](decisions/0062-ecr-cloudtrail-resources.md)).
 The `SimResult` carries `flows[]` — one route per **(entry, reachable sink)**
 pair (BFS + parent pointers), so the banner enumerates *every* destination (an
 entry that forks to S3 and to RDS lists both) rather than one path per entry —
@@ -323,14 +348,32 @@ render-only (`[...userEdges, ...derivedEdges(nodes)]`) so `onEdgesChange` keeps
 operating on user edges. The framework is generic for future plumbing (e.g.
 RDS → its subnet group).
 
+**Playback audio** ([ADR 0058](decisions/0058-playback-audio.md) +
+[ADR 0063](decisions/0063-looping-playback-audio.md)) — a pure `soundPlan(sim)`
+derives audio events from `sim.arrivals` on the same hop grid the particles use:
+a rising hop tick per hop, a two-note chime on sink arrival, a sawtooth buzz on a
+blocked flow (fan-out duplicates at the same time/hop collapse to one tick, event
+count capped). The `<SimAudio />` component is the single connection point (it
+covers Start and chaos re-simulation) and schedules each event at
+`t0 + e.t + k·CYCLE` with a look-ahead scheduler, so the sound loops **in phase**
+with the 1.4s particle cycle rather than playing once. It uses the Web Audio API
+with zero audio assets; the AudioContext is created lazily inside the Start click
+gesture (autoplay-policy-safe) and a mute toggle (`soundOn`) persists for
+classroom use.
+
 ## Terraform export
 
 **Export** runs [`src/graph/terraform.ts`](../src/graph/terraform.ts) and is
 **apply-ready** ([ADR 0016](decisions/0016-apply-ready-terraform.md), extending
 [ADR 0013](decisions/0013-terraform-export-implementation.md)). Each resource
-owns its HCL via `ResourceMeta.terraform(ctx)`; the generator resolves `refs`
-(enclosing VPC/subnet, public subnets, SG attachments and ALB targets from
-edges) and **derives the plumbing the canvas doesn't draw**: route tables +
+owns its HCL via `ResourceMeta.terraform(ctx)`. Because Security Groups are no
+longer edges (ADR 0059), `materializeSecurityGroups(nodes, edges, sgs)` projects
+the collection + `config.securityGroupIds` back into synthetic `sg` nodes and
+attachment edges **at the export boundary only**, so `terraform.ts` and its tests
+still see the same shape they always did (lossless adapter). The generator then
+resolves `refs` (enclosing VPC/subnet, public subnets, SG attachments and ALB
+targets from edges) and **derives the plumbing the canvas doesn't draw**: route
+tables +
 associations (IGW → public, NAT → private), DB subnet groups, the Amazon Linux
 2023 AMI lookup, Lambda's IAM role + inline package, and the API Gateway REST
 API chain (`{proxy+}` AWS_PROXY integration to its connected Lambda + invoke
@@ -359,14 +402,31 @@ manifest that self-declares what the stack does *not* cover (app→secret
 consumption, CMK, audit logs, CloudFront multi-region TLS, alarm actions, single
 NAT), so "apply-ready" never masquerades as "production-ready".
 
+## draw.io export
+
+[`src/graph/drawio.ts`](../src/graph/drawio.ts) `generateDrawio(nodes, edges, sgs)`
+emits an uncompressed `<mxfile>` XML that opens directly in draw.io / diagrams.net
+/ the VS Code extension / Confluence — no dependencies
+([ADR 0064](decisions/0064-drawio-export.md)). Each node maps to an AWS shape via
+the `mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.<token>` namespace (draw.io's
+current stencil set, per-category gradient fills), containers to group shapes with
+containment preserved through parent-relative geometry. Positions and container
+sizes are scaled by `POS_SCALE` so 78px icons don't visually collide (cidrunner's
+canvas is tuned for wider cards), and parent-less global services (WAF/ACM/KMS/…)
+are folded into the account box via an export-layout reflow. Security Groups —
+not nodes — are preserved as a `🛡 name` label suffix. It is an export-only
+path; import stays deferred (low fidelity).
+
 ## Mission registry
 
-[`src/missions/`](../src/missions/) holds one module per mission (12 total:
+[`src/missions/`](../src/missions/) holds one module per mission (14 total:
 `tutorial`, `threeTier`, `serverless`, `staticCdn`, `asyncPipeline`,
 `containerWorkload`, `globalWeb`, `eventDriven`, `securityHardening`,
 `disasterRecovery`, `dataPipeline`, `secureAuthWeb` — see
 [ADR 0027](decisions/0027-mission-expansion-2.md) and
-[ADR 0036](decisions/0036-mission-expansion-3-pipelines-and-auth.md)) plus an
+[ADR 0036](decisions/0036-mission-expansion-3-pipelines-and-auth.md) — plus the
+ops tier `haSurvival` and `leanServerless`,
+[ADR 0057](decisions/0057-ops-challenge-star-gates.md)) plus an
 `index.ts`. A `Mission` describes its `goal`, optional `hint`,
 `requiredResources`, and a `check(ctx)` that returns a 0–3 star rating
 (0 = not cleared) for the current graph. The MissionPanel builds the check
@@ -381,12 +441,25 @@ build**. That last scope matters: `securityOk` on `ctx` is a whole-graph flag, s
 a leftover starter seed (VPC▸Subnet▸EC2 with no SG) used to pin every VPC-less
 mission at ★2. Missions instead call `scopedSecurityOk(ctx, anchors)`
 ([`src/missions/scope.ts`](../src/missions/scope.ts)), which closes the satisfying
-flow's nodes over edges (both directions — an SG attaches as the edge *source*)
-and the containment parent chain, then checks warnings only inside that closure.
-Unrelated leftover nodes are ignored; an SSH-open SG or a public S3 that is part
-of the build is still caught. Domain-specific tiers (three-tier's per-layer SG
-attach, disaster-recovery's Multi-AZ + cross-AZ replica) are documented in each
-mission's `check`.
+flow's nodes over edges (both directions) and the containment parent chain, then
+checks warnings only inside that closure (SG assignment is read from each node's
+`config.securityGroupIds`, not from edges — ADR 0059). Unrelated leftover nodes
+are ignored; an SSH-open SG or a public S3 that is part of the build is still
+caught. Domain-specific tiers (three-tier's per-layer SG assignment,
+disaster-recovery's Multi-AZ + cross-AZ replica) are documented in each mission's
+`check`.
+
+**Custom missions (ADR 0065).** Because grading is data-driven (`liveChain`
+structural matching over live edges), an instructor can author a mission as data
+with no code deploy. A `CustomMissionSpec` (`title` / `goal` / `hint?` /
+`chain: ResourceType[][]` / `requiredResources?` / `budget?`) is turned into a
+runtime `Mission` by `toMission(spec)` using the generic rubric (★1 the chain
+flows live · ★2 `allValid` · ★3 `scopedSecurityOk`). Specs travel in a `#m=` URL
+fragment (base64url, shared with `#g=` via `graph/base64url.ts`); an incoming spec
+is whitelist-rebuilt by `sanitizeCustomMission` since the URL is untrusted. The
+`CreateMission` modal authors one from the palette, then starts it locally
+(`setCustomMission` → challenge mode, canvas untouched) or copies the share link.
+See [`src/missions/custom.ts`](../src/missions/custom.ts).
 
 ## Data flow
 
@@ -418,8 +491,8 @@ rolldown's `codeSplitting.groups` to isolate `react-flow` and a catch-all
 `vendor` chunk, keeping every chunk under the 500 kB warning threshold. Code only
 needed on demand is lazy-loaded: **JSZip** (`await import('jszip')` inside the
 Terraform export path) and the **Onboarding**, **ShortcutHelp**,
-**NodeContextMenu**, **Gallery**, and **Achievements** components (`React.lazy`).
-On the canvas, React Flow runs with
+**NodeContextMenu**, **Gallery**, **Achievements**, and **CreateMission**
+components (`React.lazy`). On the canvas, React Flow runs with
 `onlyRenderVisibleElements` so off-viewport nodes are culled and large graphs
 (100+ nodes) stay responsive on pan/zoom.
 
