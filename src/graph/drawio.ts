@@ -71,6 +71,15 @@ const AWS_POINTS =
 /** Default leaf icon box (AWS4 icons are square). */
 const LEAF = 78
 
+/**
+ * Position/size scale for the export. cidrunner lays nodes out for wide ~175px
+ * cards; draw.io renders 78px icons with the label BELOW, so at the raw
+ * coordinates rows pack too tightly and neighbours' icons+labels collide.
+ * Scaling positions and container sizes (leaves stay a fixed 78px) opens the
+ * gaps back up without changing the arrangement.
+ */
+const POS_SCALE = 1.7
+
 const XML_ESCAPES: Record<string, string> = {
   '&': '&amp;',
   '<': '&lt;',
@@ -201,11 +210,15 @@ export function generateDrawio(
     const parent = parentId && ids.has(parentId) ? `n-${parentId}` : '1'
     const style = isContainer ? containerStyle(node) : leafStyle(node.data.type)
 
-    // Size: containers keep their authored region; leaves are square icons.
+    // Size: containers keep their (scaled) authored region; leaves stay a fixed
+    // square icon. Positions scale so rows don't collide (see POS_SCALE).
     const size = sizeOf.get(node.id)
-    const w = size?.w ?? (isContainer ? Number(node.style?.width ?? node.measured?.width ?? 240) : LEAF)
-    const h = size?.h ?? (isContainer ? Number(node.style?.height ?? node.measured?.height ?? 160) : LEAF)
-    const pos = posOf.get(node.id) ?? node.position
+    const rawW = size?.w ?? Number(node.style?.width ?? node.measured?.width ?? 240)
+    const rawH = size?.h ?? Number(node.style?.height ?? node.measured?.height ?? 160)
+    const w = isContainer ? Math.round(rawW * POS_SCALE) : LEAF
+    const h = isContainer ? Math.round(rawH * POS_SCALE) : LEAF
+    const rawPos = posOf.get(node.id) ?? node.position
+    const pos = { x: Math.round(rawPos.x * POS_SCALE), y: Math.round(rawPos.y * POS_SCALE) }
 
     // Label: name + any assigned Security Groups (which aren't nodes — ADR 0059).
     const sgs = assignedSgIds(node)
