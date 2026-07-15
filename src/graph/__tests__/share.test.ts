@@ -99,19 +99,72 @@ describe('share', () => {
     expect(none?.missionId).toBeUndefined()
   })
 
-  it('rejects garbage and foreign shapes', () => {
+  it('skips unsupported resource types instead of failing the whole import', () => {
+    // A real exported topology may reference resources cidrunner does not model
+    // (e.g. ECR, CloudTrail). Load what we can; report what we dropped.
+    const design = sanitizeSnapshot({
+      v: 2,
+      nodes: [
+        N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+        N('ecr-1', 'ecr' as never, undefined, { scan_on_push: true }),
+        N('ec2-1', 'ec2', 'vpc-1', { instance_type: 't3.micro', ami: 'auto' }),
+      ],
+      edges: [E('e1', 'ecr-1', 'ec2-1'), E('e2', 'ec2-1', 'ec2-1')],
+    })
+    expect(design).not.toBeNull()
+    expect(design!.nodes.map((n) => n.id).sort()).toEqual(['ec2-1', 'vpc-1'])
+    expect(design!.unsupportedTypes).toEqual(['ecr'])
+    // The edge to the dropped ECR node is gone; the self-edge survives.
+    expect(design!.edges.some((e) => e.source === 'ecr-1')).toBe(false)
+  })
+
+  it('cascades: a child of an unsupported container is dropped too', () => {
+    const design = sanitizeSnapshot({
+      v: 2,
+      nodes: [
+        N('mesh-1', 'appmesh' as never, undefined, {}),
+        N('ec2-1', 'ec2', 'mesh-1', { instance_type: 't3.micro', ami: 'auto' }),
+        N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
+      ],
+      edges: [],
+    })
+    expect(design).not.toBeNull()
+    expect(design!.nodes.map((n) => n.id)).toEqual(['vpc-1'])
+    expect(design!.unsupportedTypes).toEqual(['appmesh'])
+  })
+
+  it('rejects structurally broken shapes', () => {
+    // Structural corruption still fails hard; unknown *resource types* no longer
+    // do (they're skipped — see the resilient-import test above).
     expect(designFromHash('#g=%%%%')).toBeNull()
     expect(designFromHash('#other')).toBeNull()
     expect(sanitizeSnapshot({ nodes: 'nope', edges: [] })).toBeNull()
-    expect(sanitizeSnapshot({ nodes: [{ id: 'x', data: { type: 'not-a-type' }, position: { x: 0, y: 0 } }], edges: [] })).toBeNull()
+    expect(sanitizeSnapshot('not an object')).toBeNull()
+    // An unknown type is skipped, not fatal: this loads to an empty design.
+    const unknown = sanitizeSnapshot({
+      nodes: [{ id: 'x', data: { type: 'not-a-type' }, position: { x: 0, y: 0 } }],
+      edges: [],
+    })
+    expect(unknown).not.toBeNull()
+    expect(unknown!.nodes).toEqual([])
+    expect(unknown!.unsupportedTypes).toEqual(['not-a-type'])
   })
 
-  it('rejects dangling references (parent/edge to missing nodes)', () => {
+  it('drops dangling references (parent/edge to missing nodes) instead of failing', () => {
+    // A node whose parent never existed is cascade-dropped, not a hard reject.
     const orphan = { ...N('ec2-1', 'ec2', 'subnet-9'), extent: 'parent' as const }
-    expect(sanitizeSnapshot({ v: 1, nodes: [orphan], edges: [] })).toBeNull()
-    expect(
-      sanitizeSnapshot({ v: 1, nodes: [N('s3-1', 's3')], edges: [E('e1', 's3-1', 'ghost')] }),
-    ).toBeNull()
+    const dropped = sanitizeSnapshot({ v: 1, nodes: [orphan], edges: [] })
+    expect(dropped).not.toBeNull()
+    expect(dropped!.nodes).toEqual([])
+    // An edge to a missing node is skipped; the valid node still loads.
+    const edgeToGhost = sanitizeSnapshot({
+      v: 1,
+      nodes: [N('s3-1', 's3')],
+      edges: [E('e1', 's3-1', 'ghost')],
+    })
+    expect(edgeToGhost).not.toBeNull()
+    expect(edgeToGhost!.nodes.map((n) => n.id)).toEqual(['s3-1'])
+    expect(edgeToGhost!.edges).toEqual([])
   })
 
   it('drops unknown fields instead of importing them', () => {
