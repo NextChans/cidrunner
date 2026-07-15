@@ -18,10 +18,12 @@ blocking resource lights up. Clear guided missions, or build freely — then
 > **Status: v2 — an AWS engineer simulation.**
 > Build a topology from a categorized palette, name resources and edit required
 > properties with two-severity real-time validation (red errors / amber security
-> warnings), attach **Security Groups by drawing edges**, press **Start** to play
-> back every traffic flow (particles, arrival pulses, per-flow outcomes), clear
-> best-practice **missions** (including a security-hardening challenge), and
-> **export apply-ready Terraform** — `terraform apply` creates the real thing.
+> warnings), **assign Security Groups** to resources from a library (chips, not
+> edges — [ADR 0059](docs/decisions/0059-security-groups-as-assignment.md)),
+> press **Start** to play back every traffic flow (particles, arrival pulses,
+> looping sound, per-flow outcomes), clear best-practice **missions** (or author
+> your own), and **export** your design as apply-ready **Terraform** or a
+> **draw.io** diagram — `terraform apply` creates the real thing.
 
 > [!NOTE]
 > **UI language: Korean.** The in-app UI is Korean (hardcoded, no i18n
@@ -45,10 +47,11 @@ Design and decisions live in [`docs/`](docs/):
 ## Concept
 
 - **Block-style editor** — a React Flow canvas with a categorized palette (networking / compute / database / storage / integration / management / security & identity), filtered live by a debounced search (press `/` to focus); resources nest and connect under real AWS rules. See [ADR 0037](docs/decisions/0037-palette-search.md).
-- **Security as gameplay** — attach Security Groups by drawing edges; encryption and public-access toggles; amber warnings for anything insecure.
-- **Traffic playback** — press Start and every flow (ALB → EC2 → RDS, Lambda → S3, …) animates with particles and arrival pulses; blocked paths highlight the blocking node.
-- **Missions & Free mode** — 12 best-practice challenges (tutorial / HA 3-tier / serverless / static CDN / async pipeline / container workload / global dynamic web / event-driven fan-out / security hardening / disaster recovery / data pipeline / secure auth web) with 0–3 star ratings, or an open sandbox.
-- **Save & Share** — designs autosave to the browser (survive refresh) and share as a single URL or a JSON file (mission context included, load asks before replacing your work); no account, no backend. Shared links carry an Open Graph / Twitter Card preview image. See [ADR 0031](docs/decisions/0031-og-image-and-share-metadata.md).
+- **Security Groups as assignment** — Security Groups live in a library, not on the canvas: create one, toggle its inbound rules (HTTP / HTTPS / SSH), then assign it to ENI-owning resources (ALB / EC2 / RDS / ECS / EKS / ElastiCache / EFS) with a chip toggle. Assigned SGs show as colored shield chips on the node, and export derives tiered SG-to-SG ingress. See [ADR 0059](docs/decisions/0059-security-groups-as-assignment.md).
+- **Traffic playback** — press Start and every flow (ALB → EC2 → RDS, Lambda → S3, …) animates with particles and arrival pulses; blocked paths highlight the blocking node. A synthesized Web-Audio soundtrack (hop ticks / arrival chimes / blocked buzz) loops in phase with the particles — toggle it with the mute button. See [ADR 0058](docs/decisions/0058-playback-audio.md) and the looping refinement [ADR 0063](docs/decisions/0063-looping-playback-audio.md).
+- **Missions & Free mode** — 14 best-practice challenges (tutorial / HA 3-tier / serverless / static CDN / async pipeline / container workload / global dynamic web / event-driven fan-out / security hardening / disaster recovery / data pipeline / secure auth web / zero-downtime ops / lean serverless) with 0–3 star ratings, or an open sandbox. Star grading is data-driven (`liveChain` structural matching over live edges).
+- **Instructor custom missions** — author your own mission from data (title / goal / hint / budget + a required resource chain) with no code deploy, then start it locally or share it as a `#m=` link; students open the link and get the same 0–3★ live grading. See [ADR 0065](docs/decisions/0065-custom-missions.md).
+- **Save & Share** — designs autosave to the browser (survive refresh) and share as a single URL or a JSON file (mission context included, load asks before replacing your work); no account, no backend. Import is resilient — an unknown resource type is skipped with a notice rather than failing the whole load. Shared links carry an Open Graph / Twitter Card preview image. See [ADR 0031](docs/decisions/0031-og-image-and-share-metadata.md) and [ADR 0061](docs/decisions/0061-resilient-import.md).
 - **Gallery** — save multiple named designs into local slots and reopen them from a card grid with live SVG thumbnails; rename and delete inline. See [ADR 0033](docs/decisions/0033-gallery-multi-slot.md).
 - **Achievements** — five badges (first clear, first 3-star, first saved design, five missions, all missions 3-star) unlock as you play, derived purely from your progress. See [ADR 0032](docs/decisions/0032-achievements-and-badges.md).
 - **Editor fundamentals** — undo/redo (Ctrl+Z, one step per gesture), a first-visit tutorial hand-off, and per-mission best-star records.
@@ -58,8 +61,9 @@ Design and decisions live in [`docs/`](docs/):
 - **Budget mode** — a live monthly-cost estimate (💸) for the whole design; missions carry a budget target, turning the build into an optimization puzzle (the NAT Gateway / ALB / EKS cost traps surface immediately). See [ADR 0051](docs/decisions/0051-cost-budget-mode.md).
 - **Chaos mode** — inject an AZ failure (⚡) and watch whether the design survives: a single-AZ build goes dark, a redundant 2-AZ / Multi-AZ-RDS one reroutes and holds. Together with Budget this is the cost ↔ resilience trade-off ("cheap and survivable"). See [ADR 0052](docs/decisions/0052-chaos-mode-fault-injection.md).
 - **Well-Architected grade** — a live A–S letter grade across four pillars (🔒 security · 🛡 reliability · 💰 cost · ⚡ performance), synthesized from the validation sweep, the chaos AZ-failure test, and the cost model — turning free mode into a "raise your grade" sandbox. See [ADR 0054](docs/decisions/0054-well-architected-grade.md).
-- **Apply-ready Terraform export** — `main.tf`, `variables.tf`, `outputs.tf` with derived route tables, DB subnet groups, IAM, and an API Gateway REST API wired to its Lambda; `terraform apply` creates real resources.
-- **Resource set (29)** — AWS Account · Availability Zone · VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda · API Gateway · RDS (+read replica) · ElastiCache · DynamoDB · S3 · EFS · Kinesis · SQS · SNS · CloudWatch · Security Group · Cognito · Secrets Manager · KMS · ACM · WAF. See [ADR 0035](docs/decisions/0035-resource-expansion-3-security-and-streaming.md), the Lambda/API GW split in [ADR 0046](docs/decisions/0046-lambda-apigw-split.md), and the Account/AZ organizational boxes in [ADR 0050](docs/decisions/0050-account-az-containers-and-inheritance.md).
+- **Apply-ready Terraform export** — `main.tf`, `variables.tf`, `outputs.tf` with derived route tables, DB subnet groups, IAM, tiered Security Group ingress, and an API Gateway REST API wired to its Lambda; `terraform apply` creates real resources. A `PRODUCTION-READINESS.md` manifest is bundled in the zip, self-reporting any unwired security or out-of-scope items. See [ADR 0055](docs/decisions/0055-terraform-apply-wiring.md) and [ADR 0056](docs/decisions/0056-security-attachment-wiring-and-readiness-manifest.md).
+- **draw.io export** — export the whole design as a `.drawio` diagram (AWS shapes, containment and positions preserved) that opens directly in draw.io / diagrams.net / the VS Code extension / Confluence — no dependencies. See [ADR 0064](docs/decisions/0064-drawio-export.md).
+- **Resource set (30)** — AWS Account · Availability Zone · VPC · Subnet · IGW · NAT · Route 53 · CloudFront · ALB · EC2 · ECS Fargate · EKS · Lambda · API Gateway · RDS (+read replica) · ElastiCache · DynamoDB · S3 · EFS · ECR · Kinesis · SQS · SNS · CloudWatch · CloudTrail · Cognito · Secrets Manager · KMS · ACM · WAF — plus **Security Groups** as an assignable overlay. See [ADR 0035](docs/decisions/0035-resource-expansion-3-security-and-streaming.md), the Lambda/API GW split in [ADR 0046](docs/decisions/0046-lambda-apigw-split.md), the Account/AZ organizational boxes in [ADR 0050](docs/decisions/0050-account-az-containers-and-inheritance.md), and ECR/CloudTrail in [ADR 0062](docs/decisions/0062-ecr-cloudtrail-resources.md).
 - **Organizational boxes & inherited defaults** — nest `AWS Account ▸ VPC ▸ Availability Zone ▸ Subnet`; a Subnet created inside a VPC auto-carves the next free `/24`, and one inside an AZ box inherits its `az` — both still editable. See [ADR 0050](docs/decisions/0050-account-az-containers-and-inheritance.md).
 - **Mobile** — building infra is a desktop-first experience, but narrow screens (<768px) get a full-viewport canvas with the palette / inspector / missions moved into overlay drawers, so a project stays viewable and demo-able on a phone. See [ADR 0009](docs/decisions/0009-mobile-responsive-drawer-pattern.md).
 
@@ -82,11 +86,13 @@ recorded as ADRs in [docs/decisions/](docs/decisions/).
 
 - [Vite](https://vite.dev/) + React 19 + TypeScript (strict)
 - [React Flow (`@xyflow/react`)](https://reactflow.dev/) — canvas & nodes
-- [Zustand](https://github.com/pmndrs/zustand) — state
+- [Zustand](https://github.com/pmndrs/zustand) (+ [zundo](https://github.com/charkour/zundo) for undo/redo) — state
 - [Tailwind CSS](https://tailwindcss.com/) — styling
 - [Framer Motion](https://www.framer.com/motion/) — animation (Phase 3)
+- Web Audio API — synthesized playback soundtrack, zero audio assets
 - [JSZip](https://stuk.github.io/jszip/) — export (Phase 4)
 - [lucide-react](https://lucide.dev/) — icons
+- [Vitest](https://vitest.dev/) — unit tests (230, gating CI)
 
 ## Requirements
 
@@ -144,8 +150,9 @@ src/
 ├─ store/useGraphStore.ts   # Zustand — nodes / edges / mode
 ├─ components/              # Layout, Canvas, Palette, Inspector, MissionPanel, Toolbar
 │  └─ nodes/ResourceNode.tsx
-├─ resources/              # 29 resource metas + registry (apply-ready terraform emitters)
-└─ missions/               # 12 missions: tutorial / 3-tier / serverless / static-CDN / async-pipeline / container / global-web / event-driven / security / disaster-recovery / data-pipeline / secure-auth-web
+├─ resources/              # 30 resource metas + registry (apply-ready terraform emitters)
+├─ graph/                  # simulate, checks, cost, chaos, grade, terraform, drawio, share, securityGroups
+└─ missions/               # 14 missions (+ data-driven custom missions): tutorial / 3-tier / serverless / static-CDN / async-pipeline / container / global-web / event-driven / security / disaster-recovery / data-pipeline / secure-auth-web / zero-downtime-ops / lean-serverless
 ```
 
 ## License
