@@ -279,13 +279,21 @@ export function graphIssues(
       }
     }
 
-    // A Kinesis stream needs a Lambda consumer to do anything with the data.
+    // A Kinesis stream needs *a* downstream to do anything with the data:
+    // either a Lambda consumer (Data Stream) or an S3 delivery (Firehose,
+    // which auto-delivers and needs no consumer) — ADR 0066.
     if (t === 'kinesis') {
-      const hasConsumer = edges.some(
-        (e) => e.source === node.id && byId.get(e.target)?.data.type === 'lambda',
-      )
-      if (!hasConsumer) {
-        push(warnings, node.id, '스트림을 소비할 Lambda가 연결되어 있지 않습니다.')
+      const hasDownstream = edges.some((e) => {
+        if (e.source !== node.id) return false
+        const target = byId.get(e.target)?.data.type
+        return target === 'lambda' || target === 's3'
+      })
+      if (!hasDownstream) {
+        push(
+          warnings,
+          node.id,
+          '스트림 데이터를 처리할 대상(Lambda 소비자 또는 S3 전송)이 연결되어 있지 않습니다.',
+        )
       }
     }
   }
