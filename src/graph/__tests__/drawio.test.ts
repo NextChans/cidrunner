@@ -84,8 +84,11 @@ describe('generateDrawio (ADR 0064)', () => {
     // Globals reparented under the account, not left at the root layer ("1").
     expect(xml).toMatch(/id="n-waf-1"[^>]*parent="n-account-1"/)
     expect(xml).toMatch(/id="n-s3-1"[^>]*parent="n-account-1"/)
-    // The account grew past its authored height to make room for the strip.
-    expect(xml).toMatch(/id="n-account-1"[\s\S]*?height="1[3-9]\d\d"/)
+    // The account grew past its authored (scaled) height to fit the strip.
+    const accH = Number(
+      xml.match(/id="n-account-1"[\s\S]*?height="(\d+)"/)?.[1] ?? '0',
+    )
+    expect(accH).toBeGreaterThan(1200 * 1.7)
   })
 
   it('uses public vs private subnet group icons from config', () => {
