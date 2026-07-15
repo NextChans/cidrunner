@@ -405,6 +405,10 @@ export function simulate(
       src !== 'acm' &&
       src !== 'waf' &&
       src !== 'cognito' &&
+      // ECR image pulls and CloudTrail log delivery are not request traffic
+      // (ADR 0062) — exclude them so they never start or extend a flow.
+      src !== 'ecr' &&
+      src !== 'cloudtrail' &&
       !(src === 'rds' && byId.get(e.target)?.data.type === 'rds')
     )
   })
