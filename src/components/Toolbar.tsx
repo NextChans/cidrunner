@@ -93,7 +93,16 @@ export function Toolbar() {
         return
       }
       loadDesign(design.nodes, design.edges, design.missionId, design.securityGroups)
-      setNotice('설계를 불러왔습니다.', 'info')
+      if (design.unsupportedTypes.length > 0) {
+        // Loaded, but some blocks were skipped because cidrunner doesn't model
+        // them yet — tell the user which, so nothing silently vanishes.
+        setNotice(
+          `설계를 불러왔습니다. 지원하지 않는 리소스는 제외했습니다: ${design.unsupportedTypes.join(', ')}`,
+          'info',
+        )
+      } else {
+        setNotice('설계를 불러왔습니다.', 'info')
+      }
     } catch {
       setNotice('불러오기 실패: JSON을 읽을 수 없습니다.')
     }

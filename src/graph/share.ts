@@ -28,6 +28,8 @@ export interface LoadedDesign {
   edges: Edge[]
   missionId?: string
   securityGroups: SecurityGroupDef[]
+  /** Resource types skipped because cidrunner doesn't model them (for a notice). */
+  unsupportedTypes: string[]
 }
 
 export function toSnapshot(
@@ -141,6 +143,13 @@ export function sanitizeSnapshot(raw: unknown): LoadedDesign | null {
 
   const nodes: ResourceNodeType[] = []
   const ids = new Set<string>()
+  // Nodes we drop rather than fail on: resource types cidrunner does not model
+  // (e.g. an ECR/CloudTrail from a real exported topology). We skip them, cascade
+  // their orphaned children, drop their edges, and report the types so the UI can
+  // say what was left out — a single unknown block should never reject the whole
+  // import.
+  const droppedIds = new Set<string>()
+  const unsupportedTypes = new Set<string>()
   // Assignments discovered from legacy `sg → resource` edges: target id → sg ids.
   const legacyAssignments = new Map<string, string[]>()
   for (const item of snap.edges) {
@@ -158,8 +167,15 @@ export function sanitizeSnapshot(raw: unknown): LoadedDesign | null {
     const type = data.type as ResourceType
     // Legacy sg nodes were folded into the collection above — not canvas nodes.
     if (type === 'sg') continue
+    if (typeof n.id !== 'string') return null
+    // Unknown resource type → skip (don't fail the import); its edges/children
+    // are dropped below and the type is reported.
+    if (!(type in resources)) {
+      droppedIds.add(n.id)
+      unsupportedTypes.add(String(type))
+      continue
+    }
     const pos = (n.position ?? {}) as Record<string, unknown>
-    if (typeof n.id !== 'string' || !(type in resources)) return null
     if (!isNum(pos.x) || !isNum(pos.y)) return null
     if (ids.has(n.id)) return null
     ids.add(n.id)
@@ -211,9 +227,21 @@ export function sanitizeSnapshot(raw: unknown): LoadedDesign | null {
     }
     nodes.push(node)
   }
-  // Parents must exist.
-  for (const n of nodes) {
-    if (n.parentId && !ids.has(n.parentId)) return null
+  // A node whose parent was dropped (unsupported type) can't be placed — cascade
+  // it (and its own children, transitively) into the dropped set rather than
+  // failing. Truly dangling parentIds (never present) are dropped the same way.
+  let cascaded = true
+  while (cascaded) {
+    cascaded = false
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const n = nodes[i]!
+      if (n.parentId && !ids.has(n.parentId)) {
+        ids.delete(n.id)
+        droppedIds.add(n.id)
+        nodes.splice(i, 1)
+        cascaded = true
+      }
+    }
   }
 
   const edges: Edge[] = []
@@ -225,7 +253,9 @@ export function sanitizeSnapshot(raw: unknown): LoadedDesign | null {
     // Legacy sg attachment edges were converted to assignments above — drop them
     // rather than fail the (now sg-node-less) endpoint check.
     if (legacySgNodeIds.has(e.source) || legacySgNodeIds.has(e.target)) continue
-    if (!ids.has(e.source) || !ids.has(e.target)) return null
+    // Endpoint dropped (unsupported node) or never present → skip this edge
+    // instead of rejecting the whole design.
+    if (!ids.has(e.source) || !ids.has(e.target)) continue
     edges.push({ id: e.id, source: e.source, target: e.target, type: 'traffic' })
   }
 
@@ -233,7 +263,7 @@ export function sanitizeSnapshot(raw: unknown): LoadedDesign | null {
   const missionId =
     typeof snap.m === 'string' && getMission(snap.m) ? snap.m : undefined
 
-  return { nodes, edges, missionId, securityGroups }
+  return { nodes, edges, missionId, securityGroups, unsupportedTypes: [...unsupportedTypes] }
 }
 
 /** Parses a design out of `location.hash` (`#g=…`), if present and valid. */
