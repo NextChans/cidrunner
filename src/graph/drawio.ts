@@ -14,25 +14,29 @@ import type { ResourceNodeType } from '@/store/useGraphStore'
  */
 
 /** AWS4 resource-icon name per leaf resource type (drawio `resIcon`). */
+// Tokens verified against drawio's mxgraph.aws4 library (ADR 0064). Compute /
+// container / database / integration services use SHORT tokens (s3, ecs, ecr,
+// eks, sqs, sns, ec2, rds, …); networking / security / management use longer
+// names (application_load_balancer, key_management_service, …).
 const RES_ICON: Partial<Record<ResourceType, string>> = {
   igw: 'internet_gateway',
   nat: 'nat_gateway',
   alb: 'application_load_balancer',
   ec2: 'ec2',
-  ecs: 'elastic_container_service',
-  eks: 'elastic_kubernetes_service',
+  ecs: 'ecs',
+  eks: 'eks',
   rds: 'rds',
   elasticache: 'elasticache',
-  s3: 'simple_storage_service',
+  s3: 's3',
   efs: 'elastic_file_system',
-  ecr: 'elastic_container_registry',
+  ecr: 'ecr',
   lambda: 'lambda',
   apigw: 'api_gateway',
   dynamodb: 'dynamodb',
   cloudfront: 'cloudfront',
   route53: 'route_53',
-  sqs: 'simple_queue_service',
-  sns: 'simple_notification_service',
+  sqs: 'sqs',
+  sns: 'sns',
   cloudwatch: 'cloudwatch',
   cloudtrail: 'cloudtrail',
   cognito: 'cognito',
@@ -101,9 +105,11 @@ function leafStyle(type: ResourceType): string {
     // No AWS4 icon mapped — a labelled rounded box still reads.
     return `rounded=1;whiteSpace=wrap;html=1;fillColor=${fill};strokeColor=none;fontColor=#FFFFFF;fontSize=11;`
   }
+  // strokeColor=#ffffff is the canonical resourceIcon template — it renders the
+  // glyph white on the colored square (the modern AWS icon look).
   return (
     'sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;' +
-    `fillColor=${fill};strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;` +
+    `fillColor=${fill};strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;` +
     'align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;whiteSpace=wrap;' +
     `shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.${icon};`
   )
