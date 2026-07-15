@@ -28,6 +28,8 @@ import { kms } from './kms'
 import { acm } from './acm'
 import { waf } from './waf'
 import { kinesis } from './kinesis'
+import { ecr } from './ecr'
+import { cloudtrail } from './cloudtrail'
 
 /** Registry mapping each resource type to its metadata. */
 export const resources: Record<ResourceType, ResourceMeta> = {
@@ -60,6 +62,8 @@ export const resources: Record<ResourceType, ResourceMeta> = {
   acm,
   waf,
   kinesis,
+  ecr,
+  cloudtrail,
 }
 
 /** Palette-ordered list of resource metas (grouped by category in the UI). */
@@ -82,11 +86,13 @@ export const resourceList: ResourceMeta[] = [
   dynamodb,
   s3,
   efs,
+  ecr,
   apigw,
   kinesis,
   sqs,
   sns,
   cloudwatch,
+  cloudtrail,
   cognito,
   secretsmanager,
   kms,

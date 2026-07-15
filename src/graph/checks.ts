@@ -258,6 +258,27 @@ export function graphIssues(
       }
     }
 
+    // ECR is only useful if a container service pulls from it (ADR 0062).
+    if (t === 'ecr') {
+      const hasConsumer = edges.some(
+        (e) => e.source === node.id && ['ecs', 'eks'].includes(byId.get(e.target)?.data.type ?? ''),
+      )
+      if (!hasConsumer) {
+        push(warnings, node.id, '이미지를 사용할 컨테이너(ECS/EKS)가 연결되어 있지 않습니다.')
+      }
+    }
+
+    // CloudTrail must deliver to an S3 bucket, else the emitted trail is
+    // incomplete (REPLACE_ME) — ADR 0062.
+    if (t === 'cloudtrail') {
+      const hasBucket = edges.some(
+        (e) => e.source === node.id && byId.get(e.target)?.data.type === 's3',
+      )
+      if (!hasBucket) {
+        push(warnings, node.id, '로그를 저장할 S3 버킷이 연결되어 있지 않습니다.')
+      }
+    }
+
     // A Kinesis stream needs a Lambda consumer to do anything with the data.
     if (t === 'kinesis') {
       const hasConsumer = edges.some(

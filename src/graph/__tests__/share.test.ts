@@ -106,16 +106,16 @@ describe('share', () => {
       v: 2,
       nodes: [
         N('vpc-1', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
-        N('ecr-1', 'ecr' as never, undefined, { scan_on_push: true }),
+        N('tgw-1', 'transitgateway' as never, undefined, {}),
         N('ec2-1', 'ec2', 'vpc-1', { instance_type: 't3.micro', ami: 'auto' }),
       ],
-      edges: [E('e1', 'ecr-1', 'ec2-1'), E('e2', 'ec2-1', 'ec2-1')],
+      edges: [E('e1', 'tgw-1', 'ec2-1'), E('e2', 'ec2-1', 'ec2-1')],
     })
     expect(design).not.toBeNull()
     expect(design!.nodes.map((n) => n.id).sort()).toEqual(['ec2-1', 'vpc-1'])
-    expect(design!.unsupportedTypes).toEqual(['ecr'])
-    // The edge to the dropped ECR node is gone; the self-edge survives.
-    expect(design!.edges.some((e) => e.source === 'ecr-1')).toBe(false)
+    expect(design!.unsupportedTypes).toEqual(['transitgateway'])
+    // The edge to the dropped node is gone; the self-edge survives.
+    expect(design!.edges.some((e) => e.source === 'tgw-1')).toBe(false)
   })
 
   it('cascades: a child of an unsupported container is dropped too', () => {

@@ -40,6 +40,8 @@ export type ResourceType =
   | 'acm'
   | 'waf'
   | 'kinesis'
+  | 'ecr'
+  | 'cloudtrail'
 
 /** Palette groups, mirroring how the AWS console organizes services. */
 export type ResourceCategory =
@@ -174,6 +176,8 @@ export interface TfContext {
      * etc., instead of only the internet toggles.
      */
     sgIngress?: { fromSg: string; port: number; desc: string }[]
+    /** Destination S3 bucket for a CloudTrail (cloudtrail → s3 edge, ADR 0062). */
+    logBucket?: string
   }
 }
 

@@ -29,8 +29,8 @@ const ORDER: ResourceType[] = [
   // are listed so the sort is total.
   'account', 'az',
   'vpc', 'subnet', 'igw', 'nat', 'sg', 'kms', 'acm', 'cognito', 'secretsmanager',
-  'efs', 'alb', 'ec2', 'ecs', 'eks', 'rds', 'elasticache', 's3', 'dynamodb',
-  'kinesis', 'sqs', 'sns', 'lambda', 'apigw', 'cloudwatch', 'waf', 'cloudfront', 'route53',
+  'efs', 'ecr', 'alb', 'ec2', 'ecs', 'eks', 'rds', 'elasticache', 's3', 'dynamodb',
+  'kinesis', 'sqs', 'sns', 'lambda', 'apigw', 'cloudwatch', 'cloudtrail', 'waf', 'cloudfront', 'route53',
 ]
 
 function ancestorOfType(
@@ -383,6 +383,10 @@ export function generateTerraform(
             node.data.type === 'apigw'
               ? firstTargetOf(node.id, ['lambda'])?.name
               : undefined,
+          logBucket:
+            node.data.type === 'cloudtrail'
+              ? firstTargetOf(node.id, ['s3'])?.name
+              : undefined,
           certificate:
             node.data.type === 'alb' ? attachedSourceOf(node.id, 'acm') : undefined,
           authorizer:
@@ -473,6 +477,43 @@ export function generateTerraform(
   subnet_ids = [${vSubnets.map((s) => `aws_subnet.${tfName(s.id)}.id`).join(', ')}]
 }`)
     }
+  }
+
+  // CloudTrail bucket policy (ADR 0062): a `cloudtrail → s3` edge delivers logs
+  // to that bucket, which needs a policy granting the CloudTrail service
+  // GetBucketAcl + PutObject — derived plumbing the canvas doesn't draw.
+  for (const trail of nodes.filter((n) => n.data.type === 'cloudtrail')) {
+    const bucketEdge = edges.find(
+      (e) => e.source === trail.id && typeOf(e.target) === 's3',
+    )
+    if (!bucketEdge) continue
+    const t = tfName(trail.id)
+    const bucket = tfName(bucketEdge.target)
+    derived.push(`data "aws_caller_identity" "${t}_current" {}
+
+resource "aws_s3_bucket_policy" "${t}_bucket_policy" {
+  bucket = aws_s3_bucket.${bucket}.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AWSCloudTrailAclCheck"
+        Effect    = "Allow"
+        Principal = { Service = "cloudtrail.amazonaws.com" }
+        Action    = "s3:GetBucketAcl"
+        Resource  = aws_s3_bucket.${bucket}.arn
+      },
+      {
+        Sid       = "AWSCloudTrailWrite"
+        Effect    = "Allow"
+        Principal = { Service = "cloudtrail.amazonaws.com" }
+        Action    = "s3:PutObject"
+        Resource  = "\${aws_s3_bucket.${bucket}.arn}/AWSLogs/\${data.aws_caller_identity.${t}_current.account_id}/*"
+        Condition = { StringEquals = { "s3:x-amz-acl" = "bucket-owner-full-control" } }
+      }
+    ]
+  })
+}`)
   }
 
   // WAF associations (ADR 0056): a `waf → alb|apigw` edge binds the web ACL to
