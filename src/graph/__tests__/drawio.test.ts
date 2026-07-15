@@ -43,6 +43,27 @@ describe('generateDrawio (ADR 0064)', () => {
     expect(xml).not.toContain('id="e-e1"')
   })
 
+  it('uses the verified short AWS4 resIcon tokens (not the long service names)', () => {
+    // Regression: ecs/ecr/s3/eks/sqs/sns render as blank blocks under the long
+    // names — the drawio aws4 library uses short tokens for these families.
+    const nodes = [
+      N('ecs-1', 'ecs', undefined, {}),
+      N('ecr-1', 'ecr', undefined, {}),
+      N('s3-1', 's3', undefined, {}),
+      N('eks-1', 'eks', undefined, {}),
+      N('sqs-1', 'sqs', undefined, {}),
+      N('sns-1', 'sns', undefined, {}),
+    ]
+    const xml = generateDrawio(nodes)
+    for (const tok of ['ecs', 'ecr', 's3', 'eks', 'sqs', 'sns']) {
+      expect(xml).toContain(`resIcon=mxgraph.aws4.${tok};`)
+    }
+    expect(xml).not.toContain('elastic_container_service')
+    expect(xml).not.toContain('simple_storage_service')
+    // Canonical resourceIcon template renders the glyph white.
+    expect(xml).toContain('strokeColor=#ffffff')
+  })
+
   it('uses public vs private subnet group icons from config', () => {
     const nodes = [
       N('v', 'vpc', undefined, { cidr_block: '10.0.0.0/16' }),
