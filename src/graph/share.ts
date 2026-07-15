@@ -3,6 +3,7 @@ import { resources, type ResourceType } from '@/resources'
 import { getMission } from '@/missions'
 import type { ResourceNodeType } from '@/store/useGraphStore'
 import type { SecurityGroupDef } from '@/graph/securityGroups'
+import { b64urlEncode, b64urlDecode } from '@/graph/base64url'
 
 /**
  * Design sharing (ADR 0020): a design serializes to versioned JSON, carried
@@ -42,25 +43,6 @@ export function toSnapshot(
   if (missionId) snap.m = missionId
   if (securityGroups.length) snap.sg = securityGroups
   return snap
-}
-
-/** UTF-8 safe base64url encode. */
-function b64urlEncode(text: string): string {
-  const bytes = new TextEncoder().encode(text)
-  let bin = ''
-  for (const b of bytes) bin += String.fromCharCode(b)
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function b64urlDecode(packed: string): string | null {
-  try {
-    const b64 = packed.replace(/-/g, '+').replace(/_/g, '/')
-    const bin = atob(b64)
-    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
-    return new TextDecoder().decode(bytes)
-  } catch {
-    return null
-  }
 }
 
 /** Builds a shareable URL for the current page carrying the design. */

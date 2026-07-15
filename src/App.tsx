@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { Layout } from './components/Layout'
 import { designFromHash } from '@/graph/share'
+import { customMissionFromHash } from '@/missions/custom'
 import { useAchievements } from '@/hooks/useAchievements'
 import { useGraphStore } from '@/store/useGraphStore'
 
@@ -37,16 +38,28 @@ function App() {
   // navigation fires `hashchange`, not a reload).
   useEffect(() => {
     const loadFromHash = () => {
+      const store = useGraphStore.getState()
+
+      // Instructor custom mission (#m=, ADR 0065): activate it in challenge mode
+      // without touching the canvas — the student builds their own solution.
+      const spec = customMissionFromHash(window.location.hash)
+      if (spec) {
+        store.setCustomMission(spec)
+        store.setNotice(`커스텀 미션 "${spec.title}"을(를) 불러왔습니다.`, 'info')
+        setSharedLoaded(true)
+        history.replaceState(null, '', window.location.pathname + window.location.search)
+        return
+      }
+
       const design = designFromHash(window.location.hash)
       if (!design) return
-      const store = useGraphStore.getState()
       const proceed =
         !hasExistingWork() ||
         window.confirm(
           '공유된 설계를 불러오면 현재 캔버스가 대체됩니다.\n(현재 작업이 필요하면 취소 후 JSON으로 내보내세요.)\n\n계속할까요?',
         )
       if (proceed) {
-        store.loadDesign(design.nodes, design.edges, design.missionId)
+        store.loadDesign(design.nodes, design.edges, design.missionId, design.securityGroups)
         store.setNotice(
           design.missionId ? '공유된 미션 제출물을 불러왔습니다.' : '공유된 설계를 불러왔습니다.',
           'info',

@@ -18,6 +18,7 @@ import {
   makeSecurityGroup,
   type SecurityGroupDef,
 } from '@/graph/securityGroups'
+import type { CustomMissionSpec } from '@/missions/custom'
 
 export type Mode = 'free' | 'challenge'
 
@@ -100,6 +101,10 @@ interface GraphState {
   showGallery: boolean
   /** Whether the achievements modal is open (ADR 0032). */
   showAchievements: boolean
+  /** Whether the "create custom mission" modal is open (ADR 0065). */
+  showCreateMission: boolean
+  /** Active instructor-authored custom mission spec, or null (ADR 0065). */
+  customMission: CustomMissionSpec | null
   /** Saved design slots — persisted (ADR 0033). */
   slots: GallerySlot[]
   /** Ids of badges already announced to the player — persisted (ADR 0032). */
@@ -186,6 +191,9 @@ interface GraphState {
   setShortcutHelp: (open: boolean) => void
   setShowGallery: (open: boolean) => void
   setShowAchievements: (open: boolean) => void
+  setShowCreateMission: (open: boolean) => void
+  /** Sets (or clears) the custom mission and activates it in challenge mode. */
+  setCustomMission: (spec: CustomMissionSpec | null) => void
   /** Saves the current design into a new gallery slot. */
   saveSlot: (name: string) => void
   /** Replaces the canvas with a slot's design (re-sanitized on the way in). */
@@ -352,6 +360,8 @@ export const useGraphStore = create<GraphState>()(
   showShortcutHelp: false,
   showGallery: false,
   showAchievements: false,
+  showCreateMission: false,
+  customMission: null,
   slots: [],
   earnedBadges: [],
   securityGroups: [],
@@ -699,6 +709,13 @@ export const useGraphStore = create<GraphState>()(
   setShortcutHelp: (showShortcutHelp) => set({ showShortcutHelp }),
   setShowGallery: (showGallery) => set({ showGallery }),
   setShowAchievements: (showAchievements) => set({ showAchievements }),
+  setShowCreateMission: (showCreateMission) => set({ showCreateMission }),
+  setCustomMission: (customMission) =>
+    set(
+      customMission
+        ? { customMission, activeMissionId: 'custom', mode: 'challenge' as const }
+        : { customMission: null },
+    ),
 
   saveSlot: (name) =>
     set((state) => {
@@ -796,6 +813,8 @@ export const useGraphStore = create<GraphState>()(
           slots: s.slots,
           earnedBadges: s.earnedBadges,
           soundOn: s.soundOn,
+          // Custom mission (ADR 0065) persists so a loaded #m= link survives refresh.
+          customMission: s.customMission,
           // Security groups (ADR 0059). Persisted alongside the graph; an older
           // payload without it (SGs as nodes+edges) is migrated by the sanitizer
           // in `merge` below, which folds legacy sg nodes into this collection.
