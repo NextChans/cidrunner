@@ -88,3 +88,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0061](0061-resilient-import.md) | 관대한 불러오기 — 모르는 리소스 타입은 건너뛰고 알림(전체 거부 → 부분 로드, extends 0020·0023) | Accepted | 2026-07-10 |
 | [0062](0062-ecr-cloudtrail-resources.md) | ECR·CloudTrail 정식 리소스 추가 (29→31, apply-ready TF·CloudTrail S3 버킷 정책 파생) | Accepted | 2026-07-10 |
 | [0063](0063-looping-playback-audio.md) | 재생 사운드 루프 — 파티클 CYCLE(1.4s)과 위상 고정해 계속 재생 (reverses 0058 one-pass) | Accepted | 2026-07-10 |
+| [0064](0064-drawio-export.md) | draw.io 내보내기 — 설계를 .drawio(AWS4 셰이프)로, 좌표·containment 무손실 (export 전용) | Accepted | 2026-07-10 |

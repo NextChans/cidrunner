@@ -16,9 +16,11 @@ import {
   Keyboard,
   Trophy,
   Images,
+  Workflow,
 } from 'lucide-react'
 import { redoDesign, undoDesign, useGraphStore, type Mode } from '@/store/useGraphStore'
 import { downloadTerraformZip } from '@/graph/terraform'
+import { downloadDrawio } from '@/graph/drawio'
 import { getGraphIssues } from '@/graph/checks'
 import { encodeShareUrl, sanitizeSnapshot, toSnapshot } from '@/graph/share'
 
@@ -228,6 +230,20 @@ export function Toolbar() {
       >
         <Download size={14} />
         Terraform 내보내기
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          const { nodes, edges, securityGroups } = useGraphStore.getState()
+          downloadDrawio(nodes, edges, securityGroups)
+          setNotice('설계를 cidrunner.drawio로 내보냈습니다. draw.io에서 열 수 있습니다.', 'info')
+        }}
+        className={iconBtn}
+        title="draw.io(.drawio)로 내보내기"
+        aria-label="draw.io로 내보내기"
+      >
+        <Workflow size={14} />
       </button>
 
       <button
