@@ -178,6 +178,12 @@ export interface TfContext {
     sgIngress?: { fromSg: string; port: number; desc: string }[]
     /** Destination S3 bucket for a CloudTrail (cloudtrail → s3 edge, ADR 0062). */
     logBucket?: string
+    /**
+     * Firehose delivery destination for a Kinesis stream (kinesis → s3 edge,
+     * ADR 0066). When present the stream emits a Firehose delivery stream to
+     * this bucket and needs no Lambda consumer.
+     */
+    deliveryBucket?: string
   }
 }
 

@@ -387,6 +387,10 @@ export function generateTerraform(
             node.data.type === 'cloudtrail'
               ? firstTargetOf(node.id, ['s3'])?.name
               : undefined,
+          deliveryBucket:
+            node.data.type === 'kinesis'
+              ? firstTargetOf(node.id, ['s3'])?.name
+              : undefined,
           certificate:
             node.data.type === 'alb' ? attachedSourceOf(node.id, 'acm') : undefined,
           authorizer:

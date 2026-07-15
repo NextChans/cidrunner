@@ -72,6 +72,8 @@ function secureAuthTopology() {
 describe('resource expansion batch 3 (ADR 0035)', () => {
   it('extends edge rules for the streaming + secrets blocks', () => {
     expect(canConnect('kinesis', 'lambda')).toBe(true)
+    // A kinesis → s3 edge is a Firehose delivery (ADR 0066).
+    expect(canConnect('kinesis', 's3')).toBe(true)
     expect(canConnect('secretsmanager', 'kms')).toBe(true)
     // Security-attachment edges: cert/firewall/authorizer front a target
     // without carrying traffic (ADR 0056, superseding ADR 0035's no-edges).
@@ -84,7 +86,6 @@ describe('resource expansion batch 3 (ADR 0035)', () => {
     expect(canConnect('cognito', 'alb')).toBe(false)
     expect(canBeSource('kms')).toBe(false)
     // Not allowed.
-    expect(canConnect('kinesis', 's3')).toBe(false)
     expect(canConnect('kms', 'secretsmanager')).toBe(false)
   })
 
@@ -187,8 +188,36 @@ describe('resource expansion batch 3 (ADR 0035)', () => {
 
   it('does not clear the pipeline mission without the Lambda hop', () => {
     const { nodes } = pipelineTopology()
-    // Kinesis straight to S3 is not a valid edge, so there is no processing hop.
+    // Kinesis straight to S3 is a valid Firehose delivery, but the data-pipeline
+    // mission requires the Lambda processing hop — so it still does not clear.
     const direct: Edge[] = [E('t', 'kinesis-1', 's3-3')]
     expect(getMission('data-pipeline')!.check!(ctxFor(nodes, direct))).toBe(0)
+  })
+
+  it('treats a kinesis → s3 edge as a Firehose delivery (no consumer needed)', () => {
+    const nodes = [
+      N('kinesis-1', 'kinesis', undefined, { mode: 'ON_DEMAND', shard_count: 1, retention_hours: 24 }, 'Ingest'),
+      N('s3-2', 's3', undefined, {}, 'Lake'),
+    ]
+    const edges = [E('t', 'kinesis-1', 's3-2')]
+
+    // No "no consumer" warning — the stream auto-delivers to S3.
+    const issues = graphIssues(nodes, edges)
+    expect(issues.warnings.get('kinesis-1')?.join() ?? '').not.toContain('Lambda')
+
+    // It traces as a complete pipeline: kinesis (entry) → s3 (sink).
+    const sim = simulate(nodes, edges)
+    expect(sim.ok).toBe(true)
+    expect(sim.flows[0]!.pathNodeIds).toEqual(['kinesis-1', 's3-2'])
+
+    // Terraform emits a Firehose delivery stream + a role, no event source mapping.
+    const main = generateTerraform(nodes, edges)['main.tf']!
+    expect(main).toContain('resource "aws_kinesis_firehose_delivery_stream" "kinesis_1_firehose"')
+    expect(main).toContain('kinesis_stream_arn = aws_kinesis_stream.kinesis_1.arn')
+    expect(main).toContain('bucket_arn = aws_s3_bucket.s3_2.arn')
+    expect(main).toContain('resource "aws_iam_role" "kinesis_1_firehose_role"')
+    expect(main).not.toContain('aws_lambda_event_source_mapping')
+    expect((main.match(/{/g) ?? []).length).toBe((main.match(/}/g) ?? []).length)
+    expect(main).not.toContain('REPLACE_ME')
   })
 })

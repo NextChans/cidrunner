@@ -190,7 +190,7 @@ function blockedMessage(type: ResourceType): string {
     case 'sns':
       return 'SNS 토픽을 구독하는 대상(SQS/Lambda)이 없습니다.'
     case 'kinesis':
-      return '스트림을 소비할 Lambda가 연결되어 있지 않습니다.'
+      return '스트림 데이터를 처리할 대상(Lambda 소비자 또는 S3 전송)이 없습니다.'
     default:
       return `${getResource(type).label}에서 경로가 끊겼습니다.`
   }
