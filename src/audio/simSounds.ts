@@ -1,16 +1,21 @@
 import { HOP_SECONDS, type SimResult } from '@/graph/simulate'
 
 /**
- * Playback audio (ADR 0058). The simulation's timing data (`arrivals`, hop
- * stagger) is turned into a one-pass sound schedule synchronized with the
+ * Playback audio (ADR 0058, looped per ADR 0063). The simulation's timing data
+ * (`arrivals`, hop stagger) becomes a sound schedule synchronized with the
  * particle animation: a short tick per hop (pitch rising along the chain), a
  * two-note "data saved" chime per successful flow, a low buzz per blocked one.
  *
- * Sounds play ONCE per Start (the particles loop; looping audio would be
- * torture). Everything is synthesized with the Web Audio API — zero audio
- * assets, static hosting untouched. The AudioContext is created lazily inside
- * the Start-click gesture, which is exactly what autoplay policies require.
+ * The schedule LOOPS every {@link CYCLE} seconds — matching the particle
+ * animation's cycle — so each event re-fires in lockstep with the node's own
+ * repeating arrival pulse, for continuous "the traffic is alive" feedback (차니
+ * 요청). Everything is synthesized with the Web Audio API — zero audio assets,
+ * static hosting untouched. The AudioContext is created lazily inside the
+ * Start-click gesture, which is exactly what autoplay policies require.
  */
+
+/** Loop period — MUST match the particle animation's CYCLE in TrafficEdge.tsx. */
+const CYCLE = 1.4
 
 export interface SoundEvent {
   /** Seconds from schedule start. */
@@ -50,6 +55,7 @@ export function soundPlan(sim: SimResult): SoundEvent[] {
 let audioCtx: AudioContext | null = null
 let master: GainNode | null = null
 let live: OscillatorNode[] = []
+let loopTimer: ReturnType<typeof setInterval> | null = null
 
 function ensureContext(): AudioContext | null {
   if (typeof window === 'undefined' || !('AudioContext' in window)) return null
@@ -84,34 +90,66 @@ function tone(
   osc.start(at)
   osc.stop(at + dur + 0.02)
   live.push(osc)
+  // Drop the reference once it finishes so `live` stays bounded over a long loop.
+  osc.onended = () => {
+    live = live.filter((o) => o !== osc)
+  }
 }
 
-/** Schedules one audio pass for a simulation run (cancels any previous pass). */
+/** Emits the tone(s) for one scheduled event at absolute audio time `at`. */
+function scheduleEvent(ctx: AudioContext, at: number, e: SoundEvent): void {
+  if (e.kind === 'tick') {
+    // Rising whole-tone steps as the request advances hop by hop.
+    tone(ctx, at, 440 * Math.pow(1.1225, e.step), 0.07, 'sine', 0.5)
+  } else if (e.kind === 'chime') {
+    // "Data saved" — a small major-third flourish.
+    tone(ctx, at, 880, 0.22, 'sine', 0.6)
+    tone(ctx, at + 0.09, 1108.7, 0.28, 'sine', 0.5)
+  } else {
+    // Blocked — a low, short growl.
+    tone(ctx, at, 98, 0.3, 'sawtooth', 0.55)
+  }
+}
+
+/**
+ * Starts looping the simulation's sound schedule (cancels any previous run).
+ * The plan repeats every {@link CYCLE}s so each event stays phase-locked to the
+ * node's repeating arrival pulse. We keep ~2 cycles scheduled ahead and top up
+ * on a timer — Web Audio plays from its own clock, so timer jitter never smears
+ * the sound.
+ */
 export function playSimSounds(sim: SimResult): void {
   const ctx = ensureContext()
   if (!ctx) return
   stopSimSounds()
-  const t0 = ctx.currentTime + 0.05
-  for (const e of soundPlan(sim)) {
-    const at = t0 + e.t
-    if (e.kind === 'tick') {
-      // Rising whole-tone steps as the request advances hop by hop.
-      tone(ctx, at, 440 * Math.pow(1.1225, e.step), 0.07, 'sine', 0.5)
-    } else if (e.kind === 'chime') {
-      // "Data saved" — a small major-third flourish.
-      tone(ctx, at, 880, 0.22, 'sine', 0.6)
-      tone(ctx, at + 0.09, 1108.7, 0.28, 'sine', 0.5)
-    } else {
-      // Blocked — a low, short growl.
-      tone(ctx, at, 98, 0.3, 'sawtooth', 0.55)
-    }
+  const plan = soundPlan(sim)
+  if (plan.length === 0) return
+
+  const cycleAt = (base: number) => {
+    for (const e of plan) scheduleEvent(ctx, base + e.t, e)
   }
+
+  let nextBase = ctx.currentTime + 0.08
+  cycleAt(nextBase)
+  cycleAt(nextBase + CYCLE)
+  nextBase += CYCLE * 2
+
+  loopTimer = setInterval(() => {
+    if (!audioCtx) return
+    cycleAt(nextBase)
+    nextBase += CYCLE
+  }, CYCLE * 1000)
 }
 
-/** Silences any pass still scheduled/playing. */
+/** Silences the loop and anything still scheduled/playing. */
 export function stopSimSounds(): void {
+  if (loopTimer !== null) {
+    clearInterval(loopTimer)
+    loopTimer = null
+  }
   for (const osc of live) {
     try {
+      osc.onended = null
       osc.stop()
     } catch {
       // already stopped — fine
