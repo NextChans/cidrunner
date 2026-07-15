@@ -16,6 +16,7 @@ const ShortcutHelp = lazy(() => import('./ShortcutHelp'))
 const NodeContextMenu = lazy(() => import('./NodeContextMenu'))
 const Gallery = lazy(() => import('./Gallery'))
 const Achievements = lazy(() => import('./Achievements'))
+const CreateMission = lazy(() => import('./CreateMission'))
 
 export function Layout() {
   const drawers = useGraphStore((s) => s.mobileDrawers)
@@ -23,6 +24,7 @@ export function Layout() {
   const showShortcutHelp = useGraphStore((s) => s.showShortcutHelp)
   const showGallery = useGraphStore((s) => s.showGallery)
   const showAchievements = useGraphStore((s) => s.showAchievements)
+  const showCreateMission = useGraphStore((s) => s.showCreateMission)
   const contextMenu = useGraphStore((s) => s.contextMenu)
 
   // Mounted here (inside ReactFlowProvider) so `R` can reach the flow instance.
@@ -90,6 +92,7 @@ export function Layout() {
         {showShortcutHelp && <ShortcutHelp />}
         {showGallery && <Gallery />}
         {showAchievements && <Achievements />}
+        {showCreateMission && <CreateMission />}
       </Suspense>
     </div>
   )

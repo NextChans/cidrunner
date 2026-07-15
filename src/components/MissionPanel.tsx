@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from 'react'
 import clsx from 'clsx'
-import { Target, Star, CheckCircle2, Circle, ArrowRightCircle } from 'lucide-react'
+import { Target, Star, CheckCircle2, Circle, ArrowRightCircle, Plus } from 'lucide-react'
 import { missions } from '@/missions'
+import { toMission, CUSTOM_MISSION_ID } from '@/missions/custom'
 import type { Mission, MissionCheckContext } from '@/missions/types'
 import { getResource } from '@/resources'
 import { simulate } from '@/graph/simulate'
@@ -76,8 +77,17 @@ export function MissionList() {
   const setMode = useGraphStore((s) => s.setMode)
   const bestStars = useGraphStore((s) => s.bestStars)
   const recordStars = useGraphStore((s) => s.recordStars)
+  const customMission = useGraphStore((s) => s.customMission)
+  const setShowCreateMission = useGraphStore((s) => s.setShowCreateMission)
 
   const disabled = mode !== 'challenge'
+
+  // The active custom mission (ADR 0065) is graded live alongside the built-ins,
+  // shown first so an opened `#m=` link is front and centre.
+  const allMissions = useMemo<Mission[]>(
+    () => (customMission ? [toMission(customMission), ...missions] : missions),
+    [customMission],
+  )
 
   // Live clear-check context: simulate the graph and sweep validation once
   // (per-node config checks plus graph-level errors and security warnings).
@@ -116,7 +126,15 @@ export function MissionList() {
 
   return (
     <div className="space-y-2 overflow-y-auto px-3 pb-3">
-      {missions.map((mission) => {
+      <button
+        type="button"
+        onClick={() => setShowCreateMission(true)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-surface-border px-3 py-2 text-xs text-slate-300 transition-colors hover:border-accent hover:text-slate-100"
+      >
+        <Plus size={13} />
+        나만의 미션 만들기
+      </button>
+      {allMissions.map((mission) => {
         const active = activeMissionId === mission.id
         const stars = mission.check?.(ctx) ?? 0
         const cleared = stars >= 1
@@ -143,6 +161,11 @@ export function MissionList() {
               <span className="flex items-center gap-2 text-sm font-medium text-slate-100">
                 <Target size={14} className="text-accent-soft" />
                 {mission.title}
+                {mission.id === CUSTOM_MISSION_ID && (
+                  <span className="rounded bg-violet-900/70 px-1.5 py-0.5 text-[9px] font-semibold text-violet-200">
+                    커스텀
+                  </span>
+                )}
               </span>
               {cleared ? (
                 <span className="flex items-center gap-1.5">
