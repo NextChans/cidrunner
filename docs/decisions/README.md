@@ -91,3 +91,4 @@ Each record's status is one of: `Proposed` · `Accepted` · `Superseded by NNNN`
 | [0064](0064-drawio-export.md) | draw.io 내보내기 — 설계를 .drawio(AWS4 셰이프)로, 좌표·containment 무손실 (export 전용) | Accepted | 2026-07-10 |
 | [0065](0065-custom-missions.md) | 강사용 커스텀 미션 — 데이터(CustomMissionSpec)로 저작, #m= URL 배포, 제네릭 별점 루브릭 (extends 0041·0047·0030) | Accepted | 2026-07-10 |
 | [0066](0066-kinesis-firehose-delivery.md) | Kinesis 다운스트림 케이스별 — kinesis→lambda 소비 vs kinesis→s3 Firehose 전송(소비자 불요), 경고·TF 분기 (extends 0035) | Accepted | 2026-07-15 |
+| [0067](0067-well-architected-capstone-mission.md) | Well-Architected 심사 캡스톤 미션 — 등급(0054)을 별점으로 소비(B→★1·A→★2·S→★3), 미션 14→15 (extends 0054·0057) | Accepted | 2026-07-16 |

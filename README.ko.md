@@ -47,7 +47,7 @@
 - **블록형 에디터** — 카테고리(네트워킹/컴퓨팅/데이터베이스/스토리지/앱 통합/관리·모니터링/보안·아이덴티티)로 정리된 팔레트와 실제 AWS 규칙을 따르는 중첩·연결. 상단 검색으로 실시간 필터(debounce), `/` 키로 포커스. [ADR 0037](docs/decisions/0037-palette-search.md) 참고.
 - **Security Group은 할당 방식** — Security Group은 캔버스가 아니라 라이브러리에 존재합니다: 하나 만들고 인바운드 규칙(HTTP / HTTPS / SSH)을 토글한 뒤, ENI를 갖는 리소스(ALB / EC2 / RDS / ECS / EKS / ElastiCache / EFS)에 칩 토글로 할당합니다. 할당된 SG는 노드 위 컬러 방패 칩으로 보이고, 내보내기 시 티어드 SG-to-SG 인그레스가 유도됩니다. [ADR 0059](docs/decisions/0059-security-groups-as-assignment.md) 참고.
 - **트래픽 재생** — Start를 누르면 모든 플로우(ALB → EC2 → RDS, Lambda → S3 …)가 파티클과 도착 펄스로 재생되고, 막힌 경로는 병목 노드가 하이라이트됩니다. 파티클과 위상을 맞춰 반복 재생되는 Web Audio 합성 사운드(홉 틱 / 도착 차임 / 차단 버즈)를 음소거 버튼으로 켜고 끕니다. [ADR 0058](docs/decisions/0058-playback-audio.md)과 루프 개선 [ADR 0063](docs/decisions/0063-looping-playback-audio.md) 참고.
-- **미션 & 자유 모드** — 베스트 프랙티스 챌린지 14종(튜토리얼 / 고가용성 3-tier / 서버리스 / 글로벌 정적 웹 / 비동기 파이프라인 / 컨테이너 워크로드 / 글로벌 동적 웹 / 이벤트 드리븐 팬아웃 / 시큐리티 하드닝 / 재난 복구 / 데이터 파이프라인 / 보안·인증 웹 / 무중단 운영 / 린 서버리스)과 별점(0–3), 또는 자유 샌드박스. 별점 채점은 데이터 주도(`liveChain` 구조적 체인 매칭).
+- **미션 & 자유 모드** — 베스트 프랙티스 챌린지 15종(튜토리얼 / 고가용성 3-tier / 서버리스 / 글로벌 정적 웹 / 비동기 파이프라인 / 컨테이너 워크로드 / 글로벌 동적 웹 / 이벤트 드리븐 팬아웃 / 시큐리티 하드닝 / 재난 복구 / 데이터 파이프라인 / 보안·인증 웹 / 무중단 운영 / 린 서버리스 / Well-Architected 심사)과 별점(0–3), 또는 자유 샌드박스. 별점 채점은 데이터 주도(`liveChain` 구조적 체인 매칭). Well-Architected 캡스톤은 실시간 A~S 등급 배지를 별점 게이트로 소비합니다(ADR 0067).
 - **강사용 커스텀 미션** — 코드 배포 없이 미션을 데이터로 저작(제목 / 목표 / 힌트 / 예산 + 필수 리소스 체인)하고, 로컬에서 바로 시작하거나 `#m=` 링크로 공유합니다. 학생이 링크를 열면 빌트인과 동일한 0–3★ 라이브 채점을 받습니다. [ADR 0065](docs/decisions/0065-custom-missions.md) 참고.
 - **저장 & 공유** — 설계가 브라우저에 자동 저장되어 새로고침에도 유지되고, URL 하나 또는 JSON 파일로 공유됩니다(미션 컨텍스트 포함, 불러오기 전 기존 작업 확인). 계정·백엔드 불필요. 불러오기는 관대해서, 모르는 리소스 타입은 전체 실패 대신 건너뛰고 알립니다. 공유 링크는 Open Graph·Twitter Card 미리보기 이미지를 함께 노출합니다. [ADR 0031](docs/decisions/0031-og-image-and-share-metadata.md) · [ADR 0061](docs/decisions/0061-resilient-import.md) 참고.
 - **갤러리** — 여러 설계를 이름 붙여 로컬 슬롯에 저장하고, 실시간 SVG 썸네일 카드 그리드에서 다시 엽니다. 이름 변경·삭제도 인라인으로. [ADR 0033](docs/decisions/0033-gallery-multi-slot.md) 참고.
@@ -150,7 +150,7 @@ src/
 │  └─ nodes/ResourceNode.tsx
 ├─ resources/              # 리소스 30종 meta + 레지스트리 (apply-ready terraform 생성기)
 ├─ graph/                  # simulate, checks, cost, chaos, grade, terraform, drawio, share, securityGroups
-└─ missions/               # 미션 14종 (+ 데이터 주도 커스텀 미션): 튜토리얼 / 3-tier / 서버리스 / 정적CDN / 비동기파이프라인 / 컨테이너 / 글로벌동적웹 / 이벤트드리븐 / 보안 / 재난복구 / 데이터파이프라인 / 보안인증웹 / 무중단운영 / 린서버리스
+└─ missions/               # 미션 15종 (+ 데이터 주도 커스텀 미션): 튜토리얼 / 3-tier / 서버리스 / 정적CDN / 비동기파이프라인 / 컨테이너 / 글로벌동적웹 / 이벤트드리븐 / 보안 / 재난복구 / 데이터파이프라인 / 보안인증웹 / 무중단운영 / 린서버리스 / Well-Architected심사
 ```
 
 ## 라이선스

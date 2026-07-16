@@ -235,8 +235,10 @@ computes the dead set, failovers, promotions, and rewired edges.
 a live A–S letter grade across four pillars: 🔒 security (validation warnings),
 🛡 reliability (multi-AZ + DB resilience + surviving every single-AZ chaos
 failure), 💰 cost (idle expensive resources), ⚡ performance (accelerator
-presence). Shown next to the cost meter; display-only, it does not affect the
-star gate.
+presence). Shown next to the cost meter. It no longer only decorates: the
+Well-Architected capstone mission gates its stars on this letter
+(B→★1 · A→★2 · S→★3, [ADR 0067](decisions/0067-well-architected-capstone-mission.md)),
+while all other missions' gates are unaffected.
 
 ## Graph rules
 
@@ -419,14 +421,16 @@ path; import stays deferred (low fidelity).
 
 ## Mission registry
 
-[`src/missions/`](../src/missions/) holds one module per mission (14 total:
+[`src/missions/`](../src/missions/) holds one module per mission (15 total:
 `tutorial`, `threeTier`, `serverless`, `staticCdn`, `asyncPipeline`,
 `containerWorkload`, `globalWeb`, `eventDriven`, `securityHardening`,
 `disasterRecovery`, `dataPipeline`, `secureAuthWeb` — see
 [ADR 0027](decisions/0027-mission-expansion-2.md) and
 [ADR 0036](decisions/0036-mission-expansion-3-pipelines-and-auth.md) — plus the
-ops tier `haSurvival` and `leanServerless`,
-[ADR 0057](decisions/0057-ops-challenge-star-gates.md)) plus an
+ops tier `haSurvival` and `leanServerless`
+([ADR 0057](decisions/0057-ops-challenge-star-gates.md)) and the
+`wellArchitectedReview` capstone, whose stars consume the Well-Architected
+grade ([ADR 0067](decisions/0067-well-architected-capstone-mission.md))) plus an
 `index.ts`. A `Mission` describes its `goal`, optional `hint`,
 `requiredResources`, and a `check(ctx)` that returns a 0–3 star rating
 (0 = not cleared) for the current graph. The MissionPanel builds the check

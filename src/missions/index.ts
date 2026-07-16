@@ -13,6 +13,7 @@ import { dataPipeline } from './dataPipeline'
 import { secureAuthWeb } from './secureAuthWeb'
 import { haSurvival } from './haSurvival'
 import { leanServerless } from './leanServerless'
+import { wellArchitectedReview } from './wellArchitectedReview'
 
 /** Ordered list of missions shown in the MissionPanel. */
 export const missions: Mission[] = [
@@ -31,6 +32,8 @@ export const missions: Mission[] = [
   // 운영 챌린지 티어 (ADR 0057) — 비용·카오스가 별점 게이트가 되는 미션들.
   haSurvival,
   leanServerless,
+  // 캡스톤 (ADR 0067) — Well-Architected 등급(ADR 0054)을 별점으로 소비.
+  wellArchitectedReview,
 ]
 
 export function getMission(id: string): Mission | undefined {
