@@ -30,7 +30,12 @@ function doneSteps(nodes: ResourceNodeType[]): number[] {
 describe('tutorial interactive steps (ADR 0030)', () => {
   it('steps ship only where intended (tutorial + ops tier); others stay step-less', () => {
     const withSteps = missions.filter((m) => m.steps)
-    expect(withSteps.map((m) => m.id)).toEqual(['tutorial', 'ha-survival', 'lean-serverless'])
+    expect(withSteps.map((m) => m.id)).toEqual([
+      'tutorial',
+      'ha-survival',
+      'lean-serverless',
+      'well-architected-review',
+    ])
     expect(getMission('tutorial')!.steps).toHaveLength(4)
   })
 
