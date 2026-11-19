@@ -4,8 +4,10 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // Deployed to GitHub Pages under /cidrunner/ (see ADR 0007); local dev stays at /.
-  base: process.env.NODE_ENV === 'production' ? '/cidrunner/' : '/',
+  // GitHub Pages serves under /cidrunner/ (ADR 0007); Vercel serves at the domain
+  // root (ADR 0068) and sets VERCEL=1 during its build. Local dev stays at /.
+  base:
+    process.env.NODE_ENV === 'production' && !process.env.VERCEL ? '/cidrunner/' : '/',
   plugins: [react()],
   resolve: {
     alias: {

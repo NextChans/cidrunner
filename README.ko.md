@@ -141,6 +141,12 @@ GitHub Actions 워크플로가 두 개로 나뉘어 있습니다
 > 있습니다 — 정상입니다. build job은 소스와 무관하게 프로덕션 번들을 계속
 > 검증합니다.
 
+**Vercel (선택, Pages와 병행).** [ADR 0068](docs/decisions/0068-vercel-deployment.md)
+참고. 빌드 설정은 [`vercel.json`](vercel.json)에 있고, Vercel 빌드에서는
+`VERCEL=1`이 설정되어 Vite `base`가 `/`로 바뀝니다. 최초 1회 설정: vercel.com →
+**Add New → Project** → `NextChans/cidrunner` import 후 감지된 설정 그대로 Deploy.
+이후 `main` push는 프로덕션, PR은 프리뷰 URL로 자동 배포되며 저장소 시크릿은 필요 없습니다.
+
 ## 프로젝트 구조
 
 ```

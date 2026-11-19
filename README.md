@@ -143,6 +143,14 @@ configured with `base: '/cidrunner/'` for production builds
 > fail on its first run — that is expected. The build job still validates the
 > production bundle regardless.
 
+**Vercel (optional, runs alongside Pages).** See
+[ADR 0068](docs/decisions/0068-vercel-deployment.md). Build settings live in
+[`vercel.json`](vercel.json); Vercel builds set `VERCEL=1`, which switches the
+Vite `base` to `/`. One-time setup: on vercel.com → **Add New → Project** →
+import `NextChans/cidrunner` and deploy with the detected settings. After that,
+pushes to `main` deploy to production and pull requests get preview URLs, with
+no repository secrets.
+
 ## Project structure
 
 ```
